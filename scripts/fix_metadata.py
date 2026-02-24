@@ -1,6 +1,10 @@
 import os
+import sys
+
 from safetensors import safe_open
 from safetensors.torch import save_file
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import MASTER_MODEL_DIR, CLEAN_MODEL_DIR
 
 model_path = MASTER_MODEL_DIR

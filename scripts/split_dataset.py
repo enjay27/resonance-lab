@@ -1,6 +1,9 @@
 import json
 import random
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import PROCESSED_LOGS, LORA_DATASET_DIR
 
 def prepare_lora_dataset(input_path, output_dir, val_split=0.05, seed=42):
     """
@@ -29,8 +32,8 @@ def prepare_lora_dataset(input_path, output_dir, val_split=0.05, seed=42):
         for line in f:
             try:
                 line_data = json.loads(line)
-                original = line_data.get("original", "").strip()
-                translated = line_data.get("translated", "").strip()
+                original = line_data.get("input", "").strip()
+                translated = line_data.get("output", "").strip()
 
                 # Basic Data Cleaning
                 if not original or not translated:
@@ -54,7 +57,7 @@ def prepare_lora_dataset(input_path, output_dir, val_split=0.05, seed=42):
     # Shuffle and Split
     random.shuffle(processed_data)
     total_count = len(processed_data)
-    val_count = int(total_count * val_split)
+    val_count = max(1, int(total_count * val_split)) if total_count > 1 else 0
 
     train_data = processed_data[val_count:]
     val_data = processed_data[:val_count]
@@ -81,8 +84,11 @@ def prepare_lora_dataset(input_path, output_dir, val_split=0.05, seed=42):
 
 # Run the script
 if __name__ == "__main__":
-    from config import PROCESSED_LOGS, LORA_DATASET_DIR
-
+    # CRITICAL: Check if input exists and exit with error if not
+    if not os.path.exists(PROCESSED_LOGS):
+        print(f"[ERROR] Input file not found: {PROCESSED_LOGS}")
+        print("Check if preprocess.py ran correctly and generated this file.")
+        sys.exit(1) # This tells run_pipeline.py to STOP
     prepare_lora_dataset(
         input_path=PROCESSED_LOGS,
         output_dir=LORA_DATASET_DIR

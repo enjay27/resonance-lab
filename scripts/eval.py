@@ -19,7 +19,10 @@ print("\n--- Translation Test ---")
 for jp_text in test_queries:
     inputs = tokenizer(
         [
-            f"<|im_start|>system\nTranslate the following Blue Protocol chat log from Japanese into neutral Korean.<|im_end|>\n<|im_start|>user\n{jp_text}<|im_end|>\n<|im_start|>assistant\n"
+            f"<|im_start|>system\n"
+            f"다음 Blue Protocol (스타레조) 채팅 로그를 일본어에서 중립적인 한국어로 번역하세요. "
+            f"명사를 임의로 추가하지 말고, 게임 용어(T, H, D, 狂, 響, NM, EH, M16)는 유지하십시오."
+            f"<|im_end|>\n<|im_start|>user\n{jp_text}<|im_end|>\n<|im_start|>assistant\n"
         ], return_tensors = "pt").to("cuda")
 
     outputs = model.generate(**inputs, max_new_tokens = 64)

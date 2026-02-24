@@ -1,8 +1,12 @@
+import os
+import sys
+
 from unsloth import FastLanguageModel
 import torch
 from datasets import load_dataset
 from trl import SFTTrainer
 from transformers import TrainingArguments
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import MODEL_NAME, LORA_DATASET_DIR, OUTPUT_DIR, MASTER_MODEL_DIR
 
 # 1. Configuration
