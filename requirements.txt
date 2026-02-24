@@ -1,38 +1,33 @@
-# --- Index for CUDA-accelerated Torch ---
---extra-index-url https://download.pytorch.org/whl/cu124
+# --- Index for CUDA-accelerated Torch (Python 3.13 / CUDA 12.6) ---
+--extra-index-url https://download.pytorch.org/whl/cu126
 
-# --- Training & Fine-Tuning (Unsloth Stack) ---
-# Unsloth handles the memory-efficient 4-bit loading and LoRA
-unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git
-torch==2.5.1
-torchvision
-torchaudio
-xformers
-trl
-peft
-accelerate
-bitsandbytes
+# --- Core ML Framework (CUDA Enabled) ---
+torch==2.10.0
+torchaudio==2.10.0+cu126
+torchvision==0.25.0+cu126
+xformers==0.0.35
+triton-windows==3.6.0.post25
+bitsandbytes==0.49.2
+
+# --- Unsloth & Training Stack ---
+# RUN git config --system core.longpaths true - if you encounter path length error
+unsloth @ git+https://github.com/unslothai/unsloth.git@852c817e65ccba4626bae01ce3f4c87a2cbde16b
+unsloth_zoo==2026.2.1
+transformers==4.57.6
+peft==0.18.1
+trl==0.24.0
+accelerate==1.12.0
+datasets==4.3.0
 
 # --- GGUF Conversion & Quantization ---
-# Required for llama.cpp's python scripts
-gguf>=0.10.0
-sentencepiece
-numpy<2.0.0
-safetensors
+# Note: sentencepiece is required by llama.cpp/convert_hf_to_gguf.py
+sentencepiece==0.2.1
+gguf==0.17.1
+numpy==1.26.4
+safetensors==0.7.0
 
-# --- Experiment Tracking ---
-mlflow
-
-# --- Core Logic & Dataset Handling ---
-ctranslate2==4.7.1
-pykakasi==2.3.0
-transformers==4.48.0
-huggingface_hub
-hanja==0.15.1
-kyujipy==0.6.8
-datasets
-jsonlines
-
-# --- General Utilities ---
-psutil
-tqdm
+# --- Experiment Tracking & Utils ---
+psutil==7.2.2
+tqdm==4.67.3
+# mlflow
+# jsonlines
