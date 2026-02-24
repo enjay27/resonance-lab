@@ -81,8 +81,9 @@ def prepare_lora_dataset(input_path, output_dir, val_split=0.05, seed=42):
 
 # Run the script
 if __name__ == "__main__":
-    # Update these paths to your actual filenames
+    from config import PROCESSED_LOGS, LORA_DATASET_DIR
+
     prepare_lora_dataset(
-        input_path='../raw_translated_logs.jsonl',
-        output_dir='../lora_dataset'
+        input_path=PROCESSED_LOGS,
+        output_dir=LORA_DATASET_DIR
     )

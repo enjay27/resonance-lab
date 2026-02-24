@@ -3,6 +3,7 @@ import torch
 from datasets import load_dataset
 from trl import SFTTrainer
 from transformers import TrainingArguments
+from config import MODEL_NAME, LORA_DATASET_DIR, OUTPUT_DIR, MASTER_MODEL_DIR
 
 # 1. Configuration
 max_seq_length = 512
@@ -36,7 +37,10 @@ def formatting_prompts_func(examples):
         texts.append(text)
     return { "text" : texts, }
 
-dataset = load_dataset("json", data_files={"train": "lora_dataset/train.jsonl", "test": "lora_dataset/val.jsonl"})
+dataset = load_dataset("json", data_files={
+    "train": os.path.join(LORA_DATASET_DIR, "train.jsonl"),
+    "test": os.path.join(LORA_DATASET_DIR, "val.jsonl")
+})
 dataset = dataset.map(formatting_prompts_func, batched = True,)
 
 # 4. Training Arguments
@@ -60,7 +64,7 @@ trainer = SFTTrainer(
         weight_decay = 0.01,
         lr_scheduler_type = "linear",
         seed = 3407,
-        output_dir ="../outputs",
+        output_dir = OUTPUT_DIR,
     ),
 )
 
@@ -69,9 +73,9 @@ trainer.train()
 
 # 6. Export to GGUF (Change your output name here)
 # This will save a file like: BlueProtocol_JP_KO_Translator.Q8_0.gguf
-output_model_name = "BlueProtocol_JP_KO_Translator-merged-16bit"
+model.save_pretrained_merged(MASTER_MODEL_DIR, tokenizer, save_method = "merged_16bit")
 
 model.save_pretrained_merged("model_f16", tokenizer, save_method = "merged_16bit")
 # model.save_pretrained_gguf(output_model_name, tokenizer, quantization_method = "q6_k")
 
-print(f"Training finished! Your 1.7B GGUF model is saved as: {output_model_name}")
+print(f"Training finished! Your 1.7B GGUF model is saved as: {MASTER_MODEL_DIR}")

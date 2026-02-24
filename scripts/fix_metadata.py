@@ -1,9 +1,10 @@
 import os
 from safetensors import safe_open
 from safetensors.torch import save_file
+from config import MASTER_MODEL_DIR, CLEAN_MODEL_DIR
 
-model_path = "../model_f16"  # The folder you are trying to convert
-output_path = "../model_f16_clean"
+model_path = MASTER_MODEL_DIR
+output_path = CLEAN_MODEL_DIR
 os.makedirs(output_path, exist_ok=True)
 
 # 1. Process the weights
