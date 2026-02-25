@@ -3,7 +3,7 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import RAW_LOGS, PROCESSED_LOGS
+from config import RAW_LOGS, PROCESSED_LOGS, INSTRUCTION
 
 
 def transform_for_lora(input_file, output_file):
@@ -19,13 +19,7 @@ def transform_for_lora(input_file, output_file):
         for line in f_in:
             data = json.loads(line)
             lora_data = {
-                "instruction": (
-                    "다음 Blue Protocol (스타레조) 채팅 로그를 일본어에서 중립적인 한국어로 번역하세요. "
-                    "원본에 명시되지 않은 주어나 목적어(명사)를 임의로 추가하지 마십시오. "
-                    "일본어와 마찬가지로 한국어에서도 문맥상 추측 가능한 명사는 생략하여 자연스러운 구어체로 번역하십시오. "
-                    "게임 용어, 클래스 약어(T, H, D, 狂, 響) 및 던전/레이드 약어(NM, EH, M16)는 "
-                    "일본 서버 컨텍스트에 맞게 적절히 유지하십시오."
-                ),
+                "instruction": INSTRUCTION,
                 "input": data["original"],
                 "output": data["translated"]
             }

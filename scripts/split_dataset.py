@@ -1,9 +1,11 @@
 import json
-import random
 import os
+import random
 import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import PROCESSED_LOGS, LORA_DATASET_DIR
+
 
 def prepare_lora_dataset(input_path, output_dir, val_split=0.05, seed=42):
     """
@@ -11,13 +13,6 @@ def prepare_lora_dataset(input_path, output_dir, val_split=0.05, seed=42):
     Includes data deduplication and a train/val split.
     """
     random.seed(seed)
-
-    # The consistent instruction for the model
-    INSTRUCTION = (
-        "Translate the following Blue Protocol (Star Resonance) chat log from Japanese into neutral Korean. "
-        "Preserve all game-specific terminology, class abbreviations (e.g., T, H, D, 狂, 響), "
-        "and dungeon/raid shorthand (e.g., NM, EH, M16) as they are used in the Japanese server context."
-    )
 
     processed_data = []
     seen_inputs = set()
@@ -32,6 +27,7 @@ def prepare_lora_dataset(input_path, output_dir, val_split=0.05, seed=42):
         for line in f:
             try:
                 line_data = json.loads(line)
+                instruction = line_data.get("instruction", "").strip()
                 original = line_data.get("input", "").strip()
                 translated = line_data.get("output", "").strip()
 
@@ -47,7 +43,7 @@ def prepare_lora_dataset(input_path, output_dir, val_split=0.05, seed=42):
 
                 # Construct the LoRA object
                 processed_data.append({
-                    "instruction": INSTRUCTION,
+                    "instruction": instruction,
                     "input": original,
                     "output": translated
                 })

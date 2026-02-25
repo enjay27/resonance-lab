@@ -11,6 +11,10 @@ model_path = MASTER_MODEL_DIR
 output_path = CLEAN_MODEL_DIR
 os.makedirs(output_path, exist_ok=True)
 
+if not os.path.exists(model_path):
+    print(f"[ERROR] Source model directory not found: {model_path}")
+    sys.exit(1)
+
 # 1. Process the weights
 for filename in os.listdir(model_path):
     if filename.endswith(".safetensors"):

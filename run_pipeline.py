@@ -6,6 +6,9 @@ import shutil
 import platform
 import torch
 
+from config import BASE_DIR
+
+
 def log_diagnostic(stage, status, elapsed=None):
     """Prints a structured diagnostic message for each pipeline stage."""
     timestamp = time.strftime("%H:%M:%S")
@@ -50,11 +53,12 @@ def main():
 
     # Define the pipeline stages based on your scripts folder
     pipeline = [
-        ("Preprocessing", "scripts/preprocess.py"),
-        ("Dataset Split", "scripts/split_dataset.py"),
-        ("Fine-Tuning",   "scripts/train.py"),
-        ("Metadata Fix",  "scripts/fix_metadata.py"),
-        ("Evaluation",    "scripts/eval.py")
+        ("Validate", os.path.join(BASE_DIR, "scripts", "validate.py")),
+        ("Preprocessing", os.path.join(BASE_DIR, "scripts", "preprocess.py")),
+        ("Dataset Split", os.path.join(BASE_DIR, "scripts", "split_dataset.py")),
+        ("Fine-Tuning", os.path.join(BASE_DIR, "scripts", "train.py")),
+        ("Metadata Fix", os.path.join(BASE_DIR, "scripts", "fix_metadata.py")),
+        ("Evaluation", os.path.join(BASE_DIR, "scripts", "eval.py")),
     ]
 
     for name, path in pipeline:

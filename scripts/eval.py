@@ -1,34 +1,49 @@
+import os
+import sys
 from unsloth import FastLanguageModel
-import torch
 
-# 1. Load the model you just trained
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import CLEAN_MODEL_DIR, INSTRUCTION
+
+# 1. Load the model
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "BlueProtocol_JP_KO_Translator", # Or your output name
-    load_in_4bit = True,
+    model_name=CLEAN_MODEL_DIR,
+    load_in_4bit=True,
 )
-FastLanguageModel.for_inference(model) # Enable 2x faster inference
+FastLanguageModel.for_inference(model)
 
-# 2. Test Cases (Try some tricky Star Resonance slang)
+# 2. Test Cases
 test_queries = [
     "遺跡 １F～ T1 D2 28000↑募集中～",
     "スタレゾはよS2ならんか？服欲しい",
-    "3竜EHN＠DたくさんH3T2 27k↑ギミック理解者のみ"
+    "3竜EHN＠DたくさんH3T2 27k↑ギミック理解者のみ",
+    "スカイ全然でる気配ないや",
+    "ムクボ3돌 완료! 이제 90무기 제작하러 갑니다",
+    "遺跡1Fから　29k↑　＠T1",
+    "おやすみ！",
+    "ムクボ3凸完了"
 ]
 
 print("\n--- Translation Test ---")
 for jp_text in test_queries:
-    inputs = tokenizer(
-        [
-            f"<|im_start|>system\n"
-            f"다음 Blue Protocol (스타레조) 채팅 로그를 일본어에서 중립적인 한국어로 번역하세요. "
-            f"명사를 임의로 추가하지 말고, 게임 용어(T, H, D, 狂, 響, NM, EH, M16)는 유지하십시오."
-            f"<|im_end|>\n<|im_start|>user\n{jp_text}<|im_end|>\n<|im_start|>assistant\n"
-        ], return_tensors = "pt").to("cuda")
+    # Use the exact same format as your training script!
+    messages = [
+        {"role": "system", "content": INSTRUCTION},
+        {"role": "user", "content": jp_text}
+    ]
 
-    outputs = model.generate(**inputs, max_new_tokens = 64)
-    result = tokenizer.batch_decode(outputs)[0]
+    # Let the tokenizer handle the <|im_start|> tags automatically
+    inputs = tokenizer.apply_chat_template(
+        messages,
+        tokenize=True,
+        add_generation_prompt=True,
+        return_tensors="pt"
+    ).to("cuda")
 
-    # Extract only the assistant's response
-    ko_translation = result.split("<|im_start|>assistant\n")[-1].replace("<|im_end|>", "").strip()
+    outputs = model.generate(inputs, max_new_tokens=64)
+    result = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+
+    # Extracting the final answer cleanly
+    ko_translation = result.split("assistant\n")[-1].strip()
     print(f"JP: {jp_text}")
     print(f"KO: {ko_translation}\n")
