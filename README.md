@@ -1,5 +1,7 @@
-# resonance-lab
+# Resonance Lab
 Python project for Resonance Stream, which generate output for translator model, based from Qwen 3 1.7B
+
+hugging-face: https://huggingface.co/enjay27/Qwen3-Blue-Protocol-Translator-JA-KO
 
 ## Prerequisites
 - Python 3.13
