@@ -61,6 +61,7 @@ trainer = SFTTrainer(
     eval_dataset = dataset["test"],
     dataset_text_field = "text",
     max_seq_length = MAX_SEQ_LENGTH,
+    packing= False,
     args=TrainingArguments(
         per_device_train_batch_size=2,
         gradient_accumulation_steps=8,
@@ -76,7 +77,7 @@ trainer = SFTTrainer(
         weight_decay=0.01,
         # 2. Scheduler 변경
         lr_scheduler_type="cosine",
-        seed=3407,
+        seed=1557,
         output_dir=OUTPUT_DIR,
 
         # --- 3 & 4. 검증 및 저장(Checkpoint) 설정 추가 ---

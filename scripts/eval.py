@@ -1,40 +1,51 @@
 import os
 import sys
+import json
+import random
+import torch
+import sacrebleu
 from unsloth import FastLanguageModel
+from tqdm import tqdm
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import CLEAN_MODEL_DIR, INSTRUCTION
+from config import MASTER_MODEL_DIR, INSTRUCTION, LORA_DATASET_DIR
 
 # 1. Load the model
+print("Loading model for evaluation...")
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name=CLEAN_MODEL_DIR,
-    load_in_4bit=True,
+    model_name=MASTER_MODEL_DIR,
+    dtype=torch.bfloat16,
+    load_in_4bit=False,
 )
 FastLanguageModel.for_inference(model)
 
-# 2. Test Cases
-test_queries = [
-    "遺跡 １F～ T1 D2 28000↑募集中～",
-    "スタレゾはよS2ならんか？服欲しい",
-    "3竜EHN＠DたくさんH3T2 27k↑ギミック理解者のみ",
-    "スカイ全然でる気配ないや",
-    "ムクボ3돌 완료! 이제 90무기 제작하러 갑니다",
-    "遺跡1Fから　29k↑　＠T1",
-    "おやすみ！",
-    "ムクボ3凸完了",
-    "15ch 銀ナッポ 転送・カナミヤ族集落の郊外の崖下あたり",
-    "バグったので再起しましたー"
-]
+# 2. Load Validation Data
+val_file = os.path.join(LORA_DATASET_DIR, "val.jsonl")
+val_data = []
+with open(val_file, 'r', encoding='utf-8') as f:
+    for line in f:
+        val_data.append(json.loads(line))
 
-print("\n--- Translation Test ---")
-for jp_text in test_queries:
-    # Use the exact same format as your training script!
+# Pick a random sample to evaluate (e.g., 50 lines).
+# Evaluating the entire val set auto-regressively can take a long time.
+EVAL_SAMPLE_SIZE = 50
+if len(val_data) > EVAL_SAMPLE_SIZE:
+    random.seed(42)
+    val_data = random.sample(val_data, EVAL_SAMPLE_SIZE)
+
+predictions = []
+references = []
+
+print(f"\n--- Running Translation on {len(val_data)} Validation Samples ---")
+for data in tqdm(val_data, desc="Translating"):
+    jp_text = data["input"]
+    true_ko = data["output"]
+
     messages = [
         {"role": "system", "content": INSTRUCTION},
         {"role": "user", "content": jp_text}
     ]
 
-    # Let the tokenizer handle the <|im_start|> tags automatically
     inputs = tokenizer.apply_chat_template(
         messages,
         tokenize=True,
@@ -42,10 +53,29 @@ for jp_text in test_queries:
         return_tensors="pt"
     ).to("cuda")
 
-    outputs = model.generate(inputs, max_new_tokens=64)
+    outputs = model.generate(inputs, max_new_tokens=128, pad_token_id=tokenizer.eos_token_id)
     result = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
-
-    # Extracting the final answer cleanly
     ko_translation = result.split("assistant\n")[-1].strip()
-    print(f"JP: {jp_text}")
-    print(f"KO: {ko_translation}\n")
+
+    predictions.append(ko_translation)
+    # sacrebleu expects a list of references for each prediction (in case there are multiple valid translations)
+    references.append([true_ko])
+
+# 3. Calculate Metrics
+print("\n--- Translation Metrics ---")
+
+# Calculate BLEU (using tokenize='ko-mecab' if installed, otherwise default)
+bleu = sacrebleu.corpus_bleu(predictions, references)
+print(f"BLEU Score: {bleu.score:.2f} (Scale: 0-100, Higher is better)")
+
+# Calculate chrF (Better for Korean due to agglutinative grammar)
+chrf = sacrebleu.corpus_chrf(predictions, references)
+print(f"chrF Score: {chrf.score:.2f} (Scale: 0-100, Higher is better)")
+
+# Print a few examples to manually verify
+print("\n--- Sample Outputs ---")
+for i in range(min(3, len(predictions))):
+    print(f"JP (Input) : {val_data[i]['input']}")
+    print(f"KO (Actual): {val_data[i]['output']}")
+    print(f"KO (Model) : {predictions[i]}")
+    print("-" * 30)

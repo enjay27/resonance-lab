@@ -17,4 +17,11 @@ hugging-face: https://huggingface.co/enjay27/Qwen3-Blue-Protocol-Translator-JA-K
 - llama.cpp/build/bin/Release/llama-quantize.exe .\model.f16.gguf model_q4_k_m.gguf q4_k_m
 
 ## Install
-pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https://download.pytorch.org/whl/cu126
+- pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https://download.pytorch.org/whl/cu126
+- pip uninstall xformers -y
+- pip install --no-deps xformers==0.0.33.post2
+- pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https://download.pytorch.org/whl/cu126
+- pip install unsloth unsloth_zoo
+
+## upload to HF
+- pip install sacrebleu

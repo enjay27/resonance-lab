@@ -35,8 +35,14 @@ for filename in os.listdir(model_path):
 
 # 2. Copy the config files (including your hacked config.json)
 import shutil
+
 for filename in os.listdir(model_path):
-    if not filename.endswith(".safetensors"):
-        shutil.copy(os.path.join(model_path, filename), os.path.join(output_path, filename))
+    src_path = os.path.join(model_path, filename)
+
+    # 1. 파일인지 확인 (폴더는 건너뜀)
+    # 2. .safetensors가 아닌 설정 파일들만 복사
+    if os.path.isfile(src_path) and not filename.endswith(".safetensors"):
+        shutil.copy(src_path, os.path.join(output_path, filename))
+        print(f"Copied config: {filename}")
 
 print("\nDone! Now run the GGUF conversion on 'model_f16_clean'.")
