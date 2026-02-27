@@ -15,3 +15,6 @@ hugging-face: https://huggingface.co/enjay27/Qwen3-Blue-Protocol-Translator-JA-K
 - cmake --build build --config Release -j
 - python llama.cpp/convert_hf_to_gguf.py model_f16_clean --outfile model.f16.gguf
 - llama.cpp/build/bin/Release/llama-quantize.exe .\model.f16.gguf model_q4_k_m.gguf q4_k_m
+
+## Install
+pip install torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1 --index-url https://download.pytorch.org/whl/cu126

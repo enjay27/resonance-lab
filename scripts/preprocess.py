@@ -17,14 +17,17 @@ def transform_for_lora(input_file, output_file):
     with open(input_file, 'r', encoding='utf-8') as f_in, \
             open(output_file, 'w', encoding='utf-8') as f_out:
         for line in f_in:
-            data = json.loads(line)
-            lora_data = {
-                "instruction": INSTRUCTION,
-                "input": data["original"],
-                "output": data["translated"]
-            }
-            f_out.write(json.dumps(lora_data, ensure_ascii=False) + '\n')
-            count += 1
+            try:
+                data = json.loads(line)
+                lora_data = {
+                    "instruction": INSTRUCTION,
+                    "input": data["original"],
+                    "output": data["translated"]
+                }
+                f_out.write(json.dumps(lora_data, ensure_ascii=False) + '\n')
+                count += 1
+            except Exception as e:
+                print(e)
 
     if count == 0:
         print("[ERROR] Preprocessing produced 0 lines. Check your raw input file.")
