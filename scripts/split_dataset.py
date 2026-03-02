@@ -39,6 +39,8 @@ def prepare_lora_dataset(input_path, output_dir, val_split=0.05, seed=42):
                 # Keeping some is fine for style, but 17k of the exact same line can hurt.
                 if original in seen_inputs:
                     continue
+                if len(original) > 150 or original.count('ID:') > 1:
+                    continue
                 seen_inputs.add(original)
 
                 # Construct the LoRA object

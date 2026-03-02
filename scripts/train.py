@@ -8,14 +8,17 @@ from datasets import load_dataset
 from trl import SFTTrainer
 from transformers import TrainingArguments
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import MODEL_NAME, LORA_DATASET_DIR, OUTPUT_DIR, MASTER_MODEL_DIR, MAX_STEPS, MAX_SEQ_LENGTH
+from config import (
+    MODEL_NAME, LORA_DATASET_DIR, OUTPUT_DIR, MASTER_MODEL_DIR,
+    MAX_STEPS, MAX_SEQ_LENGTH, LEARNING_RATE  # Added LEARNING_RATE
+)
 
 # 1. Configuration
 
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = MODEL_NAME,
     max_seq_length = MAX_SEQ_LENGTH,
-    load_in_4bit = True,
+    load_in_4bit = False,
 )
 
 # 2. Add LoRA Adapters (Optimized for Qwen)
@@ -65,19 +68,17 @@ trainer = SFTTrainer(
     args=TrainingArguments(
         per_device_train_batch_size=2,
         gradient_accumulation_steps=8,
-        # 1. Warmup 변경
         warmup_ratio=0.1,
         max_steps=MAX_STEPS,
-        learning_rate=5e-5,
+        learning_rate=LEARNING_RATE,
         fp16=False,
         bf16=True,
         bf16_full_eval=True,
         logging_steps=1,
         optim="adamw_8bit",
         weight_decay=0.01,
-        # 2. Scheduler 변경
         lr_scheduler_type="cosine",
-        seed=1557,
+        seed=2404,
         output_dir=OUTPUT_DIR,
 
         # --- 3 & 4. 검증 및 저장(Checkpoint) 설정 추가 ---
@@ -85,6 +86,8 @@ trainer = SFTTrainer(
         eval_steps=100,
         save_strategy="steps",
         save_steps=100,
+        save_total_limit=3,
+        load_best_model_at_end=True,
     ),
 )
 

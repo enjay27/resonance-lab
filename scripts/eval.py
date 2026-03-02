@@ -61,6 +61,10 @@ for data in tqdm(val_data, desc="Translating"):
     # sacrebleu expects a list of references for each prediction (in case there are multiple valid translations)
     references.append([true_ko])
 
+    prompt = tokenizer.apply_chat_template([
+        {"role": "user", "content": f"{INSTRUCTION}\n\n{jp_text}"},
+    ], tokenize=False, add_generation_prompt=True)  # Ensure add_generation_prompt=True for inference
+
 # 3. Calculate Metrics
 print("\n--- Translation Metrics ---")
 
