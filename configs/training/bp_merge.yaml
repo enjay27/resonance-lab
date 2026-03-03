@@ -1,0 +1,11 @@
+### Model
+model_name_or_path: dnotitia/Qwen3-4B-Instruct-2507
+adapter_name_or_path: outputs/bp_qwen3_lora
+template: qwen3
+finetuning_type: lora
+
+### Export
+export_dir: model_merged
+export_size: 2
+export_device: cpu
+export_legacy_format: false

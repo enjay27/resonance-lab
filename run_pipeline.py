@@ -54,10 +54,9 @@ def main():
     # Define the pipeline stages based on your scripts folder
     pipeline = [
         ("Validate", os.path.join(BASE_DIR, "scripts", "validate.py")),
+        ("Update Dataset", os.path.join(BASE_DIR, "scripts", "update_dataset_info.py")),
         ("Preprocessing", os.path.join(BASE_DIR, "scripts", "preprocess.py")),
-        ("Dataset Split", os.path.join(BASE_DIR, "scripts", "split_dataset.py")),
         ("Fine-Tuning", os.path.join(BASE_DIR, "scripts", "train.py")),
-        ("Metadata Fix", os.path.join(BASE_DIR, "scripts", "fix_metadata.py")),
         ("Evaluation", os.path.join(BASE_DIR, "scripts", "eval.py")),
     ]
 
