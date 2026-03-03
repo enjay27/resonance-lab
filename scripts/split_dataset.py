@@ -31,8 +31,14 @@ def prepare_lora_dataset(input_path, output_dir, val_split=0.05, seed=42):
                 original = line_data.get("input", "").strip()
                 translated = line_data.get("output", "").strip()
 
-                # Basic Data Cleaning
                 if not original or not translated:
+                    continue
+                # Skip hallucinated/looping outputs
+                if len(translated) > len(original) * 10:
+                    continue
+                # Skip outputs with Japanese characters remaining
+                import re
+                if re.search(r'[\u3040-\u30ff\u4e00-\u9fff]', translated):
                     continue
 
                 # Deduplication: Chat logs often have repetitive recruitment spam.
