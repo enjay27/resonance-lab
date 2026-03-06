@@ -58,6 +58,7 @@ def main():
         ("Preprocessing", os.path.join(BASE_DIR, "scripts", "preprocess.py")),
         ("Fine-Tuning", os.path.join(BASE_DIR, "scripts", "train.py")),
         ("Evaluation", os.path.join(BASE_DIR, "scripts", "eval.py")),
+        ("Export GGUF",    os.path.join(BASE_DIR, "scripts", "export.py")),
     ]
 
     for name, path in pipeline:
