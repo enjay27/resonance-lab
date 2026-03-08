@@ -17,7 +17,7 @@ def update_dataset_info():
     # 2. Build dataset_info
     dataset_info = {
         "bp_translation": {
-            "file_name": "raw/bp-training-dataset-final.jsonl",
+            "file_name": "processed/bp-training-dataset-processed.jsonl",
             "columns": {
                 "prompt": "original",
                 "response": "translated"
@@ -25,7 +25,7 @@ def update_dataset_info():
             "system": system_prompt
         },
         "bp_translation_nosystem": {
-            "file_name": "raw/bp-training-dataset-final.jsonl",
+            "file_name": "processed/bp-training-dataset-processed.jsonl",
             "columns": {
                 "prompt": "original",
                 "response": "translated"

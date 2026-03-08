@@ -16,7 +16,7 @@ lora_target: q_proj,v_proj,gate_proj,down_proj
 ### Dataset
 dataset: bp_translation_nosystem
 template: gemma3
-cutoff_len: 128
+cutoff_len: 256
 val_size: 0.05
 
 ### Training
