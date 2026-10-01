@@ -10,14 +10,16 @@ the TranslateGemma instruction + line, both directions; `preprocess.py --prompt 
 ([`shortlist`](.memory/roadmap/translator-shortlist-2026-10-01.md)).
 
 **State (2026-10-01).** Pipelines switchable (`--model <profile>`; parameter > `RESONANCE_LF_PROFILE` > default); Hy-MT2 profiles + `<model>-fast`
-profiles exist. Eval: zero-shot Hy-1.8B chrF 39.3, fine-tuned base 66.7 (25 min), `-fast` 59.3 (4.6 min), shipped TG-4B 41.7 — **likely inflated:
-eval lines may be in the training data, unchecked** ([`first-training-run`](.memory/roadmap/first-training-run-2026-10-01.md)). Training examples:
-[`reference/training-examples.md`](.memory/reference/training-examples.md). Old BLEU/chrF numbers invalid ([`old-eval-numbers`](.memory/active-issues/old-eval-numbers.md)).
+profiles exist. Eval: zero-shot Hy-1.8B chrF 39.3, fine-tuned base 66.7 (25 min), `-fast` 59.3 (4.6 min), shipped TG-4B 41.7 — **likely inflated by eval lines in the training data (now excluded)** ([`first-training-run`](.memory/roadmap/first-training-run-2026-10-01.md)). Old BLEU/chrF numbers invalid ([`old-eval-numbers`](.memory/active-issues/old-eval-numbers.md)).
 
-**Worked in this order** ([`pipeline-review-2026-10-01.md`](.memory/roadmap/pipeline-review-2026-10-01.md), one PR at a time): data safety
-(eval-overlap exclusion **done** — every score above must be re-measured after a retrain; sidecar manifest **done** and validation split **done** — re-run Preprocessing before
-training, old data has neither, eval-loss is not comparable with old runs; validate/drop-rate guards **done** (limits are guesses: calibrate on the real log); Fetch Data stage **done** — maintainer: set `repo:` in `configs/hf_dataset.yaml`, then `fetch_data.py --pin`; run identity **done** (each training = its own run dir; `run_pipeline.py --from/--only`); MLflow PR 1 (NAS server files `deploy/mlflow/`) in review — on the NAS: copy, fill `.env`, start, firewall; `tracking.py` helpers, `mlflow-skinny` pin and the offline queue (`run_queue.py`/`tracker.py`) written and run against a real server, in review; next: wire the stages (train/eval/merge/gguf + `run_pipeline.py`; model part, NOT VERIFIED without the GPU)) -> run identity -> MLflow on the NAS ([`mlflow-plan.md`](.memory/roadmap/mlflow-plan.md), revised
-with the maintainer's decisions) -> eval upgrades -> model changes. Index of what comes next: [`roadmap/next.md`](.memory/roadmap/next.md).
+**Worked in this order** ([`pipeline-review-2026-10-01.md`](.memory/roadmap/pipeline-review-2026-10-01.md), one PR at a time; PRs #25-#33 merged):
+**done** = eval-overlap exclusion (re-measure every score above after a retrain), manifest + validation split (re-run Preprocessing; eval loss is not comparable with
+old runs), validate/drop-rate guards (limits are guesses: calibrate on the real log), Fetch Data stage, run identity (each training = its own run dir; `run_pipeline.py --from/--only`),
+MLflow server files `deploy/mlflow/`, `tracking.py`, offline queue (`run_queue.py`/`tracker.py`, run against a real server).
+**Maintainer to do:** set `repo:` in `configs/hf_dataset.yaml` + `fetch_data.py --pin`; start the NAS server (`deploy/mlflow/README.md`); fill `.env.mlflow`; check `pip`
+resolves `mlflow-skinny`/`tinydb` on Python 3.13 / Windows.
+**Next session continues here: MLflow PR 4 — wire the stages to the tracker** (design notes in [`mlflow-plan.md`](.memory/roadmap/mlflow-plan.md) "PR 4"; model part, NOT VERIFIED
+without the GPU). Then eval upgrades -> model changes. Rule: **graft first** (`graft skeleton <file>` before reading a file, see CLAUDE.md). Index of what comes next: [`roadmap/next.md`](.memory/roadmap/next.md).
 
 **Model part never runs in a cloud session** (no GPU): every model stage is NOT VERIFIED —
 [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md). Auto-merge of `claude/*` PRs works.

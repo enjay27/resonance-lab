@@ -41,6 +41,15 @@
   Metric points everywhere are `(name, value, timestamp_ms, step)` = MLflow's `Metric` order. **Run against a real 3.16.1 server (skinny client) the first time exposed a swapped
   timestamp/step that the unit tests had pinned on both sides; a cross-module test now covers it.** Checked end to end: a run recorded with the server off (log line, files copied into
   the queue) arrived complete (params, tags, 300 loss points at the right times, artifact, FINISHED) when the next run started; nothing was sent twice.
+- **PR 4 (next) — design notes for the session that continues.** Callers to check first with graft: `lf_tools.train_command`/`merge_command`, `run_pipeline.stage_env`/`main`,
+  `runs.start_run`/`finish_run`/`resolve_adapter`. Plan: (a) a tested data-part module (e.g. `track_records.py`) assembles each stage's records from the pure helpers
+  (`tracking.train_params`, `dataset_tags` from `data/hf/fetch_state.json` + the manifest, `prompt_fingerprint`, `git_info`, `package_versions`, `train_result_metrics`,
+  `trainer_tags`, `eval_metrics`, `gguf_info`) so the model-part scripts stay thin; (b) `train.py`: `tracker.from_environment()`, `begin` (or `resume`), params + tags, after training
+  `step_log(trainer_log.jsonl)` + result metrics + `finish`, `flush`; (c) stages run by hand must land in the SAME run: put the tracker's local id in the run's `run.json`
+  (`runs.py`) and let merge/gguf/eval `resume` it (the merged dir's `resonance_run.json` already names the run); under `run_pipeline.py` pass it via `stage_env` and mark the run
+  FAILED when a stage fails; (d) `eval.py`: `eval_metrics` + the report and predictions as artifacts, tag `eval_prompt`; `merge.py`/`gguf.py`: stage tags, GGUF size/sha;
+  (e) every call goes through `Tracker` (never raises), tracking off = `NullTracker`; (f) record the eval decoding settings (`max_new_tokens=256`, greedy, batch 1). Then PR 5:
+  `scripts/mlflow_compare.py`. Pipeline-review items #4, #6-#8 (GGUF eval, term metric, bigger eval set, COMET/pins) follow.
 - PR order: 1 server (`deploy/mlflow/` + guard tests), 2 `tracking.py` pure helpers, 3 the queue (TinyDB + sync, fake client in tests), 4 stage
   wiring (model part, NOT VERIFIED), 5 `mlflow_compare.py` + docs.
 
