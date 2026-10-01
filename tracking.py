@@ -262,7 +262,8 @@ def _seconds(text):
 
 
 def step_metrics(lines, start_ms):
-    """The points of a `trainer_log.jsonl` as (name, value, step, timestamp_ms), time = the run's start + elapsed_time.
+    """The points of a `trainer_log.jsonl` as (name, value, timestamp_ms, step) -- MLflow's `Metric(key, value, timestamp,
+    step)` order, which the sender passes on as it is -- with time = the run's start + elapsed_time.
 
     Sent after training instead of live (HF's MLflow callback), so a run made while the NAS was off has its curves too.
     """
@@ -277,7 +278,7 @@ def step_metrics(lines, start_ms):
         timestamp = start_ms + _seconds(row.get("elapsed_time")) * 1000
         for key, name in _STEP_KEYS:
             if _number(row.get(key)):
-                points.append((name, float(row[key]), row["current_steps"], timestamp))
+                points.append((name, float(row[key]), timestamp, row["current_steps"]))
     return points
 
 

@@ -2,6 +2,10 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **Offline queue (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `run_queue.py` / `tracker.py` are unit-tested with a fake client and were run end to end against a real MLflow 3.16.1
+  server (skinny client, Python 3.11, Linux): offline record, replay, no duplicates, correct metric times. Not run on Windows / Python 3.13 (file replace semantics, `tinydb`),
+  and not against the NAS container. Nothing in the pipeline calls the tracker yet (the stage wiring PR does).
+
 - **`mlflow-skinny` on the desktop (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `requirements-llamafactory.txt` now pins `mlflow-skinny==3.16.1` (the NAS server's version). Checked here on
   Python 3.11 only; install it in the llamafactory venv (Python 3.13, Windows) with the other pins and check `pip` resolves it next to torch 2.9.1 / transformers 4.57.1 / trl 0.24.0.
   `tracking.py` itself is unit-tested and sends nothing yet.

@@ -34,6 +34,13 @@
   `git_info`, `package_versions`, `gguf_info`. **`mlflow-skinny==3.16.1` is enough for the desktop** (checked on Python 3.11 against a real server: params, 1000-metric batch,
   tags, artifact, search by tag; no torch/Flask); the pin equals the server's version (test). Not checked on Python 3.13 / Windows. A refused connection fails in ~1 s;
   a NAS that drops packets takes the 10 s timeout. With `MLFLOW_SERVER_ENABLE_JOB_EXECUTION=false` the server has no huey job-worker processes (checked).
+- **PR 3 (offline queue) done 2026-10-01:** `run_queue.py` (TinyDB document store, atomic temp-file+replace writes because TinyDB's own storage writes in place and a crash would
+  corrupt every pending run; a corrupt file is set aside as `.corrupt-<ts>`, never fatal) + `tracker.py` (`sync`, `Tracker`, `NullTracker`, `MlflowAdapter`, `from_environment`).
+  A run = a list of events (params, tags, metrics, step_log, artifact, status), each marked sent right after the server has it; `begin()` records locally, pings, replays every
+  pending run oldest first and stops at the first failure; a run found on the server by its `local_run_id` tag is not created twice; synced runs are pruned to the newest 20.
+  Metric points everywhere are `(name, value, timestamp_ms, step)` = MLflow's `Metric` order. **Run against a real 3.16.1 server (skinny client) the first time exposed a swapped
+  timestamp/step that the unit tests had pinned on both sides; a cross-module test now covers it.** Checked end to end: a run recorded with the server off (log line, files copied into
+  the queue) arrived complete (params, tags, 300 loss points at the right times, artifact, FINISHED) when the next run started; nothing was sent twice.
 - PR order: 1 server (`deploy/mlflow/` + guard tests), 2 `tracking.py` pure helpers, 3 the queue (TinyDB + sync, fake client in tests), 4 stage
   wiring (model part, NOT VERIFIED), 5 `mlflow_compare.py` + docs.
 
