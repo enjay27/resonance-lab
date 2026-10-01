@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "graft": {
+      "command": "node",
+      "args": [
+        ".claude/helpers/graft-mcp.cjs"
+      ]
+    }
+  }
+}
