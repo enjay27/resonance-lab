@@ -59,9 +59,6 @@ services:
       MLFLOW_DISABLE_AGENT_HINT: "1"
       HOME: /tmp
 
-    volumes:
-      - ./basic_auth.ini:/etc/mlflow/basic_auth.ini:ro # a template: entrypoint.py renders the real one into /tmp
-
     # Reaches Postgres (container `postgres`) over the private network that deploy/postgres/ creates.
     networks:
       - resonance-db

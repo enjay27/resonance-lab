@@ -71,7 +71,9 @@ def test_the_container_is_read_only_unprivileged_and_limited(service):
 
 
 def test_the_only_writable_place_is_tmp_because_the_data_lives_in_postgres_and_minio(service):
-    assert all(str(v).endswith(":ro") for v in service["volumes"])  # config files only
+    # Nothing is bind-mounted: a file from the NAS keeps the NAS's permissions, which user 65534 may not be allowed to read
+    # ("PermissionError: '/etc/mlflow/basic_auth.ini'"). The template and the entrypoint are copied into the image.
+    assert "volumes" not in service
     assert service["tmpfs"] == ["/tmp"]
     assert not re.search(r"MLFLOW_DATA_DIR|/data\b|NAS_UID", _text("deploy", "mlflow", "docker-compose.yml"))
 
@@ -227,6 +229,8 @@ def test_the_image_is_built_from_pinned_versions_with_the_auth_extra_and_the_pos
     assert re.search(r"psycopg2-binary==\d+\.\d+\.\d+", dockerfile)  # Postgres
     assert re.search(r"boto3==\d+\.\d+\.\d+", dockerfile)  # MinIO speaks S3
     assert "COPY entrypoint.py /opt/entrypoint.py" in dockerfile
+    assert "COPY basic_auth.ini /etc/mlflow/basic_auth.ini" in dockerfile
+    assert re.search(r"RUN chmod a\+rX /opt/entrypoint\.py /etc/mlflow/basic_auth\.ini", dockerfile)  # readable by any user
     assert re.search(r'(?m)^ENTRYPOINT \["python", "/opt/entrypoint.py"\]\s*$', dockerfile)
     assert "latest" not in dockerfile
 

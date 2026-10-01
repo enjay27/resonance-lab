@@ -13,7 +13,8 @@ Needs the Postgres of `deploy/postgres/` (running, with the `mlflow` and `mlflow
    key a policy that allows only that bucket (`s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, `s3:ListBucket` on
    `arn:aws:s3:::mlflow` and `arn:aws:s3:::mlflow/*`).
 2. **Folder.** In File Station create `docker/mlflow` (`/volume1/docker/mlflow`). Copy this folder's `Dockerfile`,
-   `docker-compose.yml`, `basic_auth.ini`, `entrypoint.py` and `.env.example` into it.
+   `docker-compose.yml`, `basic_auth.ini`, `entrypoint.py` and `.env.example` into it (`basic_auth.ini` and `entrypoint.py` are
+   copied into the image at build time; nothing is mounted from the NAS, so file permissions there do not matter).
 3. **Settings.** Copy `.env.example` to `.env` and fill it in:
    - `MLFLOW_BIND`: an IP address **the NAS really has** (DSM Control Panel -> Network, or `ip -4 addr` over SSH; give it a fixed
      address or a DHCP reservation). A wrong one fails with `cannot assign requested address`. `MLFLOW_ALLOWED_HOSTS`: that
