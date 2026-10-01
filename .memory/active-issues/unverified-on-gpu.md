@@ -69,3 +69,6 @@ Code or config changed in a session without CUDA. Delete an item once it has run
 - **`--reverse` rule + TG `cutoff_len` 256 (2026-10-01):** the rule is from `aab6b66` and unit-tested, never run on the real raw log. Check the
   Preprocessing Report on it (reverse rows are counted in Total/Passed, reasons shared) against the shipped processed file's row count.
   `translategemma-4b(-fast)` train.yaml now has `cutoff_len: 256` (the shipped recipe), which changes tokens/step in the monitor.
+- **`watch_training.py` rework (2026-10-01):** speed/ETA/lr/eval now come from `trainer_log.jsonl` (fields confirmed from a real run); unit-tested and
+  rendered here on synthetic rows, not watched on a live run. Check on the next training: s/step and samples/s appear after a restart, the
+  footer's eval/overfit lines, and `nvidia-smi` temperature/power (`power.draw` may print `[N/A]`: shown as missing).
