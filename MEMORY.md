@@ -14,7 +14,10 @@ graft-indexed, CLAUDE.md rules (data part = `just check`, model part = manual GP
 model = TranslateGemma-4B LoRA from `experiment/translategemma` (raw line, gemma3, no
 system); the app sends an English instruction + `[P0]` rule + `<bos>` it never trained on.
 Model is being re-chosen — [`translator-shortlist-2026-10-01.md`](.memory/roadmap/translator-shortlist-2026-10-01.md);
-contract and the `translated: null` crash: [`stream-contract.md`](.memory/active-issues/stream-contract.md).
+contract: [`stream-contract.md`](.memory/active-issues/stream-contract.md).
+
+**`translated: null` rows (2026-10-01):** `preprocess.py` skips them (and blank/missing
+fields) instead of crashing `split_dataset`. Fixed on `main` only, not on the experiment branch.
 
 **Model part never runs in a cloud session** (no GPU). What changed without a run:
 [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md).

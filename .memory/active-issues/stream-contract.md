@@ -39,10 +39,12 @@ eval set, then train on one written-down prompt — the exact text the app will 
 `[P0]`-masked lines in part of the data — and pin it here with a test (the exact training
 text of one sample). resonance-stream then copies that text and its pin.
 
-## 2 · Untranslated rows crash the data stages — open
+## 2 · Untranslated rows crashed the data stages — fixed on `main`
 
 The app writes `translated: null` for lines never translated. `main`'s `preprocess.py`
 copies the `null` into `output`, and `split_dataset.py` then fails
 (`None.strip()` → `AttributeError`, reproduced 2026-10-01). `experiment/translategemma`'s
 `preprocess.py` has the same bug (`data.get("translated", "").strip()` on `null`).
-Fix on `main`: next PR (`roadmap/next.md` 2).
+**Fixed on `main` (2026-10-01):** `preprocess.py` skips rows whose `original` or
+`translated` is missing, `null` or blank and reports how many (tests in
+`tests/test_preprocess.py`). `experiment/translategemma` still has it.
