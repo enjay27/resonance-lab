@@ -115,7 +115,8 @@ Reach for graft before grep/read — see `.claude/skills/graft/SKILL.md`.
 ## Conventions
 
 - **Paths and hyper-parameters live in `config.py`**, built from `BASE_DIR`. A script
-  never hardcodes a path; it imports it.
+  never hardcodes a path; it imports it. Two environment overrides exist:
+  `RESONANCE_RAW_LOGS` (raw log file) and `RESONANCE_LF_PROFILE` (llamafactory model profile).
 - **A stage that fails exits non-zero** (`sys.exit(1)` or an exception) — that is how
   `run_pipeline.py` stops. A stage that only prints an error lets the pipeline continue
   on bad data.

@@ -10,12 +10,13 @@ rule + `<bos>` it never trained on. Model is being re-chosen —
 [`translator-shortlist-2026-10-01.md`](.memory/roadmap/translator-shortlist-2026-10-01.md);
 contract: [`stream-contract.md`](.memory/active-issues/stream-contract.md).
 
-**Switchable pipelines (2026-10-01):** `run_pipeline.py --pipeline llamafactory|unsloth` (default
-`llamafactory`; `pipelines.py`). Merged: A registry+move (#3), B shared preprocess filters (#4 — drops
-more rows, so re-eval after the next training; also skips `translated: null`). C1 `llamafactory` pipeline (#5; profile yaml,
-per-pipeline requirements, separate venvs); C2 `rich` monitor (#6); `claude/eval-metrics` (D): shared eval
-report. **The branch's BLEU/chrF/TER scored only the first sample — old numbers invalid, re-baseline**
-([`old-eval-numbers.md`](.memory/active-issues/old-eval-numbers.md)). Next: re-baseline + profiles for the shortlist — [`roadmap/next.md`](.memory/roadmap/next.md) 2.
+**Switchable pipelines: done (2026-10-01, PRs #3-#7).** `run_pipeline.py --pipeline llamafactory|unsloth`
+(default `llamafactory`), shared preprocess filters (drop more rows — check the report, re-eval after the
+next training), `rich` training monitor, shared eval report. `RESONANCE_RAW_LOGS` = another raw log.
+**The branch's BLEU/chrF/TER scored only the first sample — old numbers invalid, re-baseline**
+([`old-eval-numbers.md`](.memory/active-issues/old-eval-numbers.md)).
+**Next session starts at** [`roadmap/next.md`](.memory/roadmap/next.md) *Start here*: re-baseline on the GPU
+machine, then a profile per shortlist candidate.
 
 **Model part never runs in a cloud session** (no GPU): every model stage is NOT VERIFIED —
 [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md). Auto-merge of `claude/*` PRs works.

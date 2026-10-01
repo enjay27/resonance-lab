@@ -19,6 +19,13 @@ different `trl`/`transformers`).
 A new model for the `llamafactory` pipeline is a new folder `configs/llamafactory/<profile>/` with `train.yaml` and
 `merge.yaml` (`tests/test_lf_tools.py` checks the two agree on adapter path, base model and template).
 
+## Training data
+The raw chat log is `data/raw/raw_translated_logs.jsonl` (rows `original`, `translated`; the app's `translated: null`
+rows are skipped). To train on another file, e.g. a hand-curated one, set `RESONANCE_RAW_LOGS` to its path (relative
+paths are relative to the repo root): `RESONANCE_RAW_LOGS=data/raw/bp-training-dataset-final.jsonl python run_pipeline.py`.
+It still goes through Validate and Preprocessing, so the cleaning rules in `scripts/preprocess.py` apply to it too --
+check the Preprocessing Report to see how many rows they drop.
+
 ## Evaluation
 `data/eval/bp-eval-dataset.jsonl` (gitignored; one JSON per line: `original`, `translated`, optional `category`).
 Both pipelines print the same report (chrF/BLEU/TER, COMET if `unbabel-comet` is installed, JP and `<think>`
