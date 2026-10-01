@@ -56,7 +56,7 @@ config in git is a template; `entrypoint.py` writes the real one (with the Postg
   `sudo docker compose run --rm mlflow db upgrade "postgresql+psycopg2://mlflow:<MLFLOW_DB_PASSWORD>@postgres:5432/mlflow"`.
 
 ## What was and was not verified
-Verified (MLflow 3.16.1, a real PostgreSQL 16 server with scram passwords, a moto S3 server standing in for MinIO, a throwaway
+Verified (MLflow 3.16.1, a real PostgreSQL 16 server (the compose file uses 18, not available there) with scram passwords, a moto S3 server standing in for MinIO, a throwaway
 environment): `deploy/postgres/initdb/10-mlflow.sh` creates the role and databases; `entrypoint.py` renders the auth config (mode 600)
 and starts `mlflow server` with the flags of `docker-compose.yml`; MLflow migrates its schema in Postgres and creates the `admin`
 user in `mlflow_auth`; 401 without credentials, 403 for a foreign `Host`, 200 for the admin; a client logs params, tags, a metric and

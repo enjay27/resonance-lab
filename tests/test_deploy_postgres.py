@@ -40,9 +40,8 @@ def service(compose):
     return compose["services"]["postgres"]
 
 
-def test_the_image_is_a_pinned_major_version(service):
-    assert re.fullmatch(r"postgres:\d+(\.\d+)?-alpine", service["image"])  # MLflow 3.16 needs Postgres 12 or newer
-    assert int(re.search(r":(\d+)", service["image"]).group(1)) >= 12
+def test_the_image_is_postgres_18_pinned_to_its_major_version(service):
+    assert re.fullmatch(r"postgres:18(\.\d+)?-alpine", service["image"])  # 18-alpine = the newest 18.x; 18.N-alpine pins a minor
 
 
 def test_the_database_is_never_published_on_the_lan(compose, service):
@@ -67,7 +66,9 @@ def test_the_container_is_unprivileged_read_only_and_limited(service):
 def test_the_data_is_a_named_volume_and_the_init_script_is_read_only(compose, service):
     mounts = service["volumes"]
 
-    assert "resonance-postgres-data:/var/lib/postgresql/data" in mounts  # a named volume keeps the image's postgres ownership
+    # A named volume keeps the image's postgres ownership. Since 18 the image keeps its data in /var/lib/postgresql/18/docker:
+    # the volume goes on /var/lib/postgresql (a mount on .../data would be a second, anonymous volume).
+    assert "resonance-postgres-data:/var/lib/postgresql" in mounts
     assert "./initdb:/docker-entrypoint-initdb.d:ro" in mounts
     assert all(not str(v).startswith("/") for v in mounts)  # no host path, no docker.sock
     assert "resonance-postgres-data" in compose["volumes"]

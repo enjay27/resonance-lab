@@ -29,12 +29,15 @@ Postgres is the backend MLflow itself is tested against most, and unlike SQLite 
 - **Backup:** a dump is a consistent copy and works while the server runs. In DSM Task Scheduler (user-defined script, daily):
   `docker exec resonance-postgres pg_dump -U postgres -Fc mlflow > /volume1/backup/mlflow.dump` and the same for `mlflow_auth`;
   add that folder to Hyper Backup. Restore: `docker exec -i resonance-postgres pg_restore -U postgres -d mlflow --clean < mlflow.dump`.
-- **Upgrade within 16:** `docker compose pull && docker compose up -d`. To move to another major version (`postgres:17-alpine`)
-  dump both databases, remove the volume, change the tag, start, restore.
+- **Version:** `image: postgres:18-alpine` is the newest 18.x (PostgreSQL has no LTS; each major is supported for 5 years). To pin an
+  exact minor write `postgres:18.<N>-alpine` (check the tag exists on Docker Hub first). A minor update is
+  `docker compose pull && docker compose up -d`. To move to another major version (`postgres:19-alpine`) dump both databases, remove
+  the volume, change the tag, start, restore: a major version cannot open the older one's data directory.
+- The 18+ image keeps its data in `/var/lib/postgresql/18/docker`, so the volume is mounted on `/var/lib/postgresql`.
 
 ## What was and was not verified
-Verified (a real PostgreSQL 16 server, a throwaway environment): `initdb/10-mlflow.sh` run as the image does it creates the role
+Verified (a real PostgreSQL **16** server, a throwaway environment; 18 was not available there): `initdb/10-mlflow.sh` run as the image does it creates the role
 and both databases, the `mlflow` role logs in with its password and not with a wrong one, and MLflow 3.16.1 runs its schema
 migration in it (see `deploy/mlflow/README.md`).
-**Not verified:** the container on the NAS: the read-only root file system with `user: 70:70`, the image's entrypoint running the
+**Not verified:** PostgreSQL 18 itself (the init script is plain `CREATE ROLE`/`CREATE DATABASE`/`REVOKE`; MLflow's migration was not run on 18) and the container on the NAS: the read-only root file system with `user: 70:70`, the image's entrypoint running the
 init script (it passes `PGPASSWORD`, which the script relies on), Container Manager's project import, the DSM Task Scheduler backup command.
