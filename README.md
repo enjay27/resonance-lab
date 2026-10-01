@@ -20,6 +20,12 @@ A new model for the `llamafactory` pipeline is a new folder `configs/llamafactor
 `merge.yaml` (`tests/test_lf_tools.py` checks the two agree on adapter path, base model and template).
 
 ## Training data
+The app's per-channel `dataset_<CHANNEL>.jsonl` files live in a Hugging Face dataset repo. Set `repo:` in
+`configs/hf_dataset.yaml`, run `python scripts/fetch_data.py --pin` once (pins the latest commit; needs `hf auth login`),
+and the pipeline's first stage, Fetch Data, downloads that revision into `data/hf/` and merges the channels into the raw
+log below -- only when it is missing or the pin changed. Every dataset refresh is a new pin. Without a `repo:` the stage
+is skipped and `data/raw/` is used as it is.
+
 The raw chat log is `data/raw/raw_translated_logs.jsonl` (rows `original`, `translated`; the app's `translated: null`
 rows are skipped). To train on another file, e.g. a hand-curated one, set `RESONANCE_RAW_LOGS` to its path (relative
 paths are relative to the repo root): `RESONANCE_RAW_LOGS=data/raw/bp-training-dataset-final.jsonl python run_pipeline.py`.

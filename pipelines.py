@@ -27,6 +27,7 @@ PIPELINES = {
     # LLaMA-Factory SFT + LoRA, one model per profile (configs/llamafactory/<profile>/;
     # RESONANCE_LF_PROFILE picks it). Ends in a q4_k_m GGUF for resonance-stream.
     "llamafactory": [
+        Stage("Fetch Data", _script("fetch_data.py")),
         Stage("Validate", _script("validate.py")),
         Stage("Preprocessing", _script("preprocess.py"), ("--format", "pair", "--prompt", "auto")),
         Stage("Update Dataset", _script("llamafactory", "update_dataset_info.py")),
@@ -38,6 +39,7 @@ PIPELINES = {
     ],
     # Qwen3 1.7B, LoRA with unsloth, merged to F16 (fix_metadata drops the classifier head).
     "unsloth": [
+        Stage("Fetch Data", _script("fetch_data.py")),
         Stage("Validate", _script("validate.py")),
         Stage("Preprocessing", _script("preprocess.py")),
         Stage("Dataset Split", _script("unsloth", "split_dataset.py")),
