@@ -2,7 +2,6 @@ import subprocess
 import time
 import sys
 import os
-import shutil
 import platform
 import torch
 
@@ -38,7 +37,7 @@ def run_step(name, script_path):
     start_time = time.perf_counter()
     try:
         # Run the script as a sub-process
-        result = subprocess.run([sys.executable, script_path], check=True, capture_output=False)
+        subprocess.run([sys.executable, script_path], check=True, capture_output=False)
         elapsed = time.perf_counter() - start_time
         log_diagnostic(name, "SUCCESS", elapsed)
         return True
@@ -68,7 +67,7 @@ def main():
             sys.exit(1)
 
     total_elapsed = time.perf_counter() - total_start
-    print(f"\n" + "="*40)
+    print("\n" + "="*40)
     print(f"PIPELINE COMPLETE | Total Time: {total_elapsed/60:.2f} minutes")
     print("="*40)
 

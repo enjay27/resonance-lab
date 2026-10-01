@@ -73,7 +73,7 @@ def prepare_lora_dataset(input_path, output_dir, val_split=0.05, seed=42):
     train_path = save_jsonl(train_data, 'train.jsonl')
     val_path = save_jsonl(val_data, 'val.jsonl')
 
-    print(f"--- Dataset Preparation Complete ---")
+    print("--- Dataset Preparation Complete ---")
     print(f"Total Unique Entries: {total_count}")
     print(f"Training Set: {len(train_data)} samples -> {train_path}")
     print(f"Validation Set: {len(val_data)} samples -> {val_path}")

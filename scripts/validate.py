@@ -3,10 +3,13 @@ import os
 import re
 import sys
 
-from huggingface_hub.errors import ValidationError
-
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import RAW_LOGS # Import the dynamic path
+
+
+class ValidationError(Exception):
+    """Raw logs failed a check; stops run_pipeline.py at the Validate stage."""
+
 
 def check_hangeul_in_original(file_path):
     # 한글 범위를 찾는 정규표현식
