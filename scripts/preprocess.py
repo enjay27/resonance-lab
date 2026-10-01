@@ -13,19 +13,28 @@ def transform_for_lora(input_file, output_file):
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     count = 0
+    skipped = 0
 
     with open(input_file, 'r', encoding='utf-8') as f_in, \
             open(output_file, 'w', encoding='utf-8') as f_out:
         for line in f_in:
             data = json.loads(line)
+            original = data.get("original")
+            translated = data.get("translated")
+            # resonance-stream writes `translated: null` for lines it never translated.
+            if not (original or "").strip() or not (translated or "").strip():
+                skipped += 1
+                continue
             lora_data = {
                 "instruction": INSTRUCTION,
-                "input": data["original"],
-                "output": data["translated"]
+                "input": original,
+                "output": translated
             }
             f_out.write(json.dumps(lora_data, ensure_ascii=False) + '\n')
             count += 1
 
+    if skipped:
+        print(f"Skipped {skipped} lines without an original or a translation.")
     if count == 0:
         print("[ERROR] Preprocessing produced 0 lines. Check your raw input file.")
         sys.exit(1)
