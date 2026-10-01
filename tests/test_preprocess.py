@@ -1,3 +1,4 @@
+import json
 import re
 
 import pytest
@@ -154,3 +155,72 @@ def test_main_takes_the_format_from_the_command_line(write_jsonl, tmp_path, monk
 
     preprocess.main([])  # the default stays the unsloth format
     assert list(read_jsonl(out)[0]) == ["instruction", "input", "output"]
+
+
+# --- prompt styles and the reverse direction (--format pair) -----------------------------------
+
+
+def test_pair_rows_wrap_the_line_in_the_models_instruction():
+    rows = preprocess.pair_rows("杖@2募集", "법사@2 모집", style="hy")
+
+    assert rows == [{
+        "original": "Translate the following text into Korean. Note that you should only output the translated "
+                    "result without any additional explanation:\n\n杖@2募集",
+        "translated": "법사@2 모집",
+    }]
+
+
+def test_pair_rows_without_a_style_are_the_raw_pair():
+    assert preprocess.pair_rows("杖@2募集", "법사@2 모집") == [{"original": "杖@2募集", "translated": "법사@2 모집"}]
+
+
+def test_reverse_adds_the_ko_to_ja_row_with_its_own_instruction():
+    forward, backward = preprocess.pair_rows("杖@2募集", "법사@2 모집", style="translategemma", reverse=True)
+
+    assert forward["original"].endswith("Please translate the following Japanese text into Korean:\n杖@2募集")
+    assert forward["translated"] == "법사@2 모집"
+    assert backward["original"].endswith("Please translate the following Korean text into Japanese:\n법사@2 모집")
+    assert backward["translated"] == "杖@2募集"
+
+
+def test_transform_writes_forward_and_reverse_rows_for_clean_rows_only(write_jsonl, tmp_path):
+    src = write_jsonl("raw.jsonl", [
+        {"original": "杖@2募集", "translated": "법사@2 모집"},
+        {"original": "이미 한글", "translated": "x"},  # Hangeul in the source: dropped, and not reversed either
+    ])
+    out = tmp_path / "out.jsonl"
+
+    counts = preprocess.transform_for_lora(src, str(out), fmt="pair", style="hy", reverse=True)
+
+    rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    assert len(rows) == 2 and counts["passed"] == 1
+    assert rows[1]["translated"] == "杖@2募集"
+
+
+def test_style_and_reverse_need_the_pair_format(write_jsonl, tmp_path):
+    src = write_jsonl("raw.jsonl", [{"original": "杖", "translated": "법사"}])
+
+    with pytest.raises(ValueError, match="pair"):
+        preprocess.transform_for_lora(src, str(tmp_path / "o.jsonl"), fmt="instruction", style="hy")
+
+
+def test_main_resolves_the_auto_style_from_the_model_parameter(write_jsonl, tmp_path, monkeypatch):
+    src = write_jsonl("raw.jsonl", [{"original": "杖@2募集", "translated": "법사@2 모집"}])
+    out = tmp_path / "out.jsonl"
+    monkeypatch.setattr(preprocess, "RAW_LOGS", src)
+    monkeypatch.setattr(preprocess, "PROCESSED_LOGS", str(out))
+
+    preprocess.main(["--format", "pair", "--prompt", "auto", "--model", "translategemma-4b"])
+
+    assert json.loads(out.read_text(encoding="utf-8"))["original"].startswith("You are a professional Japanese (ja)")
+
+
+def test_main_without_a_prompt_keeps_the_raw_line(write_jsonl, tmp_path, monkeypatch):
+    src = write_jsonl("raw.jsonl", [{"original": "杖@2募集", "translated": "법사@2 모집"}])
+    out = tmp_path / "out.jsonl"
+    monkeypatch.setattr(preprocess, "RAW_LOGS", src)
+    monkeypatch.setattr(preprocess, "PROCESSED_LOGS", str(out))
+
+    preprocess.main(["--format", "pair"])
+
+    assert json.loads(out.read_text(encoding="utf-8"))["original"] == "杖@2募集"

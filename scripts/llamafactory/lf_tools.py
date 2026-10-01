@@ -15,6 +15,7 @@ from typing import NamedTuple
 import yaml
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from prompts import build_prompt, style_for_template  # noqa: E402
 from config import (  # noqa: E402
     BASE_DIR,
     LF_CONFIG_ROOT,
@@ -155,13 +156,6 @@ def translategemma_messages(text, source="ja", target="ko"):
     return [{"role": "user", "content": [{"type": "text", "source_lang_code": source, "target_lang_code": target, "text": text}]}]
 
 
-# Hy-MT2's documented default translation prompt (README, "Default Translation"), target fixed to Korean.
-HY_TRANSLATE_PROMPT = (
-    "Translate the following text into Korean. Note that you should only output the translated "
-    "result without any additional explanation:\n\n{text}"
-)
-
-
 # The rest of a full training example, per template (confirmed with scripts/llamafactory/inspect_pair.py on the
 # real tokenizers, 2026-10-01): the BOS the template prefix adds, and what follows the answer. gemma3 closes the
 # turn inside the response; the Hy templates have efficient_eos, so LLaMA-Factory appends the eos token itself.
@@ -191,13 +185,19 @@ def training_example(template, original, translated):
     return prompt, start + translated + TRAINING_AFTER_ANSWER[template]
 
 
+def training_user_text(template, text):
+    """The user text of a training example: the line behind the instruction of the template's prompt style
+    (what `preprocess.py --prompt auto` writes into the `original` column)."""
+    return build_prompt(style_for_template(template), "ja-ko", text)
+
+
 def chat_messages(template, text):
     """Messages for tokenizer.apply_chat_template: the model's own documented prompt, which is not
     the training format (see training_prompt)."""
     if template == "gemma3":
         return translategemma_messages(text)
     if template in ("hy_dense_1_8b", "hy_dense_7b"):
-        return [{"role": "user", "content": HY_TRANSLATE_PROMPT.format(text=text)}]
+        return [{"role": "user", "content": build_prompt("hy", "ja-ko", text)}]
     known = ["gemma3", "hy_dense_1_8b", "hy_dense_7b"]
     raise ValueError(f"no chat prompt for template {template!r}; known: {', '.join(sorted(known))}")
 

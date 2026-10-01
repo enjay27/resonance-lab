@@ -9,10 +9,12 @@ LLaMA-Factory version or profile changes, and update both.
 
 Data in every case: `data/processed/lora_train_data.jsonl` rows `{original, translated}` (`preprocess.py --format pair`),
 mapped by `data/dataset_info.json` to prompt = `original`, response = `translated`. Same file for all profiles.
-With **this repo's pipeline** the user turn is **the raw Japanese line only** — no instruction, no system prompt, one direction.
-**The shipped TG-4B was not trained like that:** its hand-made file had the TranslateGemma instruction inside `original` and
+The examples below show the template wrapper around the user text. The user text is the line behind the model family's instruction
+(`prompts.py`; `preprocess.py --prompt auto`); with `--prompt none` (the old behaviour) it is the raw line. The shipped TG-4B's
+file (not reproduced exactly): its hand-made file had the TranslateGemma instruction inside `original` and
 every pair in both directions (`active-issues/stream-contract.md` §1, corrected 2026-10-01), i.e. the `chat-template` prompt below.
-The examples here show what this pipeline builds today; the Hy prompt decision is open (`roadmap/zero-shot-results-2026-10-01.md`).
+`{original}` in the blocks below stands for that user text. Hy's instruction is its own default prompt, not TranslateGemma's; the
+`[P0]` placeholder rule is not in any training prompt yet.
 
 | profile(s) | template | base model | cutoff_len | eos token |
 |---|---|---|---|---|

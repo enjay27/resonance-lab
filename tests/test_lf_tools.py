@@ -475,3 +475,23 @@ def test_training_example_is_the_inference_prompt_plus_the_answer():
 def test_training_example_of_an_unknown_template_lists_the_known_ones():
     with pytest.raises(ValueError, match="hy_dense_7b"):
         lf_tools.training_example("nope", "a", "b")
+
+
+# --- the user text of a training example follows the template's prompt style -------------------------
+
+
+def test_training_user_text_is_the_instruction_and_the_line_of_the_templates_style():
+    import prompts
+
+    for template in ("gemma3", "hy_dense_1_8b", "hy_dense_7b"):
+        assert lf_tools.training_user_text(template, "杖@2募集") == prompts.build_prompt(
+            prompts.style_for_template(template), "ja-ko", "杖@2募集"
+        )
+
+
+def test_hy_chat_messages_use_the_shared_prompt_module():
+    import prompts
+
+    [msg] = lf_tools.chat_messages("hy_dense_7b", "杖@2募集")
+
+    assert msg["content"] == prompts.build_prompt("hy", "ja-ko", "杖@2募集")

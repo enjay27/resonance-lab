@@ -37,9 +37,12 @@ same instruction + the `[P0]` placeholder rule + the line. Remaining differences
   (still unchecked);
 - `main`'s Qwen3 pipeline (ChatML + Korean `config.INSTRUCTION`) is a third format; it is not what ships.
 
-**This repo's pipeline does not yet reproduce that training file.** `preprocess.py --format pair` writes the raw line only (no
-instruction) and has no reverse direction; its filters (`Hangeul in original`, `JP residual in translation`) would drop every
-ko→ja row anyway. Where the final file came from (a one-off script?) is not in the repo — ask the maintainer.
+**This repo now builds that file's rows (2026-10-01):** `preprocess.py --format pair --prompt auto [--reverse]`, instruction
+texts in `prompts.py` (TranslateGemma's copied from the maintainer's sample, Hy's = its documented default prompt), pinned in
+`tests/test_prompts.py`. The pipeline's Preprocessing stage runs `--prompt auto` (style from `--model`'s template), no `--reverse`.
+Not reproduced: the shipped file's **reverse rule**. In the maintainer's sample a long recruitment line had no ko→ja partner while
+two short lines did; the one-off script that made `bp-training-dataset-processed.jsonl` is in neither git history nor this repo.
+`--reverse` reverses every clean row. Hy's ko→ja prompt is derived (README template, target "Japanese"), unverified.
 
 **Next:** decide per model the exact prompt (instruction text, directions, `[P0]`), build it in a data-part stage (test first), pin
 one sample's full text here, then resonance-stream copies it.

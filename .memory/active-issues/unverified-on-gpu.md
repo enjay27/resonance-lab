@@ -61,3 +61,8 @@ Code or config changed in a session without CUDA. Delete an item once it has run
   memory of its API (`get_template_and_fix_tokenizer`, `DataArguments`, `encode_oneturn`) and never ran. Run:
   `python scripts/llamafactory/inspect_pair.py --model hy-mt2-1.8b --rows 3` (needs `data/processed/lora_train_data.jsonl` from
   `preprocess.py --format pair`). Check: the response ends with the model's end-of-turn token; the prompt column is the raw line.
+- **`preprocess.py --prompt auto` (2026-10-01):** unit-tested only. The llamafactory pipeline's Preprocessing stage now writes the
+  instruction into `original` (training data changes -> a retrain needs the eval). Check on the real raw log:
+  `python scripts/preprocess.py --format pair --prompt auto --model hy-mt2-1.8b [--reverse]`, then
+  `python scripts/llamafactory/inspect_pair.py --model hy-mt2-1.8b` (MATCH, tokens vs cutoff_len 256 -- TG's instruction is ~60 tokens
+  longer than the line, cutoff 128 may truncate: raise it). `eval.py --prompt training` now wraps the line in the style too.

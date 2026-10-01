@@ -5,6 +5,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import RAW_LOGS, PROCESSED_LOGS, INSTRUCTION
+from prompts import STYLES, build_prompt, style_for_template
 from text_rules import HANGEUL_PATTERN, JP_PATTERN
 
 # --- Filters (from the TranslateGemma pipeline's preprocess) ---
@@ -28,6 +29,15 @@ FORMATS = {
     "pair": lambda original, translated: {"original": original, "translated": translated},
 }
 DEFAULT_FORMAT = "instruction"
+
+
+def pair_rows(original, translated, style=None, reverse=False):
+    """The `pair` rows of one clean line: ja->ko with the instruction of `style` (None = the raw line), and, with
+    `reverse`, the ko->ja row (the Korean as the input) built the same way."""
+    rows = [{"original": build_prompt(style, "ja-ko", original), "translated": translated}]
+    if reverse:
+        rows.append({"original": build_prompt(style, "ko-ja", translated), "translated": original})
+    return rows
 
 
 def clean_reason(original, translated):
@@ -66,14 +76,16 @@ def _report(counts):
         print(f"  {reason:<{width}}: {counts[reason]}")
 
 
-def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT):
+def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, reverse=False):
     """Clean raw {original, translated} rows into training rows of layout `fmt`.
 
     Returns the counts per outcome (`total`, `passed` and one per reason).
     """
     if fmt not in FORMATS:
         raise ValueError(f"unknown format {fmt!r}; choose one of: {', '.join(sorted(FORMATS))}")
-    make_row = FORMATS[fmt]
+    if (style or reverse) and fmt != "pair":
+        raise ValueError("a prompt style or --reverse needs the pair format (--format pair)")
+    make_rows = (lambda o, t: pair_rows(o, t, style, reverse)) if fmt == "pair" else (lambda o, t: [FORMATS[fmt](o, t)])
     if not os.path.exists(input_file):
         print(f"[ERROR] Raw data not found at: {input_file}")
         sys.exit(1)
@@ -103,7 +115,8 @@ def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT):
 
             seen_inputs.add(original)
             counts["passed"] += 1
-            f_out.write(json.dumps(make_row(original, translated), ensure_ascii=False) + '\n')
+            for row in make_rows(original, translated):
+                f_out.write(json.dumps(row, ensure_ascii=False) + '\n')
 
     _report(counts)
     if counts["passed"] == 0:
@@ -113,12 +126,28 @@ def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT):
     return counts
 
 
+def _profile_template(model):
+    """The LLaMA-Factory template of the model profile (needs pyyaml; only --prompt auto gets here)."""
+    sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "llamafactory"))
+    from lf_tools import load_profile, model_name
+    return load_profile(model_name(model)).template
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Clean the raw chat log into training rows.")
     parser.add_argument("--format", choices=sorted(FORMATS), default=DEFAULT_FORMAT, dest="fmt",
                         help="row layout (default: %(default)s)")
+    parser.add_argument("--prompt", default="none", choices=["none", "auto", *sorted(STYLES)],
+                        help="pair format only: instruction put before each line; auto = the style of --model's template "
+                             "(default: %(default)s = the raw line)")
+    parser.add_argument("--model", help="llamafactory profile for --prompt auto (default: $RESONANCE_LF_PROFILE, else the default)")
+    parser.add_argument("--reverse", action="store_true",
+                        help="pair format only: also write every clean row as ko->ja, Korean as the input")
     args = parser.parse_args(argv)
-    transform_for_lora(RAW_LOGS, PROCESSED_LOGS, args.fmt)
+    style = {"none": None, "auto": None}.get(args.prompt, args.prompt)
+    if args.prompt == "auto":
+        style = style_for_template(_profile_template(args.model))
+    transform_for_lora(RAW_LOGS, PROCESSED_LOGS, args.fmt, style, args.reverse)
 
 
 if __name__ == "__main__":
