@@ -44,6 +44,11 @@ def _read_yaml(path):
         return yaml.safe_load(f)
 
 
+def train_config(profile):
+    """The profile's train.yaml as a dict (what the tracker records as the recipe)."""
+    return _read_yaml(profile.train_yaml)
+
+
 def available_profiles(root=LF_CONFIG_ROOT):
     """Names of the profile folders that have both a train.yaml and a merge.yaml."""
     if not os.path.isdir(root):

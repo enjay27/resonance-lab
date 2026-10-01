@@ -2,6 +2,13 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **Stage wiring to the tracker (MLflow PR 4b, 2026-10-01):** `train.py`, `merge.py`, `gguf.py` and `llamafactory/eval.py` call `stage_tracking.py` (unit-tested with a recording tracker,
+  the real `Tracker` + offline queue and a fake client; never run on the GPU machine). Check with the NAS up and `.env.mlflow` filled: (1) `train.py` creates the run
+  `<profile>-<run id>` in experiment `resonance-lab` (params, `dataset.*`/`prompt.*`/`git.*` tags) and, when it ends, the loss curves, `train.*` / `eval.best_loss` metrics and the log
+  artifact, status FINISHED; (2) `merge.py`, `gguf.py` and `eval.py --prompt training` add their tags/metrics/report to the SAME run (`stage.merge`/`stage.gguf`/`stage`, `gguf.size_bytes`, `eval.chrf`...);
+  (3) with the NAS off (or `RESONANCE_MLFLOW=0`) every stage behaves as before and the next run sends the backlog; (4) the eval's `EVAL_MAX_NEW_TOKENS` is 256, as the hardcoded value was.
+  Also unchecked: `train_results.json` / `trainer_state.json` land in the run dir (`train_result_records` finds them there), and a failed stage tags `stage.<name>=failed` without closing the run.
+
 - **Offline queue (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `run_queue.py` / `tracker.py` are unit-tested with a fake client and were run end to end against a real MLflow 3.16.1
   server (skinny client, Python 3.11, Linux): offline record, replay, no duplicates, correct metric times. Not run on Windows / Python 3.13 (file replace semantics, `tinydb`),
   and not against the NAS container. Nothing in the pipeline calls the tracker yet (the stage wiring PR does).
