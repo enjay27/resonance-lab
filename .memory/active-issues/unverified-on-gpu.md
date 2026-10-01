@@ -24,3 +24,8 @@ Code or config changed in a session without CUDA. Delete an item once it has run
   really has `current_steps` / `loss` / `epoch` / `eval_loss` (the branch's monitor assumed so),
   that `train_stdout.log` carries the `'grad_norm'` dict lines and the tqdm bar, and that
   `nvidia-smi` is on the PATH.
+- **Eval stage (2026-10-01, `claude/eval-metrics`):** `eval_metrics.py` is unit-tested; the two
+  `eval.py` scripts ran here only as far as their error paths (llamafactory) / a parse check
+  (unsloth). Never generated anything: check `--prompt chat-template` and `--prompt training` on
+  the real merged model (tokenizer call, `enable_thinking`, BOS handling), COMET with `unbabel-comet`,
+  and that the unsloth eval's `inputs.shape[-1]` slicing (tensor, not dict) is right.

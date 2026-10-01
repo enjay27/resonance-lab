@@ -1,15 +1,13 @@
 import argparse
 import json
 import os
-import re
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import RAW_LOGS, PROCESSED_LOGS, INSTRUCTION
+from text_rules import HANGEUL_PATTERN, JP_PATTERN
 
 # --- Filters (from the TranslateGemma pipeline's preprocess) ---
-JP_PATTERN = re.compile(r'[ぁ-ゖァ-ヺ一-鿿]')
-HANGEUL_PATTERN = re.compile(r'[가-힣]')
 
 # A row is skipped for exactly one of these, checked in this order.
 REASONS = (

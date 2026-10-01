@@ -33,6 +33,8 @@ PIPELINES = {
         Stage("Fine-Tuning", _script("llamafactory", "train.py")),
         Stage("Merge LoRA", _script("llamafactory", "merge.py")),
         Stage("Export GGUF", _script("llamafactory", "gguf.py")),
+        # Last: it only reads the merged model and prints a report, so it must not block the export.
+        Stage("Evaluation", _script("llamafactory", "eval.py")),
     ],
     # Qwen3 1.7B, LoRA with unsloth, merged to F16 (fix_metadata drops the classifier head).
     "unsloth": [

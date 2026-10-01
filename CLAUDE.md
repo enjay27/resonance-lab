@@ -20,8 +20,8 @@ most important thing on this page.
 
 | tree | part | runs on | gate |
 |---|---|---|---|
-| `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
-| `scripts/unsloth/train.py` `scripts/unsloth/eval.py` `scripts/unsloth/fix_metadata.py` `scripts/llamafactory/train.py` `merge.py` `gguf.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements-<pipeline>.txt`) | none automated — a manual run, reported |
+| `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `eval_metrics.py` `text_rules.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
+| `scripts/unsloth/train.py` `scripts/unsloth/eval.py` `scripts/unsloth/fix_metadata.py` `scripts/llamafactory/train.py` `merge.py` `gguf.py` `eval.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements-<pipeline>.txt`) | none automated — a manual run, reported |
 
 `just check` needs only `requirements-dev.txt` (`pip install -r requirements-dev.txt`;
 `pip install rust-just` for `just`). CI (`.github/workflows/ci.yml`) runs it on Linux on
@@ -66,6 +66,8 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
 .github/workflows/    CI (data gate) + auto-merge
 justfile              the gates as commands
 config.py             every path and hyper-parameter; INSTRUCTION (system prompt)
+eval_metrics.py       shared eval scoring + report (chrF/BLEU/TER, COMET, JP/think leakage, terms); tested
+text_rules.py         JP / Hangeul patterns shared by preprocess and the eval metrics
 pipelines.py          registry: pipeline name -> ordered stage scripts (no torch; tested)
 run_pipeline.py       --pipeline <name>: runs its stages in order, stops at the first failure
 scripts/
@@ -78,13 +80,14 @@ scripts/
     split_dataset.py      data: dedup by input, shuffle (seed 42), train/val -> lora_dataset/
     train.py              model: LoRA fine-tune (unsloth), merge -> model_f16/
     fix_metadata.py       model: drop `score.weight` -> model_f16_clean/
-    eval.py               model: translate fixed test lines with model_f16_clean/
+    eval.py               model: demo lines, then the shared eval report (when data/eval/ has a dataset)
   llamafactory/         pipeline `llamafactory` (default)
     lf_tools.py           data: profiles, dataset_info.json, command lines (argument lists), run helpers
     update_dataset_info.py  data: writes data/dataset_info.json -> the processed pair file
     train.py              model: `llamafactory-cli train`, output -> outputs/train_stdout.log
     merge.py              model: `llamafactory-cli export` (adapter -> full model)
     gguf.py               model: convert to F16 GGUF, quantize to q4_k_m -> model_gguf/
+    eval.py               model: generate on the eval set (--prompt chat-template|training), shared report
     watch_training.py     data: live training monitor (`rich`); TrainingState parses the two logs, tested
 configs/llamafactory/<profile>/   train.yaml + merge.yaml per model (tests check they agree)
 tests/                pytest for the data part; conftest.py has the JSONL fixtures
