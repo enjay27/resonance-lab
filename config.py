@@ -62,3 +62,7 @@ PREPROCESS_MAX_SUSPICIOUS = 0.30  # share of usable rows dropped as Hangeul-in-s
 # into HF_DATA_DIR and merged into RAW_LOGS. RESONANCE_RAW_LOGS (a hand-made raw log) switches the stage off.
 HF_DATASET_CONFIG = os.path.join(BASE_DIR, "configs", "hf_dataset.yaml")
 HF_DATA_DIR = os.path.join(BASE_DIR, "data", "hf")
+
+# --- Experiment tracking (tracking.py) ---
+# The NAS server's URL and credentials: gitignored, see .env.mlflow.example and deploy/mlflow/README.md.
+MLFLOW_ENV_FILE = os.path.join(BASE_DIR, ".env.mlflow")

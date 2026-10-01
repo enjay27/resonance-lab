@@ -20,7 +20,7 @@ most important thing on this page.
 
 | tree | part | runs on | gate |
 |---|---|---|---|
-| `scripts/fetch_data.py` `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `eval_metrics.py` `text_rules.py` `hf_data.py` `runs.py` `overlap.py` `valsplit.py` `manifest.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` `deploy/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
+| `scripts/fetch_data.py` `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `eval_metrics.py` `text_rules.py` `hf_data.py` `runs.py` `tracking.py` `overlap.py` `valsplit.py` `manifest.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` `deploy/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
 | `scripts/unsloth/train.py` `scripts/unsloth/eval.py` `scripts/unsloth/fix_metadata.py` `scripts/llamafactory/train.py` `merge.py` `gguf.py` `eval.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements-<pipeline>.txt`) | none automated — a manual run, reported |
 
 `just check` needs only `requirements-dev.txt` (`pip install -r requirements-dev.txt`;
@@ -70,6 +70,7 @@ eval_metrics.py       shared eval scoring + report (chrF/BLEU/TER, COMET, JP/thi
 text_rules.py         JP / Hangeul patterns shared by preprocess and the eval metrics
 hf_data.py            the HF dataset: config, `hf download` command, merge of the per-channel files, fetch state; tested (no network)
 runs.py               one training = one run dir `<output_dir>/<run id>/` + run.json status; merge takes the latest complete run; tested
+tracking.py           what a run records in MLflow, pure: .env.mlflow settings, params/tags/metrics from yaml, manifest, fetch state, eval report, trainer files (no mlflow import); tested
 overlap.py            is a training line also an eval line? (normalised + near-duplicate); preprocess drops them; tested
 valsplit.py           which lines are validation: sha1 of the normalised line, so pairs/variants stay together and lines keep their side as data grows; tested
 manifest.py           lora_train_data.meta.json: how the training file was made (style, reverse, shas, counts); update_dataset_info/train check it; tested
@@ -125,7 +126,7 @@ Reach for graft before grep/read — see `.claude/skills/graft/SKILL.md`.
 
 - **Paths and hyper-parameters live in `config.py`**, built from `BASE_DIR`. A script
   never hardcodes a path; it imports it. Two environment overrides exist:
-  `RESONANCE_RAW_LOGS` (raw log file; also switches the Fetch Data stage off) and `RESONANCE_LF_PROFILE` (llamafactory model profile; the `--model` parameter wins over it).
+  `RESONANCE_RAW_LOGS` (raw log file; also switches the Fetch Data stage off), `RESONANCE_MLFLOW=0` (tracking off) and `RESONANCE_LF_PROFILE` (llamafactory model profile; the `--model` parameter wins over it).
 - **A stage that fails exits non-zero** (`sys.exit(1)` or an exception) — that is how
   `run_pipeline.py` stops. A stage that only prints an error lets the pipeline continue
   on bad data.

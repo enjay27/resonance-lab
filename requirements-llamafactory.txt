@@ -28,3 +28,8 @@ rich
 #   pip install liger-kernel --no-deps          # its only other dependency is torch
 # If that fails, set `enable_liger_kernel: false` in the profile's train.yaml: packing and the bigger batch
 # (most of the speed-up) still apply.
+
+# Experiment tracking (tracking.py): the client of the MLflow server on the NAS (deploy/mlflow/). The skinny package is
+# enough (no UI, no server); it must be the same version as MLFLOW_VERSION in deploy/mlflow/.env.example
+# (tests/test_deploy_mlflow.py checks). Smoke-tested on Python 3.11 against a 3.16.1 server; not on 3.13 / Windows.
+mlflow-skinny==3.16.1
