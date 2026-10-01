@@ -5,7 +5,7 @@
   desktop (same gateway). `deploy/mlflow/` holds compose + `.env.example` + README. Server URL and credentials live only in the gitignored
   `.env.mlflow` (committed `.env.mlflow.example` has blank values). Not exposed to the internet; DSM serves port 5000, so MLflow uses 5050;
   MLflow basic-auth, single user; image tag == client version; `--allowed-hosts`; no Projects/model serving/registry/gateway; non-root, read-only
-  fs, `cap_drop: ALL`, no `docker.sock`, 1 GB limit; SQLite on a local NAS volume (not SMB/NFS); Hyper Backup / `sqlite3 .backup`.
+  fs, `cap_drop: ALL`, no `docker.sock`, 1 GB limit; **superseded 2026-10-01: Postgres (`deploy/postgres/`) for records + basic-auth users and MinIO for artifacts, both already on the NAS (maintainer); backup = `pg_dump` + bucket.**
 - **Metadata + small files.** Params, tags, metrics, plus small artifacts: eval report `.txt`, per-sample predictions (eval set only: hand-written),
   `train.yaml`/`merge.yaml`, `trainer_log.jsonl`. `--serve-artifacts` on the NAS volume. Never training data, weights, checkpoints, GGUFs.
 - **Dataset = public HF repo**, refreshed about every 2 months. Download with `hf download <repo> --repo-type dataset --revision <sha>`;

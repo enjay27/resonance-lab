@@ -1,0 +1,61 @@
+# PostgreSQL on the Synology NAS (Container Manager -> Project, or `docker compose up -d`).
+# Holds MLflow's records (database `mlflow`) and its basic-auth users (`mlflow_auth`), for deploy/mlflow/. Not published on
+# the LAN: only containers on the `resonance-db` network reach it. See README.md.
+# Settings and secrets come from `.env` next to this file (copy `.env.example`); `.env` is gitignored.
+name: resonance-postgres
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: resonance-postgres
+    restart: unless-stopped
+
+    # Small: one user, a few runs a day.
+    command:
+      - postgres
+      - -c
+      - max_connections=30
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - log_connections=off
+
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256 # a password for every connection, never `trust`
+      # Read by initdb/10-mlflow.sh, once, when the data volume is empty.
+      MLFLOW_DB_PASSWORD: ${MLFLOW_DB_PASSWORD:?set MLFLOW_DB_PASSWORD in .env}
+
+    volumes:
+      # A named volume keeps the image's own ownership (postgres, 70), so no root start and no capabilities are needed.
+      - resonance-postgres-data:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+
+    networks:
+      - resonance-db
+
+    # Locked down: the image's postgres user, a read-only root file system, no capabilities, no docker socket.
+    user: "70:70"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run/postgresql
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  resonance-postgres-data:
+
+networks:
+  resonance-db:
+    name: resonance-db # deploy/mlflow/ joins it by this name
