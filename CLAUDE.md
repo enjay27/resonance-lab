@@ -112,15 +112,24 @@ Model and dataset outputs (`lora_dataset/`, `model_f16*/`, `outputs/`, `*.gguf`,
 
 ---
 
-## Using graft (the repo is indexed)
+## Using graft (the repo is indexed) — graft first, as the index of every file
 
-Reach for graft before grep/read — see `.claude/skills/graft/SKILL.md`.
+**Rule: before you open a source file, get its index from graft; read only the span you need.** The index is the
+file's map; the file itself is the last thing to open, and only in pieces. (`.claude/skills/graft/SKILL.md` has the
+full tool list.)
 
-- **Before moving, renaming or splitting a symbol:** `graft callers <sym> --depth all`.
-  Editing the primary file and stopping is the classic miss. `config.py` constants are
-  imported by name from every script — `graft grep "<NAME>"` before renaming one.
-- `graft skeleton <file>` before reading a large file whole.
-- After structural changes graft rebuilds via the PostToolUse hook; `graft build` if stale.
+1. **Know a file?** `graft skeleton <file>`: every signature with its `file:line` span, ~10x cheaper than the file.
+   Then `Read` with `offset`/`limit` for just that span. Never `Read` a whole code file, or `grep`/`rg` for it, first.
+2. **Don't know where it lives?** `graft ask "<task>" --source` (code inlined at each hit). **Need every
+   occurrence?** `graft grep "<literal>"` (ask is ranked top-N and misses some).
+3. **Before moving, renaming, splitting or changing a signature:** `graft callers <sym> --depth all`. Editing the
+   primary file and stopping is the classic miss. `config.py` constants are imported by name from every script —
+   `graft grep "<NAME>"` before renaming one.
+4. **The graph follows your edits** (PostToolUse hook); `graft build` if it looks stale. `graft/` is gitignored.
+5. **Not indexed** (yaml, md, json, requirements, `.github/`, `.memory/`): read those directly. Files you are about
+   to rewrite whole, or under ~50 lines, may be read directly too. Say so when graft is missing or empty instead of
+   silently falling back to grep.
+6. **Close a turn that used graft with the savings tally line** its hook asks for (`🌱 graft saved ~N tokens ...`).
 
 ---
 
@@ -142,6 +151,7 @@ Reach for graft before grep/read — see `.claude/skills/graft/SKILL.md`.
 
 ## Guardrails
 
+- **Graft first.** Index a file with `graft skeleton` before reading it; see *Using graft*.
 - **Plan first.** Do not modify scripts, config, manifests or CI on the first turn of a
   task. Present an impact analysis (graft `callers` output is the evidence) and wait for
   explicit confirmation. See `.claude/skills/workflow-control/SKILL.md`.
