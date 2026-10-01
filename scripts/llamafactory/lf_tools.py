@@ -95,6 +95,14 @@ def training_prompt(template, text):
     return TRAINING_PROMPTS[template].format(text=text)
 
 
+def with_bos(ids, bos_id):
+    """Token ids with the BOS in front. Training's template prefix always put it there; some tokenizers
+    (gemma3) add it when encoding, others (Hy-MT2) do not."""
+    if bos_id is None or (ids and ids[0] == bos_id):
+        return list(ids)
+    return [bos_id, *ids]
+
+
 def translategemma_messages(text, source="ja", target="ko"):
     """The structured message TranslateGemma's own chat template turns into its long English prompt."""
     return [{"role": "user", "content": [{"type": "text", "source_lang_code": source, "target_lang_code": target, "text": text}]}]

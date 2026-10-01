@@ -271,3 +271,19 @@ def test_chat_messages_of_gemma3_are_translategemmas():
 def test_chat_messages_of_an_unknown_template_lists_the_known_ones():
     with pytest.raises(ValueError, match="hy_dense_7b"):
         lf_tools.chat_messages("nope", "x")
+
+
+# --- BOS in the training-format eval prompt ------------------------------------------------------
+
+
+def test_with_bos_prepends_it_when_the_tokenizer_did_not():
+    # Hy-MT2's tokenizer does not add BOS by itself (checked locally); training's template prefix did.
+    assert lf_tools.with_bos([5, 6], bos_id=1) == [1, 5, 6]
+
+
+def test_with_bos_leaves_ids_that_already_start_with_it():
+    assert lf_tools.with_bos([1, 5, 6], bos_id=1) == [1, 5, 6]  # gemma3: the tokenizer adds <bos>
+
+
+def test_with_bos_is_a_noop_without_a_bos_token():
+    assert lf_tools.with_bos([5, 6], bos_id=None) == [5, 6]

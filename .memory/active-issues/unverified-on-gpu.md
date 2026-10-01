@@ -30,6 +30,8 @@ Code or config changed in a session without CUDA. Delete an item once it has run
   the real merged model (tokenizer call, `enable_thinking`, BOS handling), COMET with `unbabel-comet`,
   and that the unsloth eval's `inputs.shape[-1]` slicing (tensor, not dict) is right.
 - **Hy-MT2 profiles (2026-10-01, `claude/next-task-model-selection-nzghmf`):** `configs/llamafactory/hy-mt2-{1.8b,7b}/`,
+  Update: step 1 ran locally -- both templates MATCH; neither tokenizer adds BOS (eval `--prompt training` now prepends it, `with_bos`).
+  Local py3.13 raised `linecache._register_code ... 'str' has no attribute 'co_consts'` in a `python -c` run: open.
   `TRAINING_PROMPTS` / `chat_messages` in `lf_tools.py` (unit-tested), `scripts/llamafactory/inspect_template.py`.
   huggingface.co is blocked in cloud sessions, so the strings come from Tencent's README and from
   LLaMA-Factory's `template.py` (templates `hy_dense_1_8b`, `hy_dense_7b` are registered upstream; both read
