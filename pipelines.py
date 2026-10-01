@@ -21,10 +21,10 @@ PIPELINES = {
     "unsloth": [
         ("Validate", _script("validate.py")),
         ("Preprocessing", _script("preprocess.py")),
-        ("Dataset Split", _script("split_dataset.py")),
-        ("Fine-Tuning", _script("train.py")),
-        ("Metadata Fix", _script("fix_metadata.py")),
-        ("Evaluation", _script("eval.py")),
+        ("Dataset Split", _script("unsloth", "split_dataset.py")),
+        ("Fine-Tuning", _script("unsloth", "train.py")),
+        ("Metadata Fix", _script("unsloth", "fix_metadata.py")),
+        ("Evaluation", _script("unsloth", "eval.py")),
     ],
 }
 

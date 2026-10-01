@@ -2,7 +2,7 @@ import os
 import sys
 from unsloth import FastLanguageModel
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config import CLEAN_MODEL_DIR, INSTRUCTION
 
 # 1. Load the model
