@@ -56,7 +56,7 @@ Code or config changed in a session without CUDA. Delete an item once it has run
   picks fa2/sdpa; the batch fits VRAM; then compare time (watch_training tok/s) and eval chrF against the base profile.
   `python run_pipeline.py --model hy-mt2-1.8b-fast`. If fa2 works, add `neat_packing: true`.
 - **`python -c` crashes on the maintainer's Python 3.13** with `linecache._register_code ... 'str' has no attribute 'co_consts'` (seen with `-c` only; the same imports from a .py file work). Run checks from a file, not `-c`. Cause not investigated.
-- **`scripts/llamafactory/inspect_pair.py` (2026-10-01):** prints the training example LLaMA-Factory builds (masked prompt, trained
+- **`scripts/llamafactory/inspect_pair.py` (2026-10-01; run locally: the API calls work, the eos was missing -> fixed, re-run to see MATCH):** prints the training example LLaMA-Factory builds (masked prompt, trained
   response, EOS, tokens vs cutoff) via `template.encode_oneturn`. `first_pairs` is tested; the LLaMA-Factory calls are written from
   memory of its API (`get_template_and_fix_tokenizer`, `DataArguments`, `encode_oneturn`) and never ran. Run:
   `python scripts/llamafactory/inspect_pair.py --model hy-mt2-1.8b --rows 3` (needs `data/processed/lora_train_data.jsonl` from

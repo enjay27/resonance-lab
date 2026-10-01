@@ -433,3 +433,45 @@ def test_first_pairs_rejects_rows_without_the_pair_columns(tmp_path):
 
     with pytest.raises(ValueError, match="--format pair"):
         lf_tools.first_pairs(str(path), 1)
+
+
+# --- the full training example per template (verified against inspect_pair.py output, 2026-10-01) ---
+# Made-up line pair; the strings are what LLaMA-Factory builds: BOS + prompt masked, response trained.
+
+ORIGINAL, TRANSLATED = "杖@2募集", "법사@2 모집"
+
+
+def test_training_example_of_gemma3_ends_the_turn_in_the_response():
+    masked, trained = lf_tools.training_example("gemma3", ORIGINAL, TRANSLATED)
+
+    assert masked == "<bos><start_of_turn>user\n杖@2募集<end_of_turn>\n<start_of_turn>model\n"
+    assert trained == "법사@2 모집<end_of_turn>\n"
+
+
+def test_training_example_of_hy_1_8b_trains_the_assistant_token_and_the_eos():
+    # The 1.8B template puts <｜hy_Assistant｜> in the response; LLaMA-Factory appends the eos (efficient_eos).
+    masked, trained = lf_tools.training_example("hy_dense_1_8b", ORIGINAL, TRANSLATED)
+
+    assert masked == "<｜hy_begin▁of▁sentence｜><｜hy_User｜>杖@2募集"
+    assert trained == "<｜hy_Assistant｜>법사@2 모집<｜hy_place▁holder▁no▁2｜>"
+
+
+def test_training_example_of_hy_7b_has_the_user_marker_in_the_prompt():
+    masked, trained = lf_tools.training_example("hy_dense_7b", ORIGINAL, TRANSLATED)
+
+    assert masked == "<|startoftext|>杖@2募集<|extra_0|>"
+    assert trained == "법사@2 모집<|eos|>"
+
+
+def test_training_example_is_the_inference_prompt_plus_the_answer():
+    # What the model is asked at inference (training_prompt) is the training text up to the answer.
+    for template in ("gemma3", "hy_dense_1_8b", "hy_dense_7b"):
+        masked, trained = lf_tools.training_example(template, ORIGINAL, TRANSLATED)
+        bos = lf_tools.TRAINING_BOS[template]
+
+        assert (masked + trained).startswith(bos + lf_tools.training_prompt(template, ORIGINAL))
+
+
+def test_training_example_of_an_unknown_template_lists_the_known_ones():
+    with pytest.raises(ValueError, match="hy_dense_7b"):
+        lf_tools.training_example("nope", "a", "b")

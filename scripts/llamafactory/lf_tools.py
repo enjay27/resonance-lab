@@ -162,6 +162,35 @@ HY_TRANSLATE_PROMPT = (
 )
 
 
+# The rest of a full training example, per template (confirmed with scripts/llamafactory/inspect_pair.py on the
+# real tokenizers, 2026-10-01): the BOS the template prefix adds, and what follows the answer. gemma3 closes the
+# turn inside the response; the Hy templates have efficient_eos, so LLaMA-Factory appends the eos token itself.
+TRAINING_BOS = {
+    "gemma3": "<bos>",
+    "hy_dense_1_8b": "<｜hy_begin▁of▁sentence｜>",
+    "hy_dense_7b": "<|startoftext|>",
+}
+TRAINING_AFTER_ANSWER = {
+    "gemma3": "<end_of_turn>\n",
+    "hy_dense_1_8b": "<｜hy_place▁holder▁no▁2｜>",
+    "hy_dense_7b": "<|eos|>",
+}
+# The 1.8B template puts <｜hy_Assistant｜> in the trained response, not in the masked prompt.
+_ANSWER_STARTS_WITH = {"hy_dense_1_8b": "<｜hy_Assistant｜>"}
+
+
+def training_example(template, original, translated):
+    """(masked, trained): the text of one training example, as special tokens. `masked` is the prompt (loss
+    ignores it), `trained` the response the model is trained to produce."""
+    if template not in TRAINING_BOS:
+        raise ValueError(f"no training example for template {template!r}; known: {', '.join(sorted(TRAINING_BOS))}")
+    prompt = TRAINING_BOS[template] + training_prompt(template, original)
+    start = _ANSWER_STARTS_WITH.get(template, "")
+    if start:
+        prompt = prompt.removesuffix(start)
+    return prompt, start + translated + TRAINING_AFTER_ANSWER[template]
+
+
 def chat_messages(template, text):
     """Messages for tokenizer.apply_chat_template: the model's own documented prompt, which is not
     the training format (see training_prompt)."""
