@@ -2,6 +2,10 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **MLflow server (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `deploy/mlflow/` was checked as far as a cloud session can: a real MLflow 3.16.1 server with the same flags/env
+  (401/403/200 behaviour, logging, artifacts) and `docker compose config`. Never built or run in Docker (no daemon here): on the NAS check the image build
+  (`python:3.12-slim` + `mlflow[auth]`), that the container starts with `read_only: true` + tmpfs `/tmp`, the health check, and the README's `curl` checks from the desktop.
+
 - **Runs (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `train.py` now passes `output_dir=outputs/<profile>_lora/<run id>` to `llamafactory-cli train`, `merge.py` passes
   `adapter_name_or_path=<run dir>` to `export`, the monitor follows the latest run. Unit-tested with faked commands only. `key=value` overrides after the yaml and
   the "only weight files make an output_dir non-empty" rule were read in the pinned source (`hparams/parser.py` `read_args` 117-120, 612-623; `CHECKPOINT_NAMES`), never run.
