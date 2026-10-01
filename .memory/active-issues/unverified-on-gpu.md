@@ -31,6 +31,7 @@ Code or config changed in a session without CUDA. Delete an item once it has run
   and that the unsloth eval's `inputs.shape[-1]` slicing (tensor, not dict) is right.
 - **Hy-MT2 profiles (2026-10-01, `claude/next-task-model-selection-nzghmf`):** `configs/llamafactory/hy-mt2-{1.8b,7b}/`,
   Update: step 1 ran locally -- both templates MATCH; neither tokenizer adds BOS (eval `--prompt training` now prepends it, `with_bos`).
+  LLaMA-Factory: PyPI 0.9.5 lacks the Hy templates; source commit ce9dc9e0 has them and is now pinned (with transformers 4.57.1, peft 0.18.1, trl 0.24.0). eval.py `chat-template` crashed on `token_type_ids` (Hy tokenizer) -> `generate_inputs`; re-run to confirm.
   Local py3.13 raised `linecache._register_code ... 'str' has no attribute 'co_consts'` in a `python -c` run: open.
   `TRAINING_PROMPTS` / `chat_messages` in `lf_tools.py` (unit-tested), `scripts/llamafactory/inspect_template.py`.
   huggingface.co is blocked in cloud sessions, so the strings come from Tencent's README and from
