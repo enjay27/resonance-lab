@@ -4,6 +4,7 @@ Python project for Resonance Stream, which generate output for translator model,
 ## Development
 - Rules, gates and layout: [`CLAUDE.md`](CLAUDE.md); current state: [`MEMORY.md`](MEMORY.md)
 - `pip install -r requirements-dev.txt` then `just check` (lint + data-stage tests, CPU only)
+- `python run_pipeline.py --pipeline unsloth` runs a training pipeline (`pipelines.py` lists them)
 
 ## Prerequisites
 - Python 3.13
