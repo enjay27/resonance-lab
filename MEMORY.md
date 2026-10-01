@@ -18,6 +18,11 @@ next training), `rich` training monitor, shared eval report. `RESONANCE_RAW_LOGS
 **Next session starts at** [`roadmap/next.md`](.memory/roadmap/next.md) *Start here*: re-baseline on the GPU
 machine, then a profile per shortlist candidate.
 
+**Model choice, step 1 (2026-10-01): Hy-MT2 profiles written** (`hy-mt2-1.8b`, `hy-mt2-7b`; lead challenger of the
+shortlist). Not run: the cloud session cannot reach huggingface.co, so templates come from Tencent's README +
+LLaMA-Factory source. **Next: local checklist in** [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md)
+(`inspect_template.py`), then zero-shot eval vs the re-baselined TranslateGemma-4B. Other candidates: later.
+
 **Model part never runs in a cloud session** (no GPU): every model stage is NOT VERIFIED —
 [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md). Auto-merge of `claude/*` PRs works.
 

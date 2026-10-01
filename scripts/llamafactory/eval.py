@@ -12,11 +12,11 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config import EVAL_DATASET_PATH, EVAL_OUTPUT_DIR, LF_PROFILE
 from eval_metrics import comet_score, evaluate, format_report, load_eval_dataset, strip_think
-from lf_tools import load_profile, training_prompt, translategemma_messages
+from lf_tools import chat_messages, load_profile, training_prompt
 
 PROMPTS = {
-    "chat-template": "the model's own chat template with language codes (TranslateGemma's long English prompt) -- "
-    "what resonance-stream sends today",
+    "chat-template": "the model's own documented prompt through its chat template (TranslateGemma: language codes -> long "
+    "English prompt, what resonance-stream sends today; Hy-MT2: its English 'Translate the following text into Korean')",
     "training": "the raw line in the training turn format -- exactly what fine-tuning saw",
 }
 
@@ -52,7 +52,7 @@ def main(argv=None):
         if args.prompt == "training":
             return tokenizer(training_prompt(profile.template, jp_text), return_tensors="pt").to("cuda")
         return tokenizer.apply_chat_template(
-            translategemma_messages(jp_text),
+            chat_messages(profile.template, jp_text),
             tokenize=True,
             add_generation_prompt=True,
             return_dict=True,

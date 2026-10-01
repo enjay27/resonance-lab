@@ -1,0 +1,12 @@
+### Model
+model_name_or_path: tencent/Hy-MT2-1.8B
+adapter_name_or_path: outputs/hy-mt2-1.8b_lora
+template: hy_dense_1_8b
+finetuning_type: lora
+trust_remote_code: true
+
+### Export
+export_dir: model_hy-mt2-1.8b_merged
+export_size: 2
+export_device: cpu
+export_legacy_format: false
