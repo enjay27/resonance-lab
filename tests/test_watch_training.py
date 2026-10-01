@@ -66,9 +66,9 @@ def test_parse_gpu_stats_rejects_garbage(text):
 
 
 def test_tokens_per_step_comes_from_the_profile_yaml():
-    # translategemma-4b: batch 2 x accumulation 4 x cutoff 128 -- not a hard-coded guess.
+    # translategemma-4b: batch 2 x accumulation 4 x cutoff 256 -- not a hard-coded guess.
     profile = lf_tools.load_profile(config.LF_PROFILE)
-    assert wt.tokens_per_step(profile.train_yaml) == 2 * 4 * 128
+    assert wt.tokens_per_step(profile.train_yaml) == 2 * 4 * 256
 
 
 # --- state: the trainer log ---------------------------------------------------------------------

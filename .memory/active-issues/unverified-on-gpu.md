@@ -66,3 +66,6 @@ Code or config changed in a session without CUDA. Delete an item once it has run
   `python scripts/preprocess.py --format pair --prompt auto --model hy-mt2-1.8b [--reverse]`, then
   `python scripts/llamafactory/inspect_pair.py --model hy-mt2-1.8b` (MATCH, tokens vs cutoff_len 256 -- TG's instruction is ~60 tokens
   longer than the line, cutoff 128 may truncate: raise it). `eval.py --prompt training` now wraps the line in the style too.
+- **`--reverse` rule + TG `cutoff_len` 256 (2026-10-01):** the rule is from `aab6b66` and unit-tested, never run on the real raw log. Check the
+  Preprocessing Report on it (reverse rows are counted in Total/Passed, reasons shared) against the shipped processed file's row count.
+  `translategemma-4b(-fast)` train.yaml now has `cutoff_len: 256` (the shipped recipe), which changes tokens/step in the monitor.

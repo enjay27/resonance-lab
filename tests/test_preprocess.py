@@ -3,6 +3,7 @@ import re
 
 import pytest
 
+import config
 import preprocess
 from config import INSTRUCTION
 from conftest import read_jsonl
@@ -106,6 +107,8 @@ def test_filters_keep_clean_rows_in_order_and_report_each_reason(write_jsonl, tm
         "empty field": 0,
         "hangeul in original": 1,
         "JP residual in translation": 1,
+        "JP in original (ko_ja)": 0,
+        "Hangeul residual in translation (ko_ja)": 0,
         "hallucination": 1,
         "recruitment spam": 0,
         "duplicate": 1,
@@ -193,7 +196,7 @@ def test_transform_writes_forward_and_reverse_rows_for_clean_rows_only(write_jso
     counts = preprocess.transform_for_lora(src, str(out), fmt="pair", style="hy", reverse=True)
 
     rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
-    assert len(rows) == 2 and counts["passed"] == 1
+    assert len(rows) == 2 and counts["passed"] == 2  # one forward and one reverse row
     assert rows[1]["translated"] == "杖@2募集"
 
 
@@ -224,3 +227,69 @@ def test_main_without_a_prompt_keeps_the_raw_line(write_jsonl, tmp_path, monkeyp
     preprocess.main(["--format", "pair"])
 
     assert json.loads(out.read_text(encoding="utf-8"))["original"] == "杖@2募集"
+
+
+# --- the reverse direction's own filters (experiment/translategemma aab6b66, "process bidirectual training") ---
+
+
+@pytest.mark.parametrize("japanese,korean,reason", [
+    ("杖@2募集", "법사@2 모집", None),
+    ("杖@2募集", "법사 杖@2", "JP in original (ko_ja)"),  # kana/kanji left in the Korean that would be the input
+    ("杖@2募集", "", "empty field"),
+])
+def test_reverse_clean_reason_filters_the_korean_side_as_the_source(japanese, korean, reason):
+    assert preprocess.clean_reason(korean, japanese, direction="ko-ja") == reason
+
+
+def test_reverse_clean_reason_flags_hangeul_left_in_the_japanese_answer():
+    assert preprocess.clean_reason("법사@2 모집", "杖@2 모집 모집", direction="ko-ja") == "Hangeul residual in translation (ko_ja)"
+
+
+def test_reverse_clean_reason_keeps_the_ten_times_and_spam_rules():
+    assert preprocess.clean_reason("가", "あ" * 11, direction="ko-ja") == "hallucination"
+    spam = "ID: 1 ID: 2 " + "가" * 150
+    assert preprocess.clean_reason(spam, "あ", direction="ko-ja") == "recruitment spam"
+
+
+def test_forward_filters_are_unchanged_by_the_direction_argument():
+    assert preprocess.clean_reason("이미 한글", "x") == "hangeul in original"
+    assert preprocess.clean_reason("杖", "법사") is None
+
+
+def test_reverse_is_tried_only_for_forward_rows_and_counted_on_its_own(write_jsonl, tmp_path):
+    src = write_jsonl("raw.jsonl", [
+        {"original": "杖@2募集", "translated": "법사@2 모집"},          # forward ok, reverse ok
+        {"original": "杖募集" * 4, "translated": "법"},                # forward ok; reverse: Japanese 12x the Korean
+        {"original": "이미 한글", "translated": "x"},                  # forward dropped: no reverse attempted
+    ])
+    out = tmp_path / "out.jsonl"
+
+    counts = preprocess.transform_for_lora(src, str(out), fmt="pair", reverse=True)
+
+    assert counts["total"] == 3 + 2  # three forward attempts, two reverse attempts
+    assert counts["passed"] == 3     # 2 forward + 1 reverse
+    assert counts["hallucination"] == 1  # the reverse one
+    assert counts["hangeul in original"] == 1
+    assert len(out.read_text(encoding="utf-8").splitlines()) == 3
+
+
+def test_reverse_input_that_is_already_a_seen_source_is_a_duplicate(write_jsonl, tmp_path):
+    # The second line's Korean answer equals the first line's input: as a reverse source it would repeat a seen input.
+    src = write_jsonl("raw.jsonl", [
+        {"original": "AAA", "translated": "BBB"},
+        {"original": "CCC", "translated": "AAA"},
+    ])
+    out = tmp_path / "out.jsonl"
+
+    counts = preprocess.transform_for_lora(src, str(out), fmt="pair", reverse=True)
+
+    assert counts["duplicate"] >= 1
+
+
+def test_the_translategemma_profile_trains_with_room_for_the_instruction():
+    import yaml
+
+    for name in ("translategemma-4b", "translategemma-4b-fast", "hy-mt2-1.8b", "hy-mt2-7b"):
+        path = f"{config.BASE_DIR}/configs/llamafactory/{name}/train.yaml"
+        with open(path, encoding="utf-8") as f:
+            assert yaml.safe_load(f)["cutoff_len"] >= 256, name
