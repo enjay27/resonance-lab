@@ -14,10 +14,18 @@ different `trl`/`transformers`).
 | pipeline | trains | requirements | stages |
 |---|---|---|---|
 | `llamafactory` | any model with a profile in `configs/llamafactory/<profile>/` (now `translategemma-4b`; pick with `RESONANCE_LF_PROFILE`) | `requirements-llamafactory.txt` | Validate, Preprocessing, Update Dataset, Fine-Tuning, Merge LoRA, Export GGUF (`model_gguf/bp-<profile>-q4_k_m.gguf`) |
-| `unsloth` | Qwen3 1.7B | `requirements-unsloth.txt` | Validate, Preprocessing, Dataset Split, Fine-Tuning, Metadata Fix, Evaluation, then the manual GGUF steps below |
+| `unsloth` | Qwen3 1.7B | `requirements-unsloth.txt` | Validate, Preprocessing, Dataset Split, Fine-Tuning, Metadata Fix, Evaluation (+ the shared report), then the manual GGUF steps below |
 
 A new model for the `llamafactory` pipeline is a new folder `configs/llamafactory/<profile>/` with `train.yaml` and
 `merge.yaml` (`tests/test_lf_tools.py` checks the two agree on adapter path, base model and template).
+
+## Evaluation
+`data/eval/bp-eval-dataset.jsonl` (gitignored; one JSON per line: `original`, `translated`, optional `category`).
+Both pipelines print the same report (chrF/BLEU/TER, COMET if `unbabel-comet` is installed, JP and `<think>`
+leakage, game-term accuracy, exact match, per-category counts, every output) via `eval_metrics.py`, and save it
+to `outputs/eval/`. `python scripts/llamafactory/eval.py --prompt training` evaluates on the exact training prompt
+instead of the model's chat template (the default, which is what resonance-stream sends) -- the gap between the two
+is the prompt mismatch in `.memory/active-issues/stream-contract.md`.
 
 ## Prerequisites
 - Python 3.13

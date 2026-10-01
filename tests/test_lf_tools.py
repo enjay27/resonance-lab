@@ -196,3 +196,29 @@ def test_run_logged_missing_program_exits_one_without_a_traceback(tmp_path, caps
 
     assert exc.value.code == 1
     assert "not found" in capsys.readouterr().out.lower()
+
+
+# --- eval prompts --------------------------------------------------------------------------------
+
+
+def test_training_prompt_is_the_raw_line_in_the_models_turn_format():
+    # What the model saw in training (template gemma3, no system prompt); the tokenizer adds <bos>.
+    text = lf_tools.training_prompt("gemma3", "遺跡1Fから　29k↑　＠T1")
+
+    assert text == "<start_of_turn>user\n遺跡1Fから　29k↑　＠T1<end_of_turn>\n<start_of_turn>model\n"
+    assert "<bos>" not in text
+
+
+def test_training_prompt_of_an_unknown_template_lists_the_known_ones():
+    with pytest.raises(ValueError, match="gemma3"):
+        lf_tools.training_prompt("nope", "x")
+
+
+def test_the_default_profiles_template_has_a_training_prompt(profile):
+    assert lf_tools.training_prompt(profile.template, "x")
+
+
+def test_translategemma_messages_carry_the_language_codes():
+    assert lf_tools.translategemma_messages("こんにちは") == [
+        {"role": "user", "content": [{"type": "text", "source_lang_code": "ja", "target_lang_code": "ko", "text": "こんにちは"}]}
+    ]

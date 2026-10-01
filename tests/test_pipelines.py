@@ -40,7 +40,7 @@ def test_unknown_pipeline_lists_the_choices():
         pipelines.stages("nope")
 
 
-def test_llamafactory_runs_merge_before_gguf_export():
+def test_llamafactory_runs_merge_before_gguf_export_and_evaluates_last():
     assert stage_names("llamafactory") == [
         "Validate",
         "Preprocessing",
@@ -48,6 +48,7 @@ def test_llamafactory_runs_merge_before_gguf_export():
         "Fine-Tuning",
         "Merge LoRA",
         "Export GGUF",
+        "Evaluation",
     ]
 
 
@@ -69,3 +70,16 @@ def test_pipelines_share_validate_and_preprocess():
     shared = {"Validate", "Preprocessing"}
     paths = {name: {s.name: s.path for s in pipelines.stages(name) if s.name in shared} for name in pipelines.PIPELINES}
     assert paths["unsloth"] == paths["llamafactory"]
+
+
+def test_every_pipeline_ends_with_the_evaluation_stage():
+    # The eval only reads the merged model and prints a report; a missing eval set must not
+    # keep the GGUF from being exported, so it comes last.
+    for name in pipelines.PIPELINES:
+        assert stage_names(name)[-1] == "Evaluation", name
+
+
+def test_eval_dataset_path_is_configured():
+    import config
+
+    assert config.EVAL_DATASET_PATH.endswith(os.path.join("data", "eval", "bp-eval-dataset.jsonl"))

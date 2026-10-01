@@ -7,6 +7,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RAW_DATA_DIR = os.path.join(BASE_DIR, "data", "raw")
 PROCESSED_DATA_DIR = os.path.join(BASE_DIR, "data", "processed")
 LORA_DATASET_DIR = os.path.join(BASE_DIR, "lora_dataset")
+EVAL_DATASET_PATH = os.path.join(BASE_DIR, "data", "eval", "bp-eval-dataset.jsonl")  # original/translated[/category] per line
+EVAL_OUTPUT_DIR = os.path.join(BASE_DIR, "outputs", "eval")  # one report per model + prompt
 
 RAW_LOGS = os.path.join(RAW_DATA_DIR, "raw_translated_logs.jsonl")
 PROCESSED_LOGS = os.path.join(PROCESSED_DATA_DIR, "lora_train_data.jsonl")

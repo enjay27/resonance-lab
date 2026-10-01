@@ -32,9 +32,13 @@
      tok/s uses batch x accumulation x cutoff from the yaml (the branch hard-coded 8 x 256,
      but cutoff is 128); only JSON errors are swallowed (the branch had a bare `except`);
      Ctrl+C instead of `q`; needs a ~110-column terminal.
-   - **D — shared eval metrics:** chrF, COMET, JP leakage, think leakage, term accuracy
-     (`TERM_DICT`) as a tested module both pipelines' `eval.py` use, so numbers compare.
-   Not decided yet: eval stage for `llamafactory` sits after Merge LoRA (D).
+   - **D — shared eval metrics (done):** `eval_metrics.py` (chrF/BLEU/TER, COMET, JP + think
+     leakage, `TERM_DICT` accuracy, discord, exact match, categories, report), used by both
+     pipelines' `eval.py`; `text_rules.py` holds the shared JP/Hangeul patterns. Evaluation is the
+     LAST stage of both pipelines (it only reads the merged model; a missing eval set must not block
+     the GGUF). `llamafactory/eval.py --prompt chat-template|training` measures the prompt gap.
+     **Fixed a bug of the branch:** its BLEU/chrF/TER scored only the first sample
+     (`active-issues/old-eval-numbers.md`). Discord violations now count samples, not word hits.
    Prompt format is not in the registry yet (one pipeline carries the contract); revisit
    when the model is chosen (`translator-shortlist-2026-10-01.md`).
 3. **Ingest the app's per-channel files** (`dataset_<CHANNEL>.jsonl`) instead of one
@@ -45,3 +49,9 @@
 5. **`ruff format` baseline** — one formatting-only commit, its hash in
    `.git-blame-ignore-revs`, then `fmt-check` into `just check`. Off by the maintainer's
    call (2026-10-01).
+
+## After the pipeline work (A-D)
+- **Re-baseline:** run the shipped TranslateGemma-4B through `llamafactory/eval.py` with both `--prompt`
+  modes (the old chrF numbers are invalid) — the first step of the shortlist's zero-shot round.
+- A `llamafactory` profile per shortlist candidate (Hy-MT2-1.8B/7B, Gemma 4 E4B, TranslateGemma-12B):
+  `train.yaml` + `merge.yaml`, plus a `TRAINING_PROMPTS` entry and an eval prompt for its template.

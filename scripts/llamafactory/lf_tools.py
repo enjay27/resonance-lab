@@ -78,6 +78,24 @@ def dataset_info_for_processed_logs():
     return dataset_info(file_name)
 
 
+# What the model saw as a training example, per LLaMA-Factory template: the raw line as the user
+# turn, no system prompt. The tokenizer adds <bos> itself, as in training.
+TRAINING_PROMPTS = {
+    "gemma3": "<start_of_turn>user\n{text}<end_of_turn>\n<start_of_turn>model\n",
+}
+
+
+def training_prompt(template, text):
+    if template not in TRAINING_PROMPTS:
+        raise ValueError(f"no training prompt for template {template!r}; known: {', '.join(sorted(TRAINING_PROMPTS))}")
+    return TRAINING_PROMPTS[template].format(text=text)
+
+
+def translategemma_messages(text, source="ja", target="ko"):
+    """The structured message TranslateGemma's own chat template turns into its long English prompt."""
+    return [{"role": "user", "content": [{"type": "text", "source_lang_code": source, "target_lang_code": target, "text": text}]}]
+
+
 def train_command(train_yaml):
     return ["llamafactory-cli", "train", train_yaml]
 
