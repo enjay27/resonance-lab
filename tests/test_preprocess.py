@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 import preprocess
@@ -44,7 +46,9 @@ def test_skips_rows_the_app_never_translated(write_jsonl, tmp_path, capsys):
     preprocess.transform_for_lora(src, str(out))
 
     assert read_jsonl(out) == [{"instruction": INSTRUCTION, "input": "遺跡1F", "output": "유적 1F"}]
-    assert "Skipped 3 lines without an original or a translation." in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert re.search(r"Skipped\s*: 3", out)
+    assert re.search(r"empty field\s*: 3", out)
 
 
 def test_exits_when_no_row_was_translated(write_jsonl, tmp_path):
@@ -53,3 +57,69 @@ def test_exits_when_no_row_was_translated(write_jsonl, tmp_path):
     with pytest.raises(SystemExit) as exc:
         preprocess.transform_for_lora(src, str(tmp_path / "out.jsonl"))
     assert exc.value.code == 1
+
+
+@pytest.mark.parametrize(
+    "original, translated, reason",
+    [
+        ("おやすみ！", "잘 자!", None),
+        ("", "잘 자!", "empty field"),
+        ("おやすみ！", "   ", "empty field"),
+        ("ムクボ3돌 완료", "무크보 3돌 완료", "hangeul in original"),
+        ("おやすみ！", "おやすみ!", "JP residual in translation"),
+        ("遺跡1F", "遺跡 1F", "JP residual in translation"),
+        ("あ", "가" * 11, "hallucination"),
+        ("あ", "가" * 10, None),  # exactly 10x is allowed
+        ("ID:1 " + "あ" * 150 + " ID:2", "모집", "recruitment spam"),
+        ("ID:1 " + "あ" * 150, "모집", None),  # one ID is a normal recruitment line
+        ("あ" * 150 + " ID:1 ID:2", "모집", "recruitment spam"),
+        ("ID:1 ID:2", "모집", None),  # short lines are not spam
+    ],
+)
+def test_clean_reason(original, translated, reason):
+    assert preprocess.clean_reason(original, translated) == reason
+
+
+def test_filters_keep_clean_rows_in_order_and_report_each_reason(write_jsonl, tmp_path, capsys):
+    src = write_jsonl(
+        "raw.jsonl",
+        [
+            {"original": "遺跡1F", "translated": "유적 1F"},
+            {"original": "ムクボ3돌", "translated": "무크보 3돌"},  # hangeul in original
+            {"original": "おやすみ", "translated": "おやすみ"},  # JP residual
+            {"original": "遺跡1F", "translated": "다른 번역"},  # duplicate of line 1
+            "{broken json",
+            {"original": "スカイ", "translated": "스카이"},
+            {"original": "あ", "translated": "가" * 50},  # hallucination
+        ],
+    )
+    out = tmp_path / "out.jsonl"
+
+    counts = preprocess.transform_for_lora(src, str(out))
+
+    assert [r["input"] for r in read_jsonl(out)] == ["遺跡1F", "スカイ"]
+    assert read_jsonl(out)[0]["output"] == "유적 1F"  # the first occurrence wins
+    assert counts == {
+        "total": 7,
+        "passed": 2,
+        "empty field": 0,
+        "hangeul in original": 1,
+        "JP residual in translation": 1,
+        "hallucination": 1,
+        "recruitment spam": 0,
+        "duplicate": 1,
+        "json error": 1,
+    }
+    report = capsys.readouterr().out
+    for label, n in (("Total input", 7), ("Passed", 2), ("Skipped", 5), ("duplicate", 1), ("json error", 1)):
+        assert re.search(rf"{label}\s*: {n}\b", report), label
+
+
+def test_cleaned_text_is_stripped(write_jsonl, tmp_path):
+    src = write_jsonl("raw.jsonl", [{"original": "  おやすみ！\n", "translated": " 잘 자! "}])
+    out = tmp_path / "out.jsonl"
+
+    preprocess.transform_for_lora(src, str(out))
+
+    assert read_jsonl(out)[0]["input"] == "おやすみ！"
+    assert read_jsonl(out)[0]["output"] == "잘 자!"
