@@ -116,6 +116,7 @@ def test_filters_keep_clean_rows_in_order_and_report_each_reason(write_jsonl, tm
         "eval overlap (near)": 0,
         "duplicate": 1,
         "json error": 1,
+        "validation": 0,
     }
     report = capsys.readouterr().out
     for label, n in (("Total input", 7), ("Passed", 2), ("Skipped", 5), ("duplicate", 1), ("json error", 1)):
@@ -456,3 +457,113 @@ def test_a_failed_preprocess_leaves_no_stale_manifest(write_jsonl, tmp_path, mon
         preprocess.main([])
 
     assert not os.path.exists(stale)
+
+
+# --- the validation split: by line, written to its own file ---------------------------------------------
+
+
+def _many(n=600):
+    return [{"original": f"レイド募集 {i} 杖@2", "translated": f"레이드 모집 {i} 법사@2"} for i in range(n)]
+
+
+def test_validation_rows_go_to_their_own_file_and_never_to_the_training_file(write_jsonl, tmp_path):
+    from valsplit import is_validation
+
+    src = write_jsonl("raw.jsonl", _many())
+    out, val = tmp_path / "out.jsonl", tmp_path / "val.jsonl"
+
+    counts = preprocess.transform_for_lora(src, str(out), fmt="pair", val_file=str(val), val_fraction=0.1)
+
+    train_rows, val_rows = read_jsonl(out), read_jsonl(val)
+    assert counts["validation"] == len(val_rows) and counts["passed"] == len(train_rows) + len(val_rows) == 600
+    assert 30 < len(val_rows) < 90
+    assert all(is_validation(r["original"], 0.1) for r in val_rows)
+    assert not any(is_validation(r["original"], 0.1) for r in train_rows)
+
+
+def test_both_directions_of_a_pair_stay_on_the_same_side(write_jsonl, tmp_path):
+    src = write_jsonl("raw.jsonl", _many(300))
+    out, val = tmp_path / "out.jsonl", tmp_path / "val.jsonl"
+
+    preprocess.transform_for_lora(src, str(out), fmt="pair", reverse=True, val_file=str(val), val_fraction=0.2)
+
+    def sides(rows):
+        return {r["translated"] if "레이드" in r["original"] else r["original"] for r in rows}  # the Japanese line of each row
+
+    train_rows, val_rows = read_jsonl(out), read_jsonl(val)
+    assert len(val_rows) % 2 == 0 and len(train_rows) % 2 == 0  # forward + reverse together
+    assert not sides(train_rows) & sides(val_rows)
+
+
+def test_variants_of_a_line_do_not_straddle_the_split(write_jsonl, tmp_path):
+    rows = []
+    for i in range(300):
+        rows += [{"original": f"レイド {i} 集合", "translated": "a"}, {"original": f"レイド {i} 集合！", "translated": "b"}]
+    src = write_jsonl("raw.jsonl", rows)
+    out, val = tmp_path / "out.jsonl", tmp_path / "val.jsonl"
+
+    preprocess.transform_for_lora(src, str(out), fmt="pair", val_file=str(val), val_fraction=0.2)
+
+    import re
+    key = lambda r: re.sub(r"[！ ]", "", r["original"])  # noqa: E731
+    assert not {key(r) for r in read_jsonl(out)} & {key(r) for r in read_jsonl(val)}
+
+
+def test_without_a_validation_file_everything_is_training_data(write_jsonl, tmp_path):
+    src = write_jsonl("raw.jsonl", _many(50))
+    out = tmp_path / "out.jsonl"
+
+    counts = preprocess.transform_for_lora(src, str(out), fmt="pair")
+
+    assert len(read_jsonl(out)) == 50 and counts["validation"] == 0
+
+
+def test_a_validation_split_needs_the_pair_format(write_jsonl, tmp_path):
+    src = write_jsonl("raw.jsonl", _many(5))
+
+    with pytest.raises(ValueError, match="pair"):
+        preprocess.transform_for_lora(src, str(tmp_path / "o.jsonl"), fmt="instruction", val_file=str(tmp_path / "v.jsonl"), val_fraction=0.1)
+
+
+def test_main_splits_the_pair_format_by_default_and_the_instruction_format_never(write_jsonl, tmp_path, monkeypatch):
+    import manifest
+
+    src = write_jsonl("raw.jsonl", _many(600))
+    out = tmp_path / "out.jsonl"
+    monkeypatch.setattr(preprocess, "RAW_LOGS", src)
+    monkeypatch.setattr(preprocess, "PROCESSED_LOGS", str(out))
+    monkeypatch.setattr(preprocess, "EVAL_DATASET_PATH", str(tmp_path / "missing.jsonl"))
+
+    preprocess.main(["--format", "pair"])
+    val = manifest.val_path(str(out))
+    meta = manifest.read_manifest(manifest.manifest_path(str(out)))
+    assert os.path.exists(val) and meta["val_rows"] == len(read_jsonl(val)) > 0 and meta["val_fraction"] == 0.05
+    assert len(read_jsonl(out)) + len(read_jsonl(val)) == 600
+
+    preprocess.main([])  # unsloth's instruction format does its own split: no validation file, and the old one is removed
+    assert not os.path.exists(val)
+    assert manifest.read_manifest(manifest.manifest_path(str(out)))["val_rows"] == 0
+    assert len(read_jsonl(out)) == 600
+
+
+def test_main_takes_the_validation_fraction_from_the_command_line(write_jsonl, tmp_path, monkeypatch):
+    import manifest
+
+    src = write_jsonl("raw.jsonl", _many(600))
+    out = tmp_path / "out.jsonl"
+    monkeypatch.setattr(preprocess, "RAW_LOGS", src)
+    monkeypatch.setattr(preprocess, "PROCESSED_LOGS", str(out))
+    monkeypatch.setattr(preprocess, "EVAL_DATASET_PATH", str(tmp_path / "missing.jsonl"))
+
+    preprocess.main(["--format", "pair", "--val-fraction", "0.3"])
+
+    val_rows = read_jsonl(manifest.val_path(str(out)))
+    assert 120 < len(val_rows) < 240
+
+
+def test_main_refuses_a_fraction_outside_zero_to_one(write_jsonl, tmp_path, monkeypatch):
+    monkeypatch.setattr(preprocess, "RAW_LOGS", write_jsonl("raw.jsonl", _many(5)))
+    monkeypatch.setattr(preprocess, "PROCESSED_LOGS", str(tmp_path / "out.jsonl"))
+
+    with pytest.raises(SystemExit):
+        preprocess.main(["--format", "pair", "--val-fraction", "1.5"])

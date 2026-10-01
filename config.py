@@ -32,6 +32,7 @@ LF_CONFIG_ROOT = os.path.join(BASE_DIR, "configs", "llamafactory")
 LF_DATASET_DIR = os.path.join(BASE_DIR, "data")  # where LLaMA-Factory looks for dataset_info.json
 LF_DATASET_INFO_PATH = os.path.join(LF_DATASET_DIR, "dataset_info.json")
 LF_DATASET_NAME = "bp_translation"
+LF_VAL_DATASET_NAME = LF_DATASET_NAME + "_val"  # the validation rows preprocess.py splits off (valsplit.py)
 TRAIN_STDOUT_LOG = os.path.join(BASE_DIR, "outputs", "train_stdout.log")  # train.py writes it, the monitor follows it
 LLAMA_CPP_DIR = os.path.join(BASE_DIR, "llama.cpp")
 GGUF_OUTPUT_DIR = os.path.join(BASE_DIR, "model_gguf")

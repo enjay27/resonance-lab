@@ -17,7 +17,7 @@ lora_target: q_proj,k_proj,v_proj,o_proj
 dataset: bp_translation
 template: hy_dense_1_8b
 cutoff_len: 256
-val_size: 0.05
+eval_dataset: bp_translation_val  # preprocess.py --format pair writes it: a split by line (valsplit.py), not LLaMA-Factory's random val_size
 
 ### Training (speed profile: same recipe as hy-mt2-1.8b, throughput settings changed)
 # Packing joins short chat lines into full sequences instead of padding them; Liger fuses the loss/norm kernels.
