@@ -82,6 +82,10 @@ def dataset_info_for_processed_logs():
 # turn, no system prompt. The tokenizer adds <bos> itself, as in training.
 TRAINING_PROMPTS = {
     "gemma3": "<start_of_turn>user\n{text}<end_of_turn>\n<start_of_turn>model\n",
+    # Hy-MT2 (templates registered in LLaMA-Factory from Tencent's hy_dense_template.py); BOS comes
+    # from the template prefix. The 1.8B and 7B differ: 1.8B has User/Assistant tokens, 7B only <|extra_0|>.
+    "hy_dense_1_8b": "<｜hy_User｜>{text}<｜hy_Assistant｜>",
+    "hy_dense_7b": "{text}<|extra_0|>",
 }
 
 
@@ -94,6 +98,24 @@ def training_prompt(template, text):
 def translategemma_messages(text, source="ja", target="ko"):
     """The structured message TranslateGemma's own chat template turns into its long English prompt."""
     return [{"role": "user", "content": [{"type": "text", "source_lang_code": source, "target_lang_code": target, "text": text}]}]
+
+
+# Hy-MT2's documented default translation prompt (README, "Default Translation"), target fixed to Korean.
+HY_TRANSLATE_PROMPT = (
+    "Translate the following text into Korean. Note that you should only output the translated "
+    "result without any additional explanation:\n\n{text}"
+)
+
+
+def chat_messages(template, text):
+    """Messages for tokenizer.apply_chat_template: the model's own documented prompt, which is not
+    the training format (see training_prompt)."""
+    if template == "gemma3":
+        return translategemma_messages(text)
+    if template in ("hy_dense_1_8b", "hy_dense_7b"):
+        return [{"role": "user", "content": HY_TRANSLATE_PROMPT.format(text=text)}]
+    known = ["gemma3", "hy_dense_1_8b", "hy_dense_7b"]
+    raise ValueError(f"no chat prompt for template {template!r}; known: {', '.join(sorted(known))}")
 
 
 def train_command(train_yaml):

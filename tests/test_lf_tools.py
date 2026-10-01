@@ -222,3 +222,52 @@ def test_translategemma_messages_carry_the_language_codes():
     assert lf_tools.translategemma_messages("こんにちは") == [
         {"role": "user", "content": [{"type": "text", "source_lang_code": "ja", "target_lang_code": "ko", "text": "こんにちは"}]}
     ]
+
+
+# --- Hy-MT2 profiles (Tencent; templates registered upstream in LLaMA-Factory) -------------------
+
+HY_PROFILES = ["hy-mt2-1.8b", "hy-mt2-7b"]
+
+
+@pytest.mark.parametrize("name", HY_PROFILES)
+def test_hy_profiles_are_complete_and_agree(name):
+    assert name in lf_tools.available_profiles()
+    p = lf_tools.load_profile(name)
+    train, merge = read_yaml(p.train_yaml), read_yaml(p.merge_yaml)
+    assert train["model_name_or_path"] == merge["model_name_or_path"] == p.base_model
+    assert train["template"] == merge["template"] == p.template
+    assert p.dataset == config.LF_DATASET_NAME
+    assert merge["adapter_name_or_path"] == train["output_dir"]
+    assert p.template in lf_tools.TRAINING_PROMPTS
+
+
+def test_hy_profiles_use_their_own_template_and_output_dirs():
+    small, big = (lf_tools.load_profile(n) for n in HY_PROFILES)
+    assert (small.template, big.template) == ("hy_dense_1_8b", "hy_dense_7b")
+    assert small.base_model == "tencent/Hy-MT2-1.8B" and big.base_model == "tencent/Hy-MT2-7B"
+    assert len({small.adapter_dir, big.adapter_dir, small.merged_dir, big.merged_dir}) == 4
+
+
+def test_hy_training_prompts_match_the_upstream_templates():
+    # LLaMA-Factory's hy_dense_* templates, no system prompt; the BOS is added by the template prefix.
+    assert lf_tools.training_prompt("hy_dense_1_8b", "こんにちは") == "<｜hy_User｜>こんにちは<｜hy_Assistant｜>"
+    assert lf_tools.training_prompt("hy_dense_7b", "こんにちは") == "こんにちは<|extra_0|>"
+
+
+def test_chat_messages_of_hy_use_the_official_english_translate_prompt():
+    for template in ("hy_dense_1_8b", "hy_dense_7b"):
+        [msg] = lf_tools.chat_messages(template, "こんにちは")
+        assert msg["role"] == "user"
+        assert msg["content"] == (
+            "Translate the following text into Korean. Note that you should only output the translated "
+            "result without any additional explanation:\n\nこんにちは"
+        )
+
+
+def test_chat_messages_of_gemma3_are_translategemmas():
+    assert lf_tools.chat_messages("gemma3", "x") == lf_tools.translategemma_messages("x")
+
+
+def test_chat_messages_of_an_unknown_template_lists_the_known_ones():
+    with pytest.raises(ValueError, match="hy_dense_7b"):
+        lf_tools.chat_messages("nope", "x")

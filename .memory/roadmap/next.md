@@ -6,7 +6,11 @@ Windows/CUDA machine for the runs; a cloud session can prepare the files.
 1. **Re-baseline the shipped model** (Kade, on the GPU machine): `python scripts/llamafactory/eval.py
    --prompt chat-template` and `--prompt training` on `data/eval/bp-eval-dataset.jsonl`. The old chrF/BLEU/TER
    are invalid (`active-issues/old-eval-numbers.md`); the two prompt modes show the cost of the prompt mismatch.
-2. **One `llamafactory` profile per shortlist candidate** (`roadmap/translator-shortlist-2026-10-01.md`):
+2. **Profiles: Hy-MT2-1.8B and 7B are written (2026-10-01; maintainer: Hy only for now)** — see
+   `active-issues/unverified-on-gpu.md` for the local checklist (`inspect_template.py` first). Run the
+   zero-shot eval of each (`RESONANCE_LF_PROFILE=hy-mt2-1.8b`; zero-shot needs the base model merged/exported
+   or `merged_dir` pointed at it). TranslateGemma-12B and Gemma 4 E4B profiles are NOT written yet.
+   Original item, for the rest: **one `llamafactory` profile per shortlist candidate** (`roadmap/translator-shortlist-2026-10-01.md`):
    Hy-MT2-1.8B, Hy-MT2-7B, Gemma 4 E4B, TranslateGemma-12B. Each is a folder
    `configs/llamafactory/<profile>/{train,merge}.yaml` (tests check they agree) plus, for a new chat
    template, a `TRAINING_PROMPTS` entry in `lf_tools.py` and the model's own eval prompt in
