@@ -10,26 +10,15 @@ rule + `<bos>` it never trained on. Model is being re-chosen —
 [`translator-shortlist-2026-10-01.md`](.memory/roadmap/translator-shortlist-2026-10-01.md);
 contract: [`stream-contract.md`](.memory/active-issues/stream-contract.md).
 
-**Switchable pipelines: done (2026-10-01, PRs #3-#7).** `run_pipeline.py --pipeline llamafactory|unsloth`
-(default `llamafactory`), shared preprocess filters (drop more rows — check the report, re-eval after the
-next training), `rich` training monitor, shared eval report. `RESONANCE_RAW_LOGS` = another raw log.
-**The branch's BLEU/chrF/TER scored only the first sample — old numbers invalid, re-baseline**
-([`old-eval-numbers.md`](.memory/active-issues/old-eval-numbers.md)).
-**Next session starts at** [`roadmap/next.md`](.memory/roadmap/next.md) *Start here*: re-baseline on the GPU
-machine, then a profile per shortlist candidate.
+**Pipelines + model choice so far (2026-10-01).** Switchable pipelines done (PRs #3-#7); old BLEU/chrF numbers invalid
+([`old-eval-numbers.md`](.memory/active-issues/old-eval-numbers.md)). Hy-MT2 profiles `hy-mt2-1.8b|7b` exist, templates verified
+on the real tokenizers; zero-shot 1.8B chrF 39.3 vs shipped TG-4B 41.7, Hy needs the instruction prompt
+([`zero-shot-results`](.memory/roadmap/zero-shot-results-2026-10-01.md)). Training examples per model:
+[`reference/training-examples.md`](.memory/reference/training-examples.md). **Open: the prompt** (instruction vs raw line,
+`[P0]`), TG-4B `--prompt training`, Hy-7B zero-shot, first training. Next steps: [`roadmap/next.md`](.memory/roadmap/next.md).
 
-**Model choice, step 1 (2026-10-01): Hy-MT2 profiles written** (`hy-mt2-1.8b`, `hy-mt2-7b`; lead challenger of the
-shortlist). **Zero-shot numbers are in** [`zero-shot-results-2026-10-01.md`](.memory/roadmap/zero-shot-results-2026-10-01.md):
-Hy-MT2-1.8B untrained chrF 39.3 vs shipped TG-4B 41.7 (needs the instruction prompt; raw line fails). Still to run:
-TG-4B `--prompt training`, Hy-7B. Templates verified locally against both tokenizers (`inspect_template.py`: MATCH; no tokenizer adds BOS, eval now
-prepends it). Not trained/evaluated. **Next: rest of the local checklist in** [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md)
-(`inspect_template.py`), then zero-shot eval vs the re-baselined TranslateGemma-4B. Other candidates: later.
-
-**Model selection: `--model <profile>` on every llamafactory script and `run_pipeline.py` (parameter > `RESONANCE_LF_PROFILE` >
-default `translategemma-4b`);** local Windows runs pass the parameter, remote jobs keep the env var.
-
-**Speed profiles:** `<model>-fast` (packing + Liger + bigger batch) for each model, switch with `--model hy-mt2-1.8b-fast`;
-never run -- compare time and chrF against the base profile (`unverified-on-gpu.md`).
+**Selecting a model:** `--model <profile>` on every llamafactory script and `run_pipeline.py` (parameter > `RESONANCE_LF_PROFILE`
+> default `translategemma-4b`); `<model>-fast` profiles (packing + Liger + bigger batch) are never run yet.
 
 **Model part never runs in a cloud session** (no GPU): every model stage is NOT VERIFIED —
 [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md). Auto-merge of `claude/*` PRs works.
@@ -41,6 +30,7 @@ never run -- compare time and chrF against the base profile (`unverified-on-gpu.
 | [`CLAUDE.md`](CLAUDE.md) | rules, gates, layout |
 | [`.memory/README.md`](.memory/README.md) | which memory file takes what |
 | [`.memory/active-issues/`](.memory/active-issues/) | before trusting a doc, a run, or the stream contract |
+| [`.memory/reference/`](.memory/reference/) | what each model's training example looks like (`training-examples.md`) |
 | [`.memory/roadmap/`](.memory/roadmap/) | what is next, and what proves it done |
 | [`.memory/sessions/`](.memory/sessions/) | why a decision was made, including wrong turns |
 
