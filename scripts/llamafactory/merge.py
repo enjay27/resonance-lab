@@ -1,16 +1,24 @@
+import argparse
 import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from lf_tools import merge_command, profile_from_args, run
+from runs import RunError, resolve_adapter, write_merge_record
 
 
 def merge(argv=None):
-    profile, _ = profile_from_args(argv, "Merge the LoRA adapter into the base model.")
-    if not os.path.isdir(profile.adapter_dir):
-        print(f"[ERROR] No trained adapter at {profile.adapter_dir}. Run the Fine-Tuning stage first.")
+    profile, rest = profile_from_args(argv, "Merge the LoRA adapter into the base model.")
+    parser = argparse.ArgumentParser(description="Merge options.")
+    parser.add_argument("--run", help="id of the training run to merge (default: the latest complete run)")
+    args = parser.parse_args(rest)
+    try:
+        adapter = resolve_adapter(profile.adapter_dir, args.run)
+    except RunError as e:
+        print(f"[ERROR] {e}")
         sys.exit(1)
-    run(merge_command(profile.merge_yaml), "Merging the LoRA adapter into the base model")
+    run(merge_command(profile.merge_yaml, adapter), f"Merging the LoRA adapter {adapter} into the base model")
+    write_merge_record(profile.merged_dir, profile.name, adapter)
     print(f"\nMerged model: {profile.merged_dir}")
 
 

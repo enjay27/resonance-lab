@@ -2,6 +2,12 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **Runs (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `train.py` now passes `output_dir=outputs/<profile>_lora/<run id>` to `llamafactory-cli train`, `merge.py` passes
+  `adapter_name_or_path=<run dir>` to `export`, the monitor follows the latest run. Unit-tested with faked commands only. `key=value` overrides after the yaml and
+  the "only weight files make an output_dir non-empty" rule were read in the pinned source (`hparams/parser.py` `read_args` 117-120, 612-623; `CHECKPOINT_NAMES`), never run.
+  Check on a real run: training starts in the new dir and `trainer_log.jsonl` lands there, the monitor follows it, `merge.py` merges it and writes
+  `resonance_run.json`, and `--from merge` works. Older adapters in `outputs/<profile>_lora/` still merge (legacy path).
+
 - **Fetch Data stage (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `scripts/fetch_data.py` is unit-tested with a faked `hf download`; the real `hf` CLI was never run
   (no HF access in the cloud session). Check on the desktop: set `repo:` in `configs/hf_dataset.yaml`, `python scripts/fetch_data.py --pin`, then run it: the
   `hf download ... --include "dataset_*.jsonl" --local-dir data/hf` flags, the merged `data/raw/raw_translated_logs.jsonl`, and that a second run says "up to date".

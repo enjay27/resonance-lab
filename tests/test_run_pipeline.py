@@ -80,3 +80,39 @@ def test_main_runs_every_stage_with_the_model_parameter_in_the_environment(monke
     run_pipeline.main()
 
     assert envs[0]["RESONANCE_LF_PROFILE"] == "hy-mt2-1.8b"
+
+
+def _fake_pipeline(monkeypatch, argv):
+    ran = []
+    stages = [run_pipeline.pipelines.Stage(n, f"{n}.py") for n in ("Fetch Data", "Merge LoRA", "Evaluation")]
+    monkeypatch.setattr(run_pipeline.pipelines, "stages", lambda name: stages)
+    monkeypatch.setattr(run_pipeline, "check_system", lambda: None)
+    monkeypatch.setattr(run_pipeline, "run_step", lambda name, path, args=(), env=None: ran.append(name) or True)
+    monkeypatch.setattr(sys, "argv", ["run_pipeline.py", *argv])
+    return ran
+
+
+def test_from_skips_the_earlier_stages(monkeypatch):
+    ran = _fake_pipeline(monkeypatch, ["--from", "merge"])
+
+    run_pipeline.main()
+
+    assert ran == ["Merge LoRA", "Evaluation"]
+
+
+def test_only_runs_one_stage(monkeypatch):
+    ran = _fake_pipeline(monkeypatch, ["--only", "Evaluation"])
+
+    run_pipeline.main()
+
+    assert ran == ["Evaluation"]
+
+
+def test_an_unknown_stage_stops_before_anything_runs(monkeypatch, capsys):
+    ran = _fake_pipeline(monkeypatch, ["--from", "nope"])
+
+    with pytest.raises(SystemExit) as exc:
+        run_pipeline.main()
+
+    assert exc.value.code != 0 and not ran
+    assert "Merge LoRA" in capsys.readouterr().err

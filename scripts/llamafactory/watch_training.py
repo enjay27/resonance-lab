@@ -23,7 +23,7 @@ from rich.table import Table
 from rich.text import Text
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from config import TRAIN_STDOUT_LOG
+from runs import run_files
 from lf_tools import profile_from_args
 
 SMOOTH_WINDOW = 20
@@ -425,15 +425,20 @@ def render(state, log_name, visible_rows=None, now=None):
 
 def main(argv=None):
     profile, _ = profile_from_args(argv, "Live training monitor.")
-    trainer_log = os.path.join(profile.adapter_dir, "trainer_log.jsonl")
-    state = TrainingState(tokens_per_step=tokens_per_step(profile.train_yaml), samples_per_step=batch_per_step(profile.train_yaml))
+    new_state = lambda: TrainingState(tokens_per_step=tokens_per_step(profile.train_yaml), samples_per_step=batch_per_step(profile.train_yaml))  # noqa: E731
+    state, followed = new_state(), None
     console = Console()
-    print(f"Following {trainer_log} and {TRAIN_STDOUT_LOG}")
     try:
         with Live(console=console, refresh_per_second=2) as live:
             while True:
-                poll(state, trainer_log, TRAIN_STDOUT_LOG)
-                live.update(render(state, os.path.basename(trainer_log), visible_rows=max(console.height - 6, 5)))
+                trainer_log, stdout_log = run_files(profile.adapter_dir)  # the latest run: a new training is picked up
+                if (trainer_log, stdout_log) != followed:
+                    if followed is not None:
+                        state = new_state()
+                    followed = (trainer_log, stdout_log)
+                    console.print(f"Following {trainer_log} and {stdout_log}")
+                poll(state, trainer_log, stdout_log)
+                live.update(render(state, os.path.basename(os.path.dirname(trainer_log)), visible_rows=max(console.height - 6, 5)))
                 time.sleep(1)
     except KeyboardInterrupt:
         pass
