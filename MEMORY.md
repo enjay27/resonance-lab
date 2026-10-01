@@ -28,6 +28,9 @@ prepends it). Not trained/evaluated. **Next: rest of the local checklist in** [`
 **Model selection: `--model <profile>` on every llamafactory script and `run_pipeline.py` (parameter > `RESONANCE_LF_PROFILE` >
 default `translategemma-4b`);** local Windows runs pass the parameter, remote jobs keep the env var.
 
+**Speed profiles:** `<model>-fast` (packing + Liger + bigger batch) for each model, switch with `--model hy-mt2-1.8b-fast`;
+never run -- compare time and chrF against the base profile (`unverified-on-gpu.md`).
+
 **Model part never runs in a cloud session** (no GPU): every model stage is NOT VERIFIED —
 [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md). Auto-merge of `claude/*` PRs works.
 
