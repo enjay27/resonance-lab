@@ -33,7 +33,14 @@ def check_system():
             print("GPU: NOT FOUND (Check CUDA drivers)")
     print("-" * 25 + "\n")
 
-def run_step(name, script_path, args=()):
+def stage_env(model, base=None):
+    """The environment the stage scripts run in: --model, when given, overrides RESONANCE_LF_PROFILE."""
+    env = dict(os.environ if base is None else base)
+    if model:
+        env["RESONANCE_LF_PROFILE"] = model
+    return env
+
+def run_step(name, script_path, args=(), env=None):
     """Executes a single python script and tracks its performance."""
     if not os.path.exists(script_path):
         log_diagnostic(name, "MISSING")
@@ -42,7 +49,7 @@ def run_step(name, script_path, args=()):
     start_time = time.perf_counter()
     try:
         # Run the script as a sub-process
-        subprocess.run([sys.executable, script_path, *args], check=True, capture_output=False)
+        subprocess.run([sys.executable, script_path, *args], check=True, capture_output=False, env=env)
         elapsed = time.perf_counter() - start_time
         log_diagnostic(name, "SUCCESS", elapsed)
         return True
@@ -55,17 +62,20 @@ def main():
     parser = argparse.ArgumentParser(description="Run a training pipeline, stage by stage.")
     parser.add_argument("--pipeline", choices=sorted(pipelines.PIPELINES), default=pipelines.DEFAULT,
                         help="training backend (default: %(default)s)")
+    parser.add_argument("--model", help="llamafactory model profile (default: $RESONANCE_LF_PROFILE, else "
+                        "the default profile); the parameter wins over the environment")
     args = parser.parse_args()
 
     check_system()
     print(f"Pipeline: {args.pipeline}\n")
+    env = stage_env(args.model)
     total_start = time.perf_counter()
 
     pipeline = pipelines.stages(args.pipeline)
 
     for stage in pipeline:
         name = stage.name
-        success = run_step(name, stage.path, stage.args)
+        success = run_step(name, stage.path, stage.args, env)
         if not success:
             print(f"\n[!] Pipeline halted at {name}. Check logs.")
             sys.exit(1)

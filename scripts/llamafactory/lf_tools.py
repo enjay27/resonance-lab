@@ -5,6 +5,7 @@ torch or a GPU installed. Commands are argument lists (no shell string), run fro
 repo root because the yaml files use paths relative to it.
 """
 
+import argparse
 import os
 import subprocess
 import sys
@@ -18,6 +19,7 @@ from config import (  # noqa: E402
     LF_CONFIG_ROOT,
     LF_DATASET_DIR,
     LF_DATASET_NAME,
+    LF_PROFILE_DEFAULT,
     PROCESSED_LOGS,
 )
 
@@ -65,6 +67,26 @@ def load_profile(name, root=LF_CONFIG_ROOT):
         adapter_dir=os.path.join(BASE_DIR, train["output_dir"]),
         merged_dir=os.path.join(BASE_DIR, merge["export_dir"]),
     )
+
+
+def model_name(cli_value, environ=None):
+    """The profile to use: the --model parameter, else RESONANCE_LF_PROFILE (set on remote jobs),
+    else the default. An empty value counts as unset."""
+    environ = os.environ if environ is None else environ
+    return cli_value or environ.get("RESONANCE_LF_PROFILE") or LF_PROFILE_DEFAULT
+
+
+def add_model_argument(parser):
+    parser.add_argument("--model", help="model profile, a folder of configs/llamafactory/ "
+                        "(default: $RESONANCE_LF_PROFILE, else " + LF_PROFILE_DEFAULT + ")")
+
+
+def profile_from_args(argv, description):
+    """(profile, remaining argv): reads `--model <profile>` from argv; the rest is for the caller."""
+    parser = argparse.ArgumentParser(description=description)
+    add_model_argument(parser)
+    args, rest = parser.parse_known_args(argv)
+    return load_profile(model_name(args.model)), rest
 
 
 def dataset_info(file_name, name=LF_DATASET_NAME):

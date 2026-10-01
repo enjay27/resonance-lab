@@ -48,7 +48,7 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
 - **`llamafactory` pipeline** (`requirements-llamafactory.txt`): LLaMA-Factory SFT + LoRA; profile
   `translategemma-4b` = `google/translategemma-4b-it`, template `gemma3`, dataset `bp_translation`
   (user turn = the raw Japanese line only, no system prompt), `cutoff_len` 128, LoRA r=32.
-  Profile = `configs/llamafactory/<profile>/{train,merge}.yaml`, chosen by `RESONANCE_LF_PROFILE`.
+  Profile = `configs/llamafactory/<profile>/{train,merge}.yaml`, chosen by `--model <profile>` (every llamafactory script and `run_pipeline.py`), else `RESONANCE_LF_PROFILE` (remote jobs), else the default.
 - **`unsloth` pipeline** (`requirements-unsloth.txt`): unsloth (pinned commit), transformers, peft,
   trl 0.24, bitsandbytes 4-bit, torch 2.10 + CUDA 12.6 (`triton-windows`). Base
   `rd211/Qwen3-1.7B-Instruct` (`config.py`), LoRA r=64, alpha=128.
@@ -116,7 +116,7 @@ Reach for graft before grep/read — see `.claude/skills/graft/SKILL.md`.
 
 - **Paths and hyper-parameters live in `config.py`**, built from `BASE_DIR`. A script
   never hardcodes a path; it imports it. Two environment overrides exist:
-  `RESONANCE_RAW_LOGS` (raw log file) and `RESONANCE_LF_PROFILE` (llamafactory model profile).
+  `RESONANCE_RAW_LOGS` (raw log file) and `RESONANCE_LF_PROFILE` (llamafactory model profile; the `--model` parameter wins over it).
 - **A stage that fails exits non-zero** (`sys.exit(1)` or an exception) — that is how
   `run_pipeline.py` stops. A stage that only prints an error lets the pipeline continue
   on bad data.

@@ -22,8 +22,8 @@ from rich.table import Table
 from rich.text import Text
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from config import LF_PROFILE, TRAIN_STDOUT_LOG
-from lf_tools import load_profile
+from config import TRAIN_STDOUT_LOG
+from lf_tools import profile_from_args
 
 SMOOTH_WINDOW = 20
 SPIKE_THRESHOLD = 10.0
@@ -296,8 +296,8 @@ def render(state, log_name, visible_rows=None):
     return Group(title, table, Text(footer, style="bold"))
 
 
-def main():
-    profile = load_profile(LF_PROFILE)
+def main(argv=None):
+    profile, _ = profile_from_args(argv, "Live training monitor.")
     trainer_log = os.path.join(profile.adapter_dir, "trainer_log.jsonl")
     state = TrainingState(tokens_per_step=tokens_per_step(profile.train_yaml))
     console = Console()

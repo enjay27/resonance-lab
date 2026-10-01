@@ -2,12 +2,12 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from config import GGUF_OUTPUT_DIR, LF_PROFILE, LLAMA_CPP_DIR
-from lf_tools import convert_command, gguf_paths, load_profile, quantize_binary, quantize_command, run
+from config import GGUF_OUTPUT_DIR, LLAMA_CPP_DIR
+from lf_tools import convert_command, gguf_paths, profile_from_args, quantize_binary, quantize_command, run
 
 
-def export():
-    profile = load_profile(LF_PROFILE)
+def export(argv=None):
+    profile, _ = profile_from_args(argv, "Convert the merged model to a q4_k_m GGUF.")
     if not os.path.isdir(profile.merged_dir):
         print(f"[ERROR] No merged model at {profile.merged_dir}. Run the Merge LoRA stage first.")
         sys.exit(1)

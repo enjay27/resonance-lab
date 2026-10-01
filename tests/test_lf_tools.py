@@ -301,3 +301,75 @@ def test_generate_inputs_keep_only_what_generate_accepts():
 
 def test_generate_inputs_work_without_an_attention_mask():
     assert lf_tools.generate_inputs({"input_ids": [[1]]}) == {"input_ids": [[1]]}
+
+
+# --- --model: parameter > environment > default ----------------------------------------------------
+
+
+def test_model_name_prefers_the_parameter_over_the_environment():
+    env = {"RESONANCE_LF_PROFILE": "hy-mt2-7b"}
+
+    assert lf_tools.model_name("hy-mt2-1.8b", env) == "hy-mt2-1.8b"
+
+
+def test_model_name_falls_back_to_the_environment_then_the_default():
+    assert lf_tools.model_name(None, {"RESONANCE_LF_PROFILE": "hy-mt2-7b"}) == "hy-mt2-7b"
+    assert lf_tools.model_name(None, {}) == config.LF_PROFILE_DEFAULT
+    assert lf_tools.model_name(None, {"RESONANCE_LF_PROFILE": ""}) == config.LF_PROFILE_DEFAULT  # an empty variable is unset
+
+
+def test_profile_from_args_reads_the_model_parameter(monkeypatch):
+    monkeypatch.setenv("RESONANCE_LF_PROFILE", "hy-mt2-7b")
+
+    profile, rest = lf_tools.profile_from_args(["--model", "hy-mt2-1.8b", "--prompt", "x"], "demo")
+
+    assert profile.name == "hy-mt2-1.8b"
+    assert rest == ["--prompt", "x"]  # the caller's own arguments are left for its parser
+
+
+def test_profile_from_args_uses_the_environment_without_the_parameter(monkeypatch):
+    monkeypatch.setenv("RESONANCE_LF_PROFILE", "hy-mt2-7b")
+
+    profile, rest = lf_tools.profile_from_args([], "demo")
+
+    assert profile.name == "hy-mt2-7b" and rest == []
+
+
+def test_an_unknown_model_lists_the_profiles():
+    with pytest.raises(ValueError, match="hy-mt2-1.8b"):
+        lf_tools.profile_from_args(["--model", "nope"], "demo")
+
+
+def test_merge_stage_uses_the_model_parameter_not_the_environment(monkeypatch, capsys):
+    import merge
+
+    monkeypatch.setenv("RESONANCE_LF_PROFILE", "translategemma-4b")
+    with pytest.raises(SystemExit):
+        merge.merge(["--model", "hy-mt2-1.8b"])  # no adapter in the test tree: the error names the one asked for
+
+    assert "hy-mt2-1.8b_lora" in capsys.readouterr().out
+
+
+def test_train_stage_trains_the_model_parameters_yaml(monkeypatch):
+    import importlib.util
+
+    # scripts/unsloth/train.py has the same module name: load the llamafactory one by path.
+    spec = importlib.util.spec_from_file_location(
+        "lf_train", os.path.join(config.BASE_DIR, "scripts", "llamafactory", "train.py"))
+    train = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(train)
+    seen = []
+    monkeypatch.setattr(train, "run_logged", lambda cmd, log, what: seen.append(cmd))
+
+    train.train(["--model", "hy-mt2-7b"])
+
+    assert seen[0][-1].replace("\\", "/").endswith("configs/llamafactory/hy-mt2-7b/train.yaml")
+
+
+def test_no_llamafactory_script_reads_the_profile_from_config_directly():
+    # Every script picks its model through --model (parameter > env > default), never config.LF_PROFILE.
+    folder = os.path.join(config.BASE_DIR, "scripts", "llamafactory")
+    for name in os.listdir(folder):
+        if name.endswith(".py") and name != "lf_tools.py":
+            with open(os.path.join(folder, name), encoding="utf-8") as f:
+                assert "LF_PROFILE" not in f.read(), name

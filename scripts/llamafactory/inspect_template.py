@@ -1,4 +1,4 @@
-"""Check the prompt strings against the real tokenizer: `python scripts/llamafactory/inspect_template.py [--model <hf id or dir>]`.
+"""Check the prompt strings against the real tokenizer: `python scripts/llamafactory/inspect_template.py [--model <profile>] [--tokenizer <hf id or dir>]`.
 
 Needs only `transformers` and the model's tokenizer files (no GPU). Prints, for the active profile's
 template, (1) the model's own chat template output, (2) what `training_prompt` says training saw and
@@ -11,21 +11,21 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from config import LF_PROFILE
-from lf_tools import chat_messages, load_profile, training_prompt
+from lf_tools import add_model_argument, chat_messages, load_profile, model_name, training_prompt
 
 SAMPLE = "遺跡1Fから　29k↑　＠T1"
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Inspect the chat template and training prompt of a profile's model.")
-    parser.add_argument("--model", help="HF id or local dir (default: the profile's base model)")
+    add_model_argument(parser)
+    parser.add_argument("--tokenizer", help="HF id or local dir (default: the profile's base model)")
     args = parser.parse_args(argv)
 
     from transformers import AutoTokenizer
 
-    profile = load_profile(LF_PROFILE)
-    model = args.model or profile.base_model
+    profile = load_profile(model_name(args.model))
+    model = args.tokenizer or profile.base_model
     tokenizer = AutoTokenizer.from_pretrained(model, trust_remote_code=True)
     print(f"profile {profile.name} | template {profile.template} | tokenizer {model}")
     print(f"bos_token={tokenizer.bos_token!r} eos_token={tokenizer.eos_token!r} pad_token={tokenizer.pad_token!r}")
