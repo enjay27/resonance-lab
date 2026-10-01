@@ -42,6 +42,7 @@ artifacts/
 .mlflow/
 # The NAS server's URL and credentials, and the local queue of runs not yet sent to it (see .memory/roadmap/mlflow-plan.md)
 deploy/mlflow/.env
+deploy/postgres/.env
 .env.mlflow
 .run.result.backup.json
 .run.result.backup.files/

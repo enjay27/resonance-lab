@@ -10,6 +10,12 @@ Code or config changed in a session without CUDA. Delete an item once it has run
   Python 3.11 only; install it in the llamafactory venv (Python 3.13, Windows) with the other pins and check `pip` resolves it next to torch 2.9.1 / transformers 4.57.1 / trl 0.24.0.
   `tracking.py` itself is unit-tested and sends nothing yet.
 
+- **MLflow on Postgres + MinIO (2026-10-01, `claude/modest-edison-0nvyf5`):** `deploy/postgres/` (compose, `initdb/10-mlflow.sh`) is new; `deploy/mlflow/` moved from SQLite to
+  Postgres (records + basic-auth users) and MinIO (artifacts), with `entrypoint.py` rendering the auth config. Checked in a cloud session with a real PostgreSQL 16 (scram; the compose file now pins `postgres:18-alpine`, never run: check MLflow's schema migration on 18 and that the volume on `/var/lib/postgresql` holds `18/docker`), the
+  init script, `entrypoint.py` + `mlflow server` 3.16.1 and a moto S3 server: 401/403/200, run + artifact written. Never built or run in Docker: on the NAS check `docker compose up`
+  of both projects (Postgres first), the `resonance-db` network join, `user: 70:70` + read-only root for Postgres, that the postgres image's entrypoint passes `PGPASSWORD` to the
+  init script (the first NAS run printed `chmod: /var/run/postgresql: Operation not permitted` and `ls: can't open '/docker-entrypoint-initdb.d/'`; fixed by `deploy/postgres/Dockerfile` copying `initdb/` in and a tmpfs with `uid=70`: re-run with `docker compose down -v` first), a real MinIO (bucket policy, path-style), and the README's `curl` checks. This replaces the SQLite-server item below (its Dockerfile/compose no longer exist).
+
 - **MLflow server (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `deploy/mlflow/` was checked as far as a cloud session can: a real MLflow 3.16.1 server with the same flags/env
   (401/403/200 behaviour, logging, artifacts) and `docker compose config`. Never built or run in Docker (no daemon here): on the NAS check the image build
   (`python:3.12-slim` + `mlflow[auth]`), that the container starts with `read_only: true` + tmpfs `/tmp`, the health check, and the README's `curl` checks from the desktop.

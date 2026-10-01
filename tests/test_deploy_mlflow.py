@@ -1,10 +1,11 @@
 """Guards for deploy/mlflow/: the MLflow tracking server on the maintainer's NAS.
 
-The server must be reachable only by one person, run no user code, and keep no secret in git. These tests read the
-files; the real server with these flags and settings was smoke-tested (401 without credentials, 403 for a foreign
-Host header, params/metrics/tags/artifacts through the authenticated proxy), the image build on the NAS was not.
+The server must be reachable only by one person, run no user code, and keep no secret in git. It keeps its records in
+the Postgres of deploy/postgres/ and its small files in the NAS's MinIO. These tests read the files; the server with
+these flags was smoke-tested (see the README), the image build and the containers on the NAS were not.
 """
 
+import importlib.util
 import os
 import re
 
@@ -22,10 +23,22 @@ def _text(*parts):
 
 
 @pytest.fixture(scope="module")
-def service():
-    compose = yaml.safe_load(_text("deploy", "mlflow", "docker-compose.yml"))
+def compose():
+    return yaml.safe_load(_text("deploy", "mlflow", "docker-compose.yml"))
+
+
+@pytest.fixture(scope="module")
+def service(compose):
     assert list(compose["services"]) == ["mlflow"]  # one container: the tracking server, nothing else
     return compose["services"]["mlflow"]
+
+
+@pytest.fixture(scope="module")
+def entrypoint():
+    spec = importlib.util.spec_from_file_location("mlflow_entrypoint", os.path.join(DEPLOY, "entrypoint.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _env(path):
@@ -57,11 +70,17 @@ def test_the_container_is_read_only_unprivileged_and_limited(service):
     assert service["restart"] == "unless-stopped"
 
 
-def test_the_only_writable_places_are_the_data_volume_and_tmp(service):
-    mounts = [v for v in service["volumes"]]
-    assert any(str(v).endswith(":/data") for v in mounts)
-    assert all(str(v).endswith(":ro") or str(v).endswith(":/data") for v in mounts)
+def test_the_only_writable_place_is_tmp_because_the_data_lives_in_postgres_and_minio(service):
+    # Nothing is bind-mounted: a file from the NAS keeps the NAS's permissions, which user 65534 may not be allowed to read
+    # ("PermissionError: '/etc/mlflow/basic_auth.ini'"). The template and the entrypoint are copied into the image.
+    assert "volumes" not in service
     assert service["tmpfs"] == ["/tmp"]
+    assert not re.search(r"MLFLOW_DATA_DIR|/data\b|NAS_UID", _text("deploy", "mlflow", "docker-compose.yml"))
+
+
+def test_the_container_reaches_postgres_over_the_private_network_of_deploy_postgres(compose, service):
+    assert service["networks"] == ["resonance-db"]
+    assert compose["networks"]["resonance-db"] == {"name": "resonance-db", "external": True}
 
 
 # --- reachable by one person on the LAN -----------------------------------------------------------------------
@@ -94,10 +113,24 @@ def test_the_server_only_serves_tracking_and_proxies_small_artifacts(service):
     command = _command(service)
 
     assert command[0] == "server"
-    assert command[command.index("--backend-store-uri") + 1].startswith("sqlite:////data/")
-    assert "--serve-artifacts" in command
-    assert command[command.index("--artifacts-destination") + 1].startswith("/data/")
-    assert command[command.index("--workers") + 1] == "1"  # sqlite, one user, a 2-core NAS
+    backend = command[command.index("--backend-store-uri") + 1]
+    assert backend.startswith("postgresql+psycopg2://mlflow:${MLFLOW_DB_PASSWORD:?")  # the role of deploy/postgres/
+    assert backend.endswith("@postgres:5432/mlflow")
+    assert "--serve-artifacts" in command  # the desktop talks to MLflow only, never to MinIO
+    assert command[command.index("--artifacts-destination") + 1].startswith("s3://${MINIO_BUCKET:?")
+    assert command[command.index("--workers") + 1] == "1"  # one user, a 2-core NAS
+
+
+def test_minio_is_the_artifact_store_and_its_key_comes_from_the_env_file(service):
+    env = service["environment"]
+
+    assert env["MLFLOW_S3_ENDPOINT_URL"].startswith("${MINIO_ENDPOINT_URL:?")
+    assert env["AWS_ACCESS_KEY_ID"].startswith("${MINIO_ACCESS_KEY:?")
+    assert env["AWS_SECRET_ACCESS_KEY"].startswith("${MINIO_SECRET_KEY:?")
+    assert env["AWS_DEFAULT_REGION"]  # boto3 wants one; MinIO ignores it
+    assert env["MLFLOW_AUTH_DB_URI"].startswith("postgresql+psycopg2://mlflow:${MLFLOW_DB_PASSWORD:?")
+    assert env["MLFLOW_AUTH_DB_URI"].endswith("@postgres:5432/mlflow_auth")
+    assert "MLFLOW_AUTH_CONFIG_PATH" not in env  # entrypoint.py sets it to the file it renders
 
 
 def test_nothing_in_the_server_runs_user_code(service):
@@ -124,19 +157,81 @@ def test_the_auth_config_grants_nothing_by_default_and_holds_no_secret():
     ini = _text("deploy", "mlflow", "basic_auth.ini")
 
     assert re.search(r"(?m)^default_permission\s*=\s*NO_PERMISSIONS\s*$", ini)  # MLflow's own default is READ
-    assert re.search(r"(?m)^database_uri\s*=\s*sqlite:////data/", ini)
+    assert re.search(r"(?m)^database_uri\s*=\s*@AUTH_DB_URI@\s*$", ini)  # filled in at start from the env, never written here
     assert not re.search(r"(?m)^admin_password\s*=", ini)
+    assert "postgresql" not in ini and "sqlite" not in ini
+
+
+# --- the entrypoint renders the auth config from the environment ------------------------------------------------
+
+
+def test_the_auth_config_is_rendered_with_the_database_uri_from_the_environment(entrypoint):
+    template = "[mlflow]\ndatabase_uri = @AUTH_DB_URI@\ndefault_permission = NO_PERMISSIONS\n"
+
+    out = entrypoint.render_auth_config(template, "postgresql+psycopg2://mlflow:abc123@postgres:5432/mlflow_auth")
+
+    assert "database_uri = postgresql+psycopg2://mlflow:abc123@postgres:5432/mlflow_auth\n" in out
+    assert "default_permission = NO_PERMISSIONS" in out
+    assert "@AUTH_DB_URI@" not in out
+
+
+def test_a_percent_sign_in_the_uri_survives_the_ini_parser(entrypoint):
+    import configparser
+
+    out = entrypoint.render_auth_config("[mlflow]\ndatabase_uri = @AUTH_DB_URI@\n", "postgresql://u:p%40ss@h/db")
+    parser = configparser.ConfigParser()
+    parser.read_string(out)
+
+    assert parser["mlflow"]["database_uri"] == "postgresql://u:p%40ss@h/db"  # MLflow reads it through ConfigParser
+
+
+def test_the_real_template_renders_to_a_valid_config(entrypoint):
+    import configparser
+
+    out = entrypoint.render_auth_config(_text("deploy", "mlflow", "basic_auth.ini"), "postgresql://u:p@h/db")
+    parser = configparser.ConfigParser()
+    parser.read_string(out)
+
+    assert parser["mlflow"]["database_uri"] == "postgresql://u:p@h/db"
+    assert parser["mlflow"]["default_permission"] == "NO_PERMISSIONS"
+
+
+def test_without_the_database_uri_the_server_does_not_start(entrypoint):
+    with pytest.raises(SystemExit, match="MLFLOW_AUTH_DB_URI"):
+        entrypoint.prepare({}, template_path="/nonexistent", out_path="/nonexistent")
+
+
+def test_the_entrypoint_writes_the_config_privately_and_starts_mlflow(entrypoint, tmp_path, monkeypatch):
+    template = tmp_path / "basic_auth.ini"
+    template.write_text("[mlflow]\ndatabase_uri = @AUTH_DB_URI@\n", encoding="utf-8")
+    out = tmp_path / "rendered.ini"
+    started = {}
+    monkeypatch.setattr(entrypoint.os, "execvpe", lambda file, args, env: started.update(file=file, args=args, env=env))
+
+    entrypoint.main(["server", "--port", "5050"], {"MLFLOW_AUTH_DB_URI": "postgresql://u:p@h/db", "PATH": "/bin"},
+                    template_path=str(template), out_path=str(out))
+
+    assert started["file"] == "mlflow" and started["args"] == ["mlflow", "server", "--port", "5050"]
+    assert started["env"]["MLFLOW_AUTH_CONFIG_PATH"] == str(out)
+    assert "postgresql://u:p@h/db" in out.read_text(encoding="utf-8")
+    if os.name == "posix":
+        assert (out.stat().st_mode & 0o777) == 0o600  # it holds a password
 
 
 # --- the image ----------------------------------------------------------------------------------------------------
 
 
-def test_the_image_is_built_from_a_pinned_version_with_the_auth_extra():
+def test_the_image_is_built_from_pinned_versions_with_the_auth_extra_and_the_postgres_and_s3_drivers():
     dockerfile = _text("deploy", "mlflow", "Dockerfile")
 
     assert re.search(r"(?m)^FROM python:3\.\d+-slim\s*$", dockerfile)
     assert 'mlflow[auth]==${MLFLOW_VERSION}' in dockerfile  # basic-auth needs Flask-WTF: the plain package does not start it
-    assert re.search(r'(?m)^ENTRYPOINT \["mlflow"\]\s*$', dockerfile)
+    assert re.search(r"psycopg2-binary==\d+\.\d+\.\d+", dockerfile)  # Postgres
+    assert re.search(r"boto3==\d+\.\d+\.\d+", dockerfile)  # MinIO speaks S3
+    assert "COPY entrypoint.py /opt/entrypoint.py" in dockerfile
+    assert "COPY basic_auth.ini /etc/mlflow/basic_auth.ini" in dockerfile
+    assert re.search(r"RUN chmod a\+rX /opt/entrypoint\.py /etc/mlflow/basic_auth\.ini", dockerfile)  # readable by any user
+    assert re.search(r'(?m)^ENTRYPOINT \["python", "/opt/entrypoint.py"\]\s*$', dockerfile)
     assert "latest" not in dockerfile
 
 
@@ -153,7 +248,8 @@ def test_the_example_env_files_hold_no_secret_and_pin_a_version():
     client = _env((".env.mlflow.example",))
 
     assert re.fullmatch(r"\d+\.\d+\.\d+", nas["MLFLOW_VERSION"])
-    assert nas["MLFLOW_AUTH_ADMIN_PASSWORD"] == "" and nas["MLFLOW_FLASK_SERVER_SECRET_KEY"] == ""
+    for secret in ("MLFLOW_AUTH_ADMIN_PASSWORD", "MLFLOW_FLASK_SERVER_SECRET_KEY", "MLFLOW_DB_PASSWORD", "MINIO_SECRET_KEY"):
+        assert nas[secret] == "", secret
     assert client["MLFLOW_TRACKING_PASSWORD"] == "" and client["MLFLOW_TRACKING_URI"].startswith("http://")
     assert client["MLFLOW_DISABLE_TELEMETRY"] == "true"
 
@@ -168,9 +264,10 @@ def test_every_variable_the_compose_file_needs_is_in_the_example_env():
 def test_the_real_env_files_and_the_local_run_queue_are_gitignored():
     ignored = {line.strip() for line in _text(".gitignore").splitlines()}
 
-    for pattern in ("deploy/mlflow/.env", ".env.mlflow", ".run.result.backup.json", ".run.result.backup.files/"):
+    for pattern in ("deploy/mlflow/.env", "deploy/postgres/.env", ".env.mlflow", ".run.result.backup.json", ".run.result.backup.files/"):
         assert pattern in ignored, pattern
     assert ".env.mlflow.example" not in ignored and "deploy/mlflow/.env.example" not in ignored
+    assert "deploy/postgres/.env.example" not in ignored
 
 
 def test_the_desktop_client_is_pinned_to_the_servers_version():

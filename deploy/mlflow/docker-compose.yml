@@ -1,5 +1,6 @@
 # MLflow tracking server for resonance-lab, on the Synology NAS (Container Manager -> Project, or `docker compose up -d`).
 # One user, LAN only, metadata and small files (reports, predictions), no user code. See README.md.
+# Records: the Postgres of deploy/postgres/ (start that project first). Small files: the NAS's MinIO.
 # Settings and secrets come from `.env` next to this file (copy `.env.example`); `.env` is gitignored.
 name: resonance-mlflow
 
@@ -25,12 +26,12 @@ services:
       - --port
       - "5050"
       - --workers
-      - "1" # sqlite, one user, a 2-core NAS
+      - "1" # one user, a 2-core NAS
       - --backend-store-uri
-      - sqlite:////data/mlflow.db
-      - --serve-artifacts # small files go through the server: the desktop needs no access to the NAS file system
+      - postgresql+psycopg2://mlflow:${MLFLOW_DB_PASSWORD:?set MLFLOW_DB_PASSWORD in .env}@postgres:5432/mlflow
+      - --serve-artifacts # small files go through the server: the desktop needs no access to MinIO
       - --artifacts-destination
-      - /data/artifacts
+      - s3://${MINIO_BUCKET:?set MINIO_BUCKET in .env}/artifacts
       - --app-name
       - basic-auth # one admin user; users cannot sign themselves up
       - --allowed-hosts # a request must name one of these hosts (the NAS address and port you use)
@@ -39,7 +40,13 @@ services:
       - ""
 
     environment:
-      MLFLOW_AUTH_CONFIG_PATH: /etc/mlflow/basic_auth.ini
+      # basic-auth's own database (users and permissions), the second database of deploy/postgres/. entrypoint.py renders
+      # it into the auth config; MLflow reads that URI only from a file.
+      MLFLOW_AUTH_DB_URI: postgresql+psycopg2://mlflow:${MLFLOW_DB_PASSWORD:?set MLFLOW_DB_PASSWORD in .env}@postgres:5432/mlflow_auth
+      MLFLOW_S3_ENDPOINT_URL: ${MINIO_ENDPOINT_URL:?set MINIO_ENDPOINT_URL in .env}
+      AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY in .env}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env}
+      AWS_DEFAULT_REGION: us-east-1 # boto3 wants one; MinIO ignores it
       MLFLOW_AUTH_ADMIN_PASSWORD: ${MLFLOW_AUTH_ADMIN_PASSWORD:?set MLFLOW_AUTH_ADMIN_PASSWORD in .env}
       MLFLOW_FLASK_SERVER_SECRET_KEY: ${MLFLOW_FLASK_SERVER_SECRET_KEY:?set MLFLOW_FLASK_SERVER_SECRET_KEY in .env}
       # MLflow 3.x starts job workers by default: processes that execute job functions. Off: this server runs no code.
@@ -52,12 +59,12 @@ services:
       MLFLOW_DISABLE_AGENT_HINT: "1"
       HOME: /tmp
 
-    volumes:
-      - ./basic_auth.ini:/etc/mlflow/basic_auth.ini:ro
-      - ${MLFLOW_DATA_DIR:?set MLFLOW_DATA_DIR in .env}:/data # mlflow.db, basic_auth.db, artifacts/
+    # Reaches Postgres (container `postgres`) over the private network that deploy/postgres/ creates.
+    networks:
+      - resonance-db
 
-    # Locked down: a non-root NAS user, a read-only root file system, no capabilities, no docker socket.
-    user: "${NAS_UID:?set NAS_UID in .env}:${NAS_GID:?set NAS_GID in .env}"
+    # Locked down: nobody (no data files to own any more), a read-only root file system, no capabilities, no docker socket.
+    user: "65534:65534"
     read_only: true
     tmpfs:
       - /tmp
@@ -75,3 +82,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+networks:
+  resonance-db:
+    name: resonance-db
+    external: true # created by deploy/postgres/ (`docker compose up` there first)
