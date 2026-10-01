@@ -53,8 +53,11 @@ def test_the_image_is_postgres_18_pinned_to_its_major_version_with_the_init_scri
     assert "latest" not in dockerfile
 
 
-def test_the_database_is_never_published_on_the_lan(compose, service):
-    assert "ports" not in service  # only containers on the resonance-db network reach it
+def test_the_database_is_published_on_one_lan_address_never_on_every_interface(compose, service):
+    (port,) = service["ports"]  # for psql / a GUI client on the desktop; MLflow itself uses the private network
+    assert port.startswith("${POSTGRES_BIND:?")  # required: no default, so no silent 0.0.0.0
+    assert port.endswith(":5432")
+    assert "0.0.0.0" not in port
     assert service["networks"] == ["resonance-db"]
     assert compose["networks"]["resonance-db"] == {"name": "resonance-db"}  # deploy/mlflow joins it by this name
     assert service["container_name"] == "resonance-postgres"
@@ -115,6 +118,7 @@ def test_the_example_env_holds_no_secret():
     env = _env(("deploy", "postgres", ".env.example"))
 
     assert env["POSTGRES_PASSWORD"] == "" and env["MLFLOW_DB_PASSWORD"] == ""
+    assert env["POSTGRES_BIND"] and env["POSTGRES_BIND"] != "0.0.0.0"
 
 
 def test_every_variable_the_compose_file_needs_is_in_the_example_env():

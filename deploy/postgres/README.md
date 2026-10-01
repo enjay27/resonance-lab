@@ -1,13 +1,13 @@
 # PostgreSQL on the Synology NAS
 
 The database behind the MLflow server (`deploy/mlflow/`): database `mlflow` for the runs, `mlflow_auth` for its login.
-Not published on the LAN: only containers on the `resonance-db` Docker network reach it (MLflow joins that network).
+MLflow reaches it over the private `resonance-db` Docker network; your desktop reaches it on one NAS LAN address (below).
 Postgres is the backend MLflow itself is tested against most, and unlike SQLite it does not need a local volume.
 
 ## Set up on the NAS
 1. **Folder.** In File Station create `docker/postgres` (`/volume1/docker/postgres`). Copy this folder's
    `Dockerfile`, `docker-compose.yml`, `.env.example` and the `initdb/` folder (with `10-mlflow.sh`) into it.
-2. **Settings.** Copy `.env.example` to `.env` and fill in two passwords, letters and digits only
+2. **Settings.** Copy `.env.example` to `.env`, set `POSTGRES_BIND` to an address the NAS really has, and fill in two passwords, letters and digits only
    (`openssl rand -hex 24` for each). `MLFLOW_DB_PASSWORD` must be the same value you put into `deploy/mlflow/.env`.
    `.env` stays on the NAS and is gitignored here.
 3. **Start** (before the MLflow project). Container Manager -> Project -> Create: path `/volume1/docker/postgres`, use the
@@ -20,10 +20,20 @@ Postgres is the backend MLflow itself is tested against most, and unlike SQLite 
 ## What the settings do
 | Requirement | Setting |
 |---|---|
-| nobody on the LAN | no `ports:`; the container is only on the `resonance-db` network. To reach it with a client from the desktop, add `ports: ["<NAS IP>:5432:5432"]` yourself and a firewall rule for one IP |
+| the desktop only | published on `POSTGRES_BIND:5432` (required, no default, so never every interface); DSM firewall: allow TCP 5432 from the desktop's IP only. **Do not forward the port on the router**: a database on the internet gets scanned and brute-forced within hours |
 | passwords | `scram-sha-256` for every network connection (never `trust`); the passwords are only in `.env` |
 | unprivileged | the image's `postgres` user (70), read-only root file system, `/tmp` and `/run/postgresql` as tmpfs (the second owned by user 70), the init script copied into the image (not bind-mounted), no capabilities, no new privileges, 1 GB |
 | the data | the named volume `resonance-postgres-data` (Docker keeps the image's ownership, so no `chown` and no root start); it lives under Container Manager's volume folder |
+
+## Connect from the desktop
+```
+psql -h <POSTGRES_BIND> -p 5432 -U mlflow -d mlflow          # the MLflow role: its two databases only
+psql -h <POSTGRES_BIND> -p 5432 -U postgres -d postgres       # the superuser: only for administration
+```
+A GUI client (DBeaver, pgAdmin, PyCharm's Database tool) takes the same host, port, user and password. Passwords are the ones in
+the NAS `.env`; connections are password-authenticated (`scram-sha-256`) but **not encrypted** (the LAN only: no TLS here). Prefer
+the `mlflow` role, and keep the firewall rule to your desktop's IP. Changing `ports:` needs the container re-created:
+`sudo docker compose up -d` (not just a restart).
 
 ## If the first start went wrong
 The init script runs only when the data volume is empty, and a start that skipped it leaves a data directory without the
