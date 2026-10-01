@@ -39,3 +39,14 @@ Branch `claude/align-project-structure-s21g7q`.
   (LLaMA-Factory, raw line, gemma3). Read that branch; `experiment/qwen3.5` is the step
   between (same LLaMA-Factory move, Qwen3 4B).
 - The maintainer's model shortlist is kept in `roadmap/translator-shortlist-2026-10-01.md`.
+
+## Switchable pipelines (same day, later)
+- Maintainer: bring `experiment/translategemma`'s *features* onto `main`, keep the Qwen3
+  pipeline switchable, default `llamafactory`. A plain merge was rejected: conflicts in
+  README/preprocess/split_dataset, and its `config.py` reads `data/system_prompt.txt` at
+  import (gitignored) -> every test fails in CI.
+- Read the branch from a separate clone indexed with graft (25 symbols): LLaMA-Factory
+  train/export/dataset_info, richer `is_clean`, eval metrics, curses monitor.
+- Decisions: pipeline = backend, model profile = yaml; folder per pipeline; one
+  requirements file per pipeline (trl pins conflict); monitor on `rich` instead of curses
+  (OS-neutral); prompt format stays out of the registry for now.

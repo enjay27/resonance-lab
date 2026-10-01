@@ -4,8 +4,25 @@
    (`active-issues/stream-contract.md` §1). Plan: `translator-shortlist-2026-10-01.md`
    (zero-shot eval round, then fine-tune the top family on the app's exact prompt).
    Blocks the re-fine-tune (stream's A4).
-2. **Bring `experiment/translategemma` onto `main`?** It holds the shipped pipeline
-   (LLaMA-Factory, eval.py with chrF/COMET); `main` holds the older Qwen3 one. Maintainer's call.
+2. **Bring `experiment/translategemma`'s features in as a switchable pipeline** (maintainer,
+   2026-10-01: keep the Qwen3 pipeline; take only the branch's features; `llamafactory`
+   becomes the default). One PR at a time, each merged before the next:
+   - **A — registry + move (done):** `pipelines.py`, `--pipeline`, `scripts/unsloth/`.
+   - **B — shared preprocess:** the branch's filters (Hangeul in source, JP residual,
+     10x-length hallucination, recruitment spam, dedup, per-reason counts), tested first;
+     output format chosen per pipeline (`{instruction,input,output}` vs `{system,original,translated}`).
+   - **C — `llamafactory` pipeline:** `configs/training/*.yaml` (one yaml = one model
+     profile, so Hy-MT2 / Gemma 4 / Qwen3.5 from the shortlist are config files), `train.py`
+     (wraps `llamafactory-cli`), `export.py` (merge -> F16 GGUF -> q4_k_m),
+     `update_dataset_info.py`, a training monitor on `rich` (OS-neutral; replaces the
+     curses `watch_training.py`, helpers `classify_loss`/`classify_grad` tested), `config.py`
+     loads the system prompt lazily (the branch's import-time read breaks CI), one
+     requirements file per pipeline (trl 0.24.0 vs 0.29.0 conflict -> separate venvs),
+     default switches to `llamafactory`.
+   - **D — shared eval metrics:** chrF, COMET, JP leakage, think leakage, term accuracy
+     (`TERM_DICT`) as a tested module both pipelines' `eval.py` use, so numbers compare.
+   Prompt format is not in the registry yet (one pipeline carries the contract); revisit
+   when the model is chosen (`translator-shortlist-2026-10-01.md`).
 3. **Ingest the app's per-channel files** (`dataset_<CHANNEL>.jsonl`) instead of one
    hand-made `raw_translated_logs.jsonl` — a data-part script, tested.
 4. **Model scripts testable** — `train.py` / `eval.py` / `fix_metadata.py` run at import;

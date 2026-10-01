@@ -1,3 +1,4 @@
+import argparse
 import subprocess
 import time
 import sys
@@ -5,7 +6,7 @@ import os
 import platform
 import torch
 
-from config import BASE_DIR
+import pipelines
 
 
 def log_diagnostic(stage, status, elapsed=None):
@@ -47,18 +48,16 @@ def run_step(name, script_path):
         return False
 
 def main():
+    parser = argparse.ArgumentParser(description="Run a training pipeline, stage by stage.")
+    parser.add_argument("--pipeline", choices=sorted(pipelines.PIPELINES), default=pipelines.DEFAULT,
+                        help="training backend (default: %(default)s)")
+    args = parser.parse_args()
+
     check_system()
+    print(f"Pipeline: {args.pipeline}\n")
     total_start = time.perf_counter()
 
-    # Define the pipeline stages based on your scripts folder
-    pipeline = [
-        ("Validate", os.path.join(BASE_DIR, "scripts", "validate.py")),
-        ("Preprocessing", os.path.join(BASE_DIR, "scripts", "preprocess.py")),
-        ("Dataset Split", os.path.join(BASE_DIR, "scripts", "split_dataset.py")),
-        ("Fine-Tuning", os.path.join(BASE_DIR, "scripts", "train.py")),
-        ("Metadata Fix", os.path.join(BASE_DIR, "scripts", "fix_metadata.py")),
-        ("Evaluation", os.path.join(BASE_DIR, "scripts", "eval.py")),
-    ]
+    pipeline = pipelines.stages(args.pipeline)
 
     for name, path in pipeline:
         success = run_step(name, path)

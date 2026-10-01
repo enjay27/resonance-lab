@@ -11,13 +11,19 @@ the app ships today (TranslateGemma-4B + LoRA, gist model 1.1.0) was trained on 
 not on `main`. The base model is being re-chosen —
 `.memory/roadmap/translator-shortlist-2026-10-01.md` is the plan.
 
+**Pipelines are switchable:** `python run_pipeline.py --pipeline <name>` (registry:
+`pipelines.py`). `unsloth` (Qwen3 1.7B, the default for now) is the only one so far; the
+LLaMA-Factory pipeline of `experiment/translategemma` is being brought in step by step —
+plan in `.memory/roadmap/next.md`. Each pipeline has its own folder under `scripts/`, its
+own stage list in the registry, and (later) its own requirements file / virtualenv.
+
 The repo is two parts. **Which part you touch decides which gate applies.** That is the
 most important thing on this page.
 
 | tree | part | runs on | gate |
 |---|---|---|---|
-| `scripts/validate.py` `scripts/preprocess.py` `scripts/split_dataset.py` `config.py` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
-| `scripts/train.py` `scripts/eval.py` `scripts/fix_metadata.py` `run_pipeline.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements.txt`) | none automated — a manual run, reported |
+| `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `config.py` `pipelines.py` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
+| `scripts/unsloth/train.py` `scripts/unsloth/eval.py` `scripts/unsloth/fix_metadata.py` `run_pipeline.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements.txt`) | none automated — a manual run, reported |
 
 `just check` needs only `requirements-dev.txt` (`pip install -r requirements-dev.txt`;
 `pip install rust-just` for `just`). CI (`.github/workflows/ci.yml`) runs it on Linux on
@@ -59,14 +65,17 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
 .github/workflows/    CI (data gate) + auto-merge
 justfile              the gates as commands
 config.py             every path and hyper-parameter; INSTRUCTION (system prompt)
-run_pipeline.py       runs the stages below in order, stops at the first failure
+pipelines.py          registry: pipeline name -> ordered stage scripts (no torch; tested)
+run_pipeline.py       --pipeline <name>: runs its stages in order, stops at the first failure
 scripts/
-  validate.py           data: raw logs -- no Hangeul in `original` (ValidationError)
-  preprocess.py         data: raw {original, translated} -> {instruction, input, output}
-  split_dataset.py      data: dedup by input, shuffle (seed 42), train/val -> lora_dataset/
-  train.py              model: LoRA fine-tune (unsloth), merge -> model_f16/
-  fix_metadata.py       model: drop `score.weight` -> model_f16_clean/
-  eval.py               model: translate fixed test lines with model_f16_clean/
+  validate.py           shared data: raw logs -- no Hangeul in `original` (ValidationError)
+  preprocess.py         shared data: raw {original, translated} -> {instruction, input, output};
+                          skips untranslated / blank rows
+  unsloth/              pipeline `unsloth` (Qwen3 1.7B)
+    split_dataset.py      data: dedup by input, shuffle (seed 42), train/val -> lora_dataset/
+    train.py              model: LoRA fine-tune (unsloth), merge -> model_f16/
+    fix_metadata.py       model: drop `score.weight` -> model_f16_clean/
+    eval.py               model: translate fixed test lines with model_f16_clean/
 tests/                pytest for the data part; conftest.py has the JSONL fixtures
 data/raw/ data/processed/   stage inputs/outputs (config.py paths) -- GITIGNORED
 graft/                graft's generated cards -- GITIGNORED, regenerable (`graft build`)
@@ -96,9 +105,12 @@ Reach for graft before grep/read — see `.claude/skills/graft/SKILL.md`.
 - **A stage that fails exits non-zero** (`sys.exit(1)` or an exception) — that is how
   `run_pipeline.py` stops. A stage that only prints an error lets the pipeline continue
   on bad data.
-- **Scripts import `config` via `sys.path.append(<repo root>)`**; tests get the same
-  through `pyproject.toml` (`pythonpath = [".", "scripts"]`) and import scripts as
-  modules (`import preprocess`).
+- **Scripts import `config` via `sys.path.append(<repo root>)`** (one `dirname` per folder
+  level: three in `scripts/<pipeline>/`); tests get the same through `pyproject.toml`
+  (`pythonpath` lists the root and each script folder) and import scripts as modules
+  (`import preprocess`). A new script folder goes into `pythonpath`.
+- **A new pipeline is a folder under `scripts/` plus an entry in `pipelines.py`**;
+  `tests/test_pipelines.py` checks every registered stage script exists.
 - JSONL is read and written as UTF-8 with `ensure_ascii=False`.
 
 ## Guardrails

@@ -3,7 +3,7 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Tests import the scripts as modules: `import preprocess`, `from config import ...`.
-pythonpath = [".", "scripts"]
+pythonpath = [".", "scripts", "scripts/unsloth"]
 
 [tool.ruff]
 target-version = "py311"
