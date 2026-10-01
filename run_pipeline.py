@@ -4,7 +4,6 @@ import time
 import sys
 import os
 import platform
-import torch
 
 import pipelines
 
@@ -22,14 +21,19 @@ def check_system():
     print("--- System Diagnostic ---")
     print(f"OS: {platform.system()} {platform.release()}")
     print(f"Python: {sys.version.split()[0]}")
-    if torch.cuda.is_available():
-        print(f"GPU: {torch.cuda.get_device_name(0)}")
-        print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
+    try:
+        import torch  # imported here: the data gate has no torch
+    except ImportError:
+        print("GPU: unknown (torch not installed in this environment)")
     else:
-        print("GPU: NOT FOUND (Check CUDA drivers)")
+        if torch.cuda.is_available():
+            print(f"GPU: {torch.cuda.get_device_name(0)}")
+            print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
+        else:
+            print("GPU: NOT FOUND (Check CUDA drivers)")
     print("-" * 25 + "\n")
 
-def run_step(name, script_path):
+def run_step(name, script_path, args=()):
     """Executes a single python script and tracks its performance."""
     if not os.path.exists(script_path):
         log_diagnostic(name, "MISSING")
@@ -38,7 +42,7 @@ def run_step(name, script_path):
     start_time = time.perf_counter()
     try:
         # Run the script as a sub-process
-        subprocess.run([sys.executable, script_path], check=True, capture_output=False)
+        subprocess.run([sys.executable, script_path, *args], check=True, capture_output=False)
         elapsed = time.perf_counter() - start_time
         log_diagnostic(name, "SUCCESS", elapsed)
         return True
@@ -59,8 +63,9 @@ def main():
 
     pipeline = pipelines.stages(args.pipeline)
 
-    for name, path in pipeline:
-        success = run_step(name, path)
+    for stage in pipeline:
+        name = stage.name
+        success = run_step(name, stage.path, stage.args)
         if not success:
             print(f"\n[!] Pipeline halted at {name}. Check logs.")
             sys.exit(1)

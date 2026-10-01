@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import re
@@ -20,6 +21,15 @@ REASONS = (
     "duplicate",
     "json error",
 )
+
+
+# Output row layouts, by pipeline: unsloth trains on instruction/input/output rows,
+# LLaMA-Factory reads original/translated columns (see update_dataset_info.py).
+FORMATS = {
+    "instruction": lambda original, translated: {"instruction": INSTRUCTION, "input": original, "output": translated},
+    "pair": lambda original, translated: {"original": original, "translated": translated},
+}
+DEFAULT_FORMAT = "instruction"
 
 
 def clean_reason(original, translated):
@@ -58,11 +68,14 @@ def _report(counts):
         print(f"  {reason:<{width}}: {counts[reason]}")
 
 
-def transform_for_lora(input_file, output_file):
-    """Clean raw {original, translated} rows into LoRA {instruction, input, output} rows.
+def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT):
+    """Clean raw {original, translated} rows into training rows of layout `fmt`.
 
     Returns the counts per outcome (`total`, `passed` and one per reason).
     """
+    if fmt not in FORMATS:
+        raise ValueError(f"unknown format {fmt!r}; choose one of: {', '.join(sorted(FORMATS))}")
+    make_row = FORMATS[fmt]
     if not os.path.exists(input_file):
         print(f"[ERROR] Raw data not found at: {input_file}")
         sys.exit(1)
@@ -92,12 +105,7 @@ def transform_for_lora(input_file, output_file):
 
             seen_inputs.add(original)
             counts["passed"] += 1
-            lora_data = {
-                "instruction": INSTRUCTION,
-                "input": original,
-                "output": translated
-            }
-            f_out.write(json.dumps(lora_data, ensure_ascii=False) + '\n')
+            f_out.write(json.dumps(make_row(original, translated), ensure_ascii=False) + '\n')
 
     _report(counts)
     if counts["passed"] == 0:
@@ -107,5 +115,13 @@ def transform_for_lora(input_file, output_file):
     return counts
 
 
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Clean the raw chat log into training rows.")
+    parser.add_argument("--format", choices=sorted(FORMATS), default=DEFAULT_FORMAT, dest="fmt",
+                        help="row layout (default: %(default)s)")
+    args = parser.parse_args(argv)
+    transform_for_lora(RAW_LOGS, PROCESSED_LOGS, args.fmt)
+
+
 if __name__ == "__main__":
-    transform_for_lora(RAW_LOGS, PROCESSED_LOGS)
+    main()

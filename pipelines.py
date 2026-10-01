@@ -6,10 +6,17 @@ Kept free of torch/CUDA imports so the data gate can test it.
 """
 
 import os
+from typing import NamedTuple
 
 from config import BASE_DIR
 
 DEFAULT = "unsloth"
+
+
+class Stage(NamedTuple):
+    name: str
+    path: str  # the script, run as a subprocess
+    args: tuple = ()  # extra command-line arguments for it
 
 
 def _script(*parts):
@@ -19,18 +26,18 @@ def _script(*parts):
 PIPELINES = {
     # Qwen3 1.7B, LoRA with unsloth, merged to F16 (fix_metadata drops the classifier head).
     "unsloth": [
-        ("Validate", _script("validate.py")),
-        ("Preprocessing", _script("preprocess.py")),
-        ("Dataset Split", _script("unsloth", "split_dataset.py")),
-        ("Fine-Tuning", _script("unsloth", "train.py")),
-        ("Metadata Fix", _script("unsloth", "fix_metadata.py")),
-        ("Evaluation", _script("unsloth", "eval.py")),
+        Stage("Validate", _script("validate.py")),
+        Stage("Preprocessing", _script("preprocess.py")),
+        Stage("Dataset Split", _script("unsloth", "split_dataset.py")),
+        Stage("Fine-Tuning", _script("unsloth", "train.py")),
+        Stage("Metadata Fix", _script("unsloth", "fix_metadata.py")),
+        Stage("Evaluation", _script("unsloth", "eval.py")),
     ],
 }
 
 
 def stages(name):
-    """The (stage name, script path) list of a pipeline."""
+    """The Stage list (name, script path, extra arguments) of a pipeline."""
     if name not in PIPELINES:
         raise ValueError(f"unknown pipeline {name!r}; choose one of: {', '.join(sorted(PIPELINES))}")
     return list(PIPELINES[name])
