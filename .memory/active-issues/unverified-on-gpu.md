@@ -52,6 +52,6 @@ Code or config changed in a session without CUDA. Delete an item once it has run
 - **`--model` parameter (2026-10-01):** parsing and precedence are unit-tested and the error paths ran here; train/eval/inspect/watch with a real model not run. `inspect_template.py`'s old `--model` (tokenizer id) is now `--tokenizer`.
 - **`*-fast` profiles (2026-10-01):** `translategemma-4b-fast`, `hy-mt2-1.8b-fast`, `hy-mt2-7b-fast` = the base profile with
   packing + Liger + a bigger batch (4B 16x2, 1.8B 32x1, 7B 8x4 with checkpointing), own output/export dirs. Never run.
-  Check: `pip install liger-kernel` (Windows needs triton-windows; else set `enable_liger_kernel: false`); `flash_attn: auto`
+  Liger on Windows: `pip install liger-kernel` fails (wants `triton`, only `triton-windows` exists) -> install `triton-windows<3.6` then `liger-kernel --no-deps` (version pairing with torch 2.9.1 is my assumption, unverified), else set `enable_liger_kernel: false`. Check; `flash_attn: auto`
   picks fa2/sdpa; the batch fits VRAM; then compare time (watch_training tok/s) and eval chrF against the base profile.
   `python run_pipeline.py --model hy-mt2-1.8b-fast`. If fa2 works, add `neat_packing: true`.

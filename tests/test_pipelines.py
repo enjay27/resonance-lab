@@ -83,3 +83,12 @@ def test_eval_dataset_path_is_configured():
     import config
 
     assert config.EVAL_DATASET_PATH.endswith(os.path.join("data", "eval", "bp-eval-dataset.jsonl"))
+
+
+def test_llamafactory_requirements_do_not_pull_liger_kernel_by_name():
+    # liger-kernel depends on `triton`, which does not exist on Windows (only `triton-windows`), so a bare
+    # requirement line breaks `pip install -r` there. It is installed by hand with --no-deps (see the file).
+    with open(os.path.join(BASE_DIR, "requirements-llamafactory.txt"), encoding="utf-8") as f:
+        requirements = [line.split("#")[0].strip() for line in f]
+
+    assert not any(line.startswith("liger-kernel") for line in requirements)

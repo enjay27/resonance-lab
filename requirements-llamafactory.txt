@@ -21,7 +21,10 @@ sacrebleu
 # The training monitor (scripts/llamafactory/watch_training.py): OS-neutral terminal UI.
 rich
 
-# Needed only by the `*-fast` profiles (enable_liger_kernel: true). Not pinned: pin what you trained with.
-# On Windows install triton-windows first (same wheel as requirements-unsloth.txt); if Liger will not install,
-# set `enable_liger_kernel: false` in the profile's train.yaml -- everything else still works.
-liger-kernel
+# NOT listed: liger-kernel, needed only by the `*-fast` profiles (enable_liger_kernel: true). It depends on
+# `triton`, which does not exist on Windows (the wheel is `triton-windows`), so pip's resolver fails on it.
+# Install by hand, in this order, inside the venv:
+#   pip install "triton-windows<3.6"            # the 3.5 line matches torch 2.9.x above
+#   pip install liger-kernel --no-deps          # its only other dependency is torch
+# If that fails, set `enable_liger_kernel: false` in the profile's train.yaml: packing and the bigger batch
+# (most of the speed-up) still apply.
