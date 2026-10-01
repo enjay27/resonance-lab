@@ -24,9 +24,10 @@ Needs the Postgres of `deploy/postgres/` (running, with the `mlflow` and `mlflow
    - `.env` stays on the NAS and is gitignored here.
 4. **Start.** Container Manager -> Project -> Create: path `/volume1/docker/mlflow`, use the existing `docker-compose.yml`,
    build and start. (Or over SSH: `cd /volume1/docker/mlflow && sudo docker compose up -d --build`.)
-   The first build downloads MLflow from PyPI. If you built an older version of this folder before, remove the old
-   image (`sudo docker rmi resonance-mlflow:3.16.1`) and the old container; the new image is tagged `...-pg`.
-   `ModuleNotFoundError: No module named 'psycopg2'` means an old image is running. On the first start MLflow creates its tables in Postgres and the `admin`
+   The first build downloads MLflow from PyPI. If you built an older version of this folder before (SQLite, no Postgres driver),
+   compose reuses that image because its tag exists: remove it first (`sudo docker compose down && sudo docker rmi resonance-mlflow:<MLFLOW_VERSION>`),
+   or rebuild with `sudo docker compose build --no-cache`. `ModuleNotFoundError: No module named 'psycopg2'` means an old image is running.
+   On the first start MLflow creates its tables in Postgres and the `admin`
    user with your password. The `PIDs limit` warning on an old DSM kernel is harmless.
 5. **Firewall.** Control Panel -> Security -> Firewall: allow TCP 5050 from the desktop's IP only, deny the rest. Do
    not forward the port on the router.

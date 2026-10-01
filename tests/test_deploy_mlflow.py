@@ -233,9 +233,7 @@ def test_the_image_is_built_from_pinned_versions_with_the_auth_extra_and_the_pos
 
 def test_compose_builds_that_image_at_the_version_in_the_env_file(service):
     assert service["build"]["args"]["MLFLOW_VERSION"].startswith("${MLFLOW_VERSION:?")
-    # The tag names the drivers too: an image built before Postgres (SQLite era) had the plain `:<version>` tag, and compose reuses
-    # an image that already has its tag instead of rebuilding ("No module named 'psycopg2'").
-    assert service["image"] == "resonance-mlflow:${MLFLOW_VERSION}-pg"
+    assert service["image"] == "resonance-mlflow:${MLFLOW_VERSION}"
 
 
 # --- nothing secret is committed ------------------------------------------------------------------------------------
