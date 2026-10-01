@@ -19,7 +19,9 @@ next training), `rich` training monitor, shared eval report. `RESONANCE_RAW_LOGS
 machine, then a profile per shortlist candidate.
 
 **Model choice, step 1 (2026-10-01): Hy-MT2 profiles written** (`hy-mt2-1.8b`, `hy-mt2-7b`; lead challenger of the
-shortlist). Templates verified locally against both tokenizers (`inspect_template.py`: MATCH; no tokenizer adds BOS, eval now
+shortlist). **Zero-shot numbers are in** [`zero-shot-results-2026-10-01.md`](.memory/roadmap/zero-shot-results-2026-10-01.md):
+Hy-MT2-1.8B untrained chrF 39.3 vs shipped TG-4B 41.7 (needs the instruction prompt; raw line fails). Still to run:
+TG-4B `--prompt training`, Hy-7B. Templates verified locally against both tokenizers (`inspect_template.py`: MATCH; no tokenizer adds BOS, eval now
 prepends it). Not trained/evaluated. **Next: rest of the local checklist in** [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md)
 (`inspect_template.py`), then zero-shot eval vs the re-baselined TranslateGemma-4B. Other candidates: later.
 
