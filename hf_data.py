@@ -89,3 +89,14 @@ def with_revision(text, revision):
     if not count:
         raise FetchError("configs/hf_dataset.yaml has no `revision:` line")
     return out
+
+
+def pin_report(repo, current, latest, written=False):
+    """(message, is_current): whether the config's pinned revision `current` is the repo's `latest` commit.
+    `written` words it for `--pin`, which is about to write `latest`, instead of `--check`, which only looks."""
+    if not current:
+        return (f"{repo} pinned at {latest[:12]} (was unset)" if written
+                else f"{repo} not pinned (was unset); latest is {latest[:12]}"), False
+    if current == latest:
+        return f"{repo} already pinned at {latest[:12]}", True
+    return f"{repo} pin moved {current[:12]} -> {latest[:12]}", False
