@@ -10,7 +10,7 @@ services:
       context: .
       args:
         MLFLOW_VERSION: ${MLFLOW_VERSION:?set MLFLOW_VERSION in .env}
-    image: resonance-mlflow:${MLFLOW_VERSION}
+    image: resonance-mlflow:${MLFLOW_VERSION}-pg # the tag changes with the drivers in the Dockerfile: compose never rebuilds an image whose tag exists
     container_name: resonance-mlflow
     restart: unless-stopped
 
