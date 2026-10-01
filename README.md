@@ -13,11 +13,20 @@ different `trl`/`transformers`).
 
 | pipeline | trains | requirements | stages |
 |---|---|---|---|
-| `llamafactory` | any model with a profile in `configs/llamafactory/<profile>/` (now `translategemma-4b`; pick with `--model <profile>` on any script or on `run_pipeline.py`; `RESONANCE_LF_PROFILE` is the fallback for remote jobs, the parameter wins) | `requirements-llamafactory.txt` | Validate, Preprocessing, Update Dataset, Fine-Tuning, Merge LoRA, Export GGUF (`model_gguf/bp-<profile>-q4_k_m.gguf`) |
+| `llamafactory` | any model with a profile in `configs/llamafactory/<profile>/` (now `translategemma-4b`; pick with `--model <profile>` on any script or on `run_pipeline.py`; `RESONANCE_LF_PROFILE` is the fallback for remote jobs, the parameter wins) | `requirements-llamafactory.txt` | Fetch Data, Validate, Preprocessing, Update Dataset, Fine-Tuning, Merge LoRA, Export GGUF (`model_gguf/bp-<profile>-q4_k_m.gguf`) |
 | `unsloth` | Qwen3 1.7B | `requirements-unsloth.txt` | Validate, Preprocessing, Dataset Split, Fine-Tuning, Metadata Fix, Evaluation (+ the shared report), then the manual GGUF steps below |
 
 A new model for the `llamafactory` pipeline is a new folder `configs/llamafactory/<profile>/` with `train.yaml` and
 `merge.yaml` (`tests/test_lf_tools.py` checks the two agree on adapter path, base model and template).
+
+Part of a pipeline: `--from <stage>` starts at a stage and runs the rest, `--only <stage>` runs just one (a stage
+name or a unique prefix, case and `-`/`_`/space ignored: `python run_pipeline.py --model hy-mt2-1.8b --from merge`).
+
+**Every training is a run.** `train.py` writes into a fresh directory `outputs/<profile>_lora/<run id>/` (run id = UTC
+time) with `run.json` (running / failed / complete) and `train_stdout.log`; a retrain never resumes an older run's
+checkpoint (LLaMA-Factory would). `merge.py` merges the latest *complete* run, or `--run <id>`, and leaves
+`resonance_run.json` in the merged model's directory naming the run. The monitor follows the latest run. Adapters
+trained before runs existed (directly in `outputs/<profile>_lora/`) are still merged.
 
 ## Training data
 The app's per-channel `dataset_<CHANNEL>.jsonl` files live in a Hugging Face dataset repo. Set `repo:` in

@@ -55,3 +55,30 @@ def stages(name):
     if name not in PIPELINES:
         raise ValueError(f"unknown pipeline {name!r}; choose one of: {', '.join(sorted(PIPELINES))}")
     return list(PIPELINES[name])
+
+
+def _key(name):
+    """A stage name as compared on the command line: case, spaces, dashes and underscores do not matter."""
+    return "".join(ch for ch in name.lower() if ch.isalnum())
+
+
+def _find(stages, wanted):
+    key = _key(wanted)
+    exact = [s for s in stages if _key(s.name) == key]
+    found = exact or [s for s in stages if key and _key(s.name).startswith(key)]
+    if len(found) == 1:
+        return found[0]
+    names = ", ".join(s.name for s in (found or stages))
+    raise ValueError(f"{'ambiguous' if found else 'unknown'} stage {wanted!r}; "
+                     f"{'it matches' if found else 'choose one of'}: {names}")
+
+
+def select_stages(stages, start=None, only=None):
+    """The stages to run: all, those from `start` on, or just `only` (a name or a unique prefix of one)."""
+    if start and only:
+        raise ValueError("use either --from or --only, not both")
+    if only:
+        return [_find(stages, only)]
+    if start:
+        return list(stages)[list(stages).index(_find(stages, start)):]
+    return list(stages)

@@ -98,3 +98,48 @@ def test_llamafactory_requirements_do_not_pull_liger_kernel_by_name():
 def test_both_pipelines_fetch_the_data_first():
     for name in pipelines.PIPELINES:
         assert stage_names(name)[0] == "Fetch Data"
+
+
+# --- running part of a pipeline: --from / --only --------------------------------------------------------------
+
+
+def _stages():
+    return pipelines.stages("llamafactory")
+
+
+def test_without_a_selection_every_stage_runs():
+    assert pipelines.select_stages(_stages()) == _stages()
+
+
+def test_from_starts_at_the_named_stage_and_runs_the_rest():
+    names = [s.name for s in pipelines.select_stages(_stages(), start="Merge LoRA")]
+
+    assert names == ["Merge LoRA", "Export GGUF", "Evaluation"]
+
+
+def test_only_runs_just_the_named_stage():
+    assert [s.name for s in pipelines.select_stages(_stages(), only="Fine-Tuning")] == ["Fine-Tuning"]
+
+
+@pytest.mark.parametrize("given", ["merge lora", "MERGE-LORA", "merge_lora", " Merge LoRA "])
+def test_stage_names_match_case_and_separator_insensitively(given):
+    assert [s.name for s in pipelines.select_stages(_stages(), only=given)] == ["Merge LoRA"]
+
+
+def test_a_unique_prefix_is_enough():
+    assert [s.name for s in pipelines.select_stages(_stages(), only="merge")] == ["Merge LoRA"]
+
+
+def test_an_ambiguous_prefix_names_the_candidates():
+    with pytest.raises(ValueError, match="Export GGUF"):
+        pipelines.select_stages(_stages(), only="e")  # Export GGUF and Evaluation
+
+
+def test_an_unknown_stage_lists_the_stages_of_the_pipeline():
+    with pytest.raises(ValueError, match="Fine-Tuning"):
+        pipelines.select_stages(_stages(), start="Nope")
+
+
+def test_from_and_only_together_are_refused():
+    with pytest.raises(ValueError, match="either"):
+        pipelines.select_stages(_stages(), start="Merge LoRA", only="Evaluation")

@@ -20,7 +20,7 @@ most important thing on this page.
 
 | tree | part | runs on | gate |
 |---|---|---|---|
-| `scripts/fetch_data.py` `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `eval_metrics.py` `text_rules.py` `hf_data.py` `overlap.py` `valsplit.py` `manifest.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
+| `scripts/fetch_data.py` `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `eval_metrics.py` `text_rules.py` `hf_data.py` `runs.py` `overlap.py` `valsplit.py` `manifest.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
 | `scripts/unsloth/train.py` `scripts/unsloth/eval.py` `scripts/unsloth/fix_metadata.py` `scripts/llamafactory/train.py` `merge.py` `gguf.py` `eval.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements-<pipeline>.txt`) | none automated — a manual run, reported |
 
 `just check` needs only `requirements-dev.txt` (`pip install -r requirements-dev.txt`;
@@ -69,12 +69,13 @@ config.py             every path and hyper-parameter; INSTRUCTION (system prompt
 eval_metrics.py       shared eval scoring + report (chrF/BLEU/TER, COMET, JP/think leakage, terms); tested
 text_rules.py         JP / Hangeul patterns shared by preprocess and the eval metrics
 hf_data.py            the HF dataset: config, `hf download` command, merge of the per-channel files, fetch state; tested (no network)
+runs.py               one training = one run dir `<output_dir>/<run id>/` + run.json status; merge takes the latest complete run; tested
 overlap.py            is a training line also an eval line? (normalised + near-duplicate); preprocess drops them; tested
 valsplit.py           which lines are validation: sha1 of the normalised line, so pairs/variants stay together and lines keep their side as data grows; tested
 manifest.py           lora_train_data.meta.json: how the training file was made (style, reverse, shas, counts); update_dataset_info/train check it; tested
 pipelines.py          registry: pipeline name -> ordered stage scripts (no torch; tested)
 prompts.py            instruction text per model family and direction (translategemma, hy); used by preprocess + eval; tested
-run_pipeline.py       --pipeline <name>: runs its stages in order, stops at the first failure
+run_pipeline.py       --pipeline <name>: runs its stages in order, stops at the first failure; --from/--only <stage> run part of it
 scripts/
   fetch_data.py         shared data: `hf download` the app's dataset_<CHANNEL>.jsonl at the revision pinned in configs/hf_dataset.yaml, merge -> raw log;
                           only when missing/changed; skipped without a repo or with RESONANCE_RAW_LOGS; `--pin` writes the latest commit; `--force`
@@ -91,7 +92,7 @@ scripts/
   llamafactory/         pipeline `llamafactory` (default)
     lf_tools.py           data: profiles, dataset_info.json, command lines (argument lists), run helpers
     update_dataset_info.py  data: writes data/dataset_info.json -> the processed pair file
-    train.py              model: `llamafactory-cli train`, output -> outputs/train_stdout.log
+    train.py              model: `llamafactory-cli train` into a fresh run dir (`output_dir=` override), log -> <run dir>/train_stdout.log
     merge.py              model: `llamafactory-cli export` (adapter -> full model)
     gguf.py               model: convert to F16 GGUF, quantize to q4_k_m -> model_gguf/
     eval.py               model: generate on the eval set (--prompt chat-template|training), shared report

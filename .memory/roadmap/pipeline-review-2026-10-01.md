@@ -9,7 +9,7 @@ so the privacy item (14) is closed.
 | # | finding | status |
 |---|---|---|
 | 1 | eval lines may be in the training data; nothing excludes them | **done** — `overlap.py`, `preprocess.py --eval-set/--keep-eval`; exact (normalised) + near (>=0.9, >=10 chars) |
-| 2 | fixed `output_dir` per profile: LLaMA-Factory resumes the old checkpoint on a retrain (**confirmed in the pinned source**, `hparams/parser.py` 619-628: `get_last_checkpoint` -> `resume_from_checkpoint`) | todo — unique dir per run |
+| 2 | fixed `output_dir` per profile: LLaMA-Factory resumes the old checkpoint on a retrain (**confirmed in the pinned source**, `hparams/parser.py` 619-628: `get_last_checkpoint` -> `resume_from_checkpoint`) | **done** — `runs.py`: `<output_dir>/<run id>/`, `output_dir=` override (read in the pinned parser: `read_args`), `run.json` status, merge takes the latest complete run |
 | 3 | `lora_train_data.jsonl` is shared by all profiles and does not say which prompt style / `--reverse` made it | **done** — `manifest.py`; `preprocess.py` writes `lora_train_data.meta.json`, `update_dataset_info.py` and `train.py` refuse a missing/changed/other-style file |
 | 4 | eval runs the bf16 merged model, not the q4_k_m GGUF that ships | todo — GGUF eval stage (`llama-server`), log the bf16->q4 delta; also settles stream's A4 (double BOS) |
 | 5 | `val_size: 0.05` is a random row split: reverse rows and near-duplicates leak into validation | **done** (hash split; time holdout NOT done) — `valsplit.py`: sha1 of the normalised line, ~5%, to `lora_train_data.val.jsonl`; yamls use `eval_dataset: bp_translation_val` instead of `val_size`. Open: a time holdout (newest ~2 months) is still a choice for the maintainer |
@@ -27,8 +27,8 @@ so the privacy item (14) is closed.
 | 17 | `trust_remote_code: true` everywhere, no `model_revision` | model — pin revisions, trust only where needed |
 | 18 | Q4_K_M without imatrix | model — decide with the GGUF eval |
 | 19 | ~4.3k training rows | learning-curve run (25/50/100%) |
-| 20 | `run_pipeline.py` has no `--from/--only` | todo |
-| 21 | one fixed `train_stdout.log` | todo — per run |
+| 20 | `run_pipeline.py` has no `--from/--only` | **done** — `pipelines.select_stages`, name or unique prefix |
+| 21 | one fixed `train_stdout.log` | **done** — `<run dir>/train_stdout.log` |
 | 22 | no Fetch Data stage | **done** — `scripts/fetch_data.py` + `hf_data.py`: `hf download` at the revision pinned in `configs/hf_dataset.yaml`, per-channel `dataset_<CHANNEL>.jsonl` merged into the raw log, only when missing/changed. **`repo:` is still null: the maintainer sets it, then `fetch_data.py --pin`** |
 
 ## Order

@@ -7,6 +7,7 @@ import yaml
 
 import config
 import lf_tools
+import runs
 
 
 @pytest.fixture
@@ -350,7 +351,7 @@ def test_merge_stage_uses_the_model_parameter_not_the_environment(monkeypatch, c
     assert "hy-mt2-1.8b_lora" in capsys.readouterr().out
 
 
-def test_train_stage_trains_the_model_parameters_yaml(monkeypatch):
+def test_train_stage_trains_the_model_parameters_yaml(monkeypatch, tmp_path):
     import importlib.util
 
     # scripts/unsloth/train.py has the same module name: load the llamafactory one by path.
@@ -361,10 +362,11 @@ def test_train_stage_trains_the_model_parameters_yaml(monkeypatch):
     seen = []
     monkeypatch.setattr(train, "run_logged", lambda cmd, log, what: seen.append(cmd))
     monkeypatch.setattr(train, "check_training_data", lambda profile: None)  # the data check has its own tests
+    monkeypatch.setattr(train, "start_run", lambda base, name: runs.start_run(str(tmp_path), name))
 
     train.train(["--model", "hy-mt2-7b"])
 
-    assert seen[0][-1].replace("\\", "/").endswith("configs/llamafactory/hy-mt2-7b/train.yaml")
+    assert seen[0][2].replace("\\", "/").endswith("configs/llamafactory/hy-mt2-7b/train.yaml")
 
 
 def test_no_llamafactory_script_reads_the_profile_from_config_directly():
@@ -597,3 +599,131 @@ def test_every_profile_validates_on_the_validation_dataset_not_a_random_row_spli
 
     assert train["eval_dataset"] == config.LF_VAL_DATASET_NAME
     assert "val_size" not in train  # LLaMA-Factory refuses both together (hparams/data_args.py)
+
+
+# --- every training is its own run: its own adapter dir, log and status ------------------------------------
+
+
+def test_train_command_overrides_the_output_dir_with_a_repo_relative_path():
+    cmd = lf_tools.train_command("configs/x/train.yaml", os.path.join(config.BASE_DIR, "outputs", "hy_lora", "20261001-163005"))
+
+    assert cmd == ["llamafactory-cli", "train", "configs/x/train.yaml", "output_dir=outputs/hy_lora/20261001-163005"]
+
+
+def test_merge_command_overrides_the_adapter_with_a_repo_relative_path():
+    cmd = lf_tools.merge_command("configs/x/merge.yaml", os.path.join(config.BASE_DIR, "outputs", "hy_lora", "r1"))
+
+    assert cmd == ["llamafactory-cli", "export", "configs/x/merge.yaml", "adapter_name_or_path=outputs/hy_lora/r1"]
+
+
+def test_the_commands_without_a_directory_are_the_plain_yaml_ones():
+    assert lf_tools.train_command("t.yaml") == ["llamafactory-cli", "train", "t.yaml"]
+    assert lf_tools.merge_command("m.yaml") == ["llamafactory-cli", "export", "m.yaml"]
+
+
+def _load_stage(name):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(f"lf_{name}_x", os.path.join(config.BASE_DIR, "scripts", "llamafactory", f"{name}.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_train_stage_runs_in_its_own_dir_with_its_own_log_and_records_success(monkeypatch, tmp_path):
+    train = _load_stage("train")
+    monkeypatch.setattr(train, "check_training_data", lambda profile: None)
+    monkeypatch.setattr(train, "start_run", lambda base, name: runs.start_run(str(tmp_path), name))
+    seen = []
+    monkeypatch.setattr(train, "run_logged", lambda cmd, log, what: seen.append((cmd, log)))
+
+    train.train(["--model", "hy-mt2-1.8b"])
+
+    cmd, log = seen[0]
+    run_dir = runs.latest_run(str(tmp_path))
+    assert cmd[-1] == "output_dir=" + os.path.relpath(run_dir, config.BASE_DIR).replace(os.sep, "/")
+    assert log == os.path.join(run_dir, runs.TRAIN_LOG_NAME)
+    assert runs.read_run(run_dir)["status"] == "complete"
+
+
+def test_train_stage_records_a_failed_run_and_still_stops_the_pipeline(monkeypatch, tmp_path):
+    train = _load_stage("train")
+    monkeypatch.setattr(train, "check_training_data", lambda profile: None)
+    monkeypatch.setattr(train, "start_run", lambda base, name: runs.start_run(str(tmp_path), name))
+
+    def fail(cmd, log, what):
+        raise SystemExit(1)
+
+    monkeypatch.setattr(train, "run_logged", fail)
+
+    with pytest.raises(SystemExit) as exc:
+        train.train(["--model", "hy-mt2-1.8b"])
+
+    assert exc.value.code == 1
+    assert runs.read_run(runs.latest_run(str(tmp_path)))["status"] == "failed"
+
+
+def _use_dirs(monkeypatch, merge, profile, adapter_base, merged_dir):
+    """The merge stage on a temp tree: the profile's adapter base dir and merged dir are replaced."""
+    real = merge.profile_from_args
+
+    def moved(argv, description):
+        found, rest = real(argv, description)  # the real parsing: --model is consumed, --run stays in `rest`
+        return found._replace(adapter_dir=adapter_base, merged_dir=merged_dir), rest
+
+    monkeypatch.setattr(merge, "profile_from_args", moved)
+
+
+def test_merge_stage_merges_the_latest_complete_run_and_notes_where_it_came_from(monkeypatch, tmp_path):
+    merge = _load_stage("merge")
+    profile = lf_tools.load_profile("hy-mt2-1.8b")
+    run = runs.start_run(str(tmp_path / "lora"), profile.name)
+    runs.finish_run(run.dir, "complete")
+    merged = tmp_path / "merged"
+    merged.mkdir()
+    _use_dirs(monkeypatch, merge, profile, str(tmp_path / "lora"), str(merged))
+    seen = []
+    monkeypatch.setattr(merge, "run", lambda cmd, what: seen.append(cmd))
+
+    merge.merge(["--model", "hy-mt2-1.8b"])
+
+    assert seen[0][-1] == "adapter_name_or_path=" + os.path.relpath(run.dir, config.BASE_DIR).replace(os.sep, "/")
+    assert json.loads((merged / "resonance_run.json").read_text(encoding="utf-8"))["run"] == run.id
+
+
+def test_merge_stage_refuses_a_run_that_did_not_finish(monkeypatch, tmp_path, capsys):
+    merge = _load_stage("merge")
+    run = runs.start_run(str(tmp_path / "lora"), "hy-mt2-1.8b")
+    runs.finish_run(run.dir, "failed")
+    _use_dirs(monkeypatch, merge, lf_tools.load_profile("hy-mt2-1.8b"), str(tmp_path / "lora"), str(tmp_path / "merged"))
+    ran = []
+    monkeypatch.setattr(merge, "run", lambda cmd, what: ran.append(cmd))
+
+    with pytest.raises(SystemExit) as exc:
+        merge.merge(["--model", "hy-mt2-1.8b"])
+
+    assert exc.value.code == 1 and not ran and "failed" in capsys.readouterr().out
+
+
+def test_merge_stage_takes_a_named_run(monkeypatch, tmp_path):
+    merge = _load_stage("merge")
+    base = str(tmp_path / "lora")
+    first = runs.start_run(base, "hy-mt2-1.8b")
+    runs.finish_run(first.dir, "complete")
+    second = runs.start_run(base, "hy-mt2-1.8b", now=datetime_after(first))
+    runs.finish_run(second.dir, "complete")
+    merged = tmp_path / "merged"
+    merged.mkdir()
+    _use_dirs(monkeypatch, merge, lf_tools.load_profile("hy-mt2-1.8b"), base, str(merged))
+    seen = []
+    monkeypatch.setattr(merge, "run", lambda cmd, what: seen.append(cmd))
+
+    merge.merge(["--model", "hy-mt2-1.8b", "--run", first.id])
+
+    assert seen[0][-1].endswith(first.id)
+
+
+def datetime_after(run):
+    from datetime import datetime, timedelta, timezone
+
+    return datetime.now(timezone.utc) + timedelta(days=1)

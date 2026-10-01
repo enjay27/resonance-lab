@@ -64,6 +64,10 @@ def main():
                         help="training backend (default: %(default)s)")
     parser.add_argument("--model", help="llamafactory model profile (default: $RESONANCE_LF_PROFILE, else "
                         "the default profile); the parameter wins over the environment")
+    which = parser.add_mutually_exclusive_group()
+    which.add_argument("--from", dest="from_stage", metavar="STAGE",
+                       help="start at this stage (name or unique prefix, e.g. 'merge') and run the rest")
+    which.add_argument("--only", metavar="STAGE", help="run just this stage")
     args = parser.parse_args()
 
     check_system()
@@ -71,7 +75,10 @@ def main():
     env = stage_env(args.model)
     total_start = time.perf_counter()
 
-    pipeline = pipelines.stages(args.pipeline)
+    try:
+        pipeline = pipelines.select_stages(pipelines.stages(args.pipeline), args.from_stage, args.only)
+    except ValueError as e:
+        parser.error(str(e))
 
     for stage in pipeline:
         name = stage.name

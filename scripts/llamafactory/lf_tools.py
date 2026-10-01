@@ -35,7 +35,7 @@ class Profile(NamedTuple):
     base_model: str
     template: str
     dataset: str
-    adapter_dir: str  # where train writes the LoRA adapter
+    adapter_dir: str  # the yaml's output_dir: train writes each run's adapter in a subdirectory of it (runs.py)
     merged_dir: str  # where merge writes the full model
 
 
@@ -222,12 +222,19 @@ def chat_messages(template, text):
     raise ValueError(f"no chat prompt for template {template!r}; known: {', '.join(sorted(known))}")
 
 
-def train_command(train_yaml):
-    return ["llamafactory-cli", "train", train_yaml]
+def repo_relative(path):
+    """`path` relative to the repo root with forward slashes: how the yaml files (and the overrides) name directories."""
+    return os.path.relpath(path, BASE_DIR).replace(os.sep, "/")
 
 
-def merge_command(merge_yaml):
-    return ["llamafactory-cli", "export", merge_yaml]
+def train_command(train_yaml, output_dir=None):
+    """`llamafactory-cli train`; `output_dir` (this run's directory, see runs.py) overrides the yaml's."""
+    return ["llamafactory-cli", "train", train_yaml] + ([f"output_dir={repo_relative(output_dir)}"] if output_dir else [])
+
+
+def merge_command(merge_yaml, adapter_dir=None):
+    """`llamafactory-cli export`; `adapter_dir` (the run to merge) overrides the yaml's adapter_name_or_path."""
+    return ["llamafactory-cli", "export", merge_yaml] + ([f"adapter_name_or_path={repo_relative(adapter_dir)}"] if adapter_dir else [])
 
 
 def gguf_paths(profile_name, gguf_dir):
