@@ -4,11 +4,8 @@
 
 ## Now — 2026-10-01
 
-**Aligned with resonance-stream (2026-10-01, `claude/align-project-structure-s21g7q`):**
-graft-indexed, CLAUDE.md rules (data part = `just check`, model part = manual GPU run),
-`.memory/`, CI (Linux, data gate) + auto-merge of `claude/*` PRs.
-**Open:** first CI run is this PR; auto-merge takes effect once it is on `main`
-(this PR merged by hand) — [`sessions/2026-10-01-align-with-resonance-stream.md`](.memory/sessions/2026-10-01-align-with-resonance-stream.md).
+**Aligned with resonance-stream: done (PRs #1, #2).** Auto-merge of `claude/*` PRs works (#2 merged itself
+on green CI) — [`sessions/2026-10-01-align-with-resonance-stream.md`](.memory/sessions/2026-10-01-align-with-resonance-stream.md).
 
 **This repo owns the prompt; resonance-stream follows (maintainer, 2026-10-01).** Shipped
 model = TranslateGemma-4B LoRA from `experiment/translategemma` (raw line, gemma3, no
