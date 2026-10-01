@@ -12,9 +12,9 @@ contract: [`stream-contract.md`](.memory/active-issues/stream-contract.md).
 
 **Switchable pipelines (2026-10-01):** `run_pipeline.py --pipeline llamafactory|unsloth` (default
 `llamafactory`; `pipelines.py`). Merged: A registry+move (#3), B shared preprocess filters (#4 — drops
-more rows, so re-eval after the next training; also skips `translated: null`). `claude/llamafactory-pipeline`
-(C1): the `llamafactory` pipeline, profile yaml, per-pipeline requirements (separate venvs). Next: C2
-`rich` training monitor, D shared eval metrics — [`roadmap/next.md`](.memory/roadmap/next.md) 2.
+more rows, so re-eval after the next training; also skips `translated: null`). C1 `llamafactory` pipeline (#5; profile yaml,
+per-pipeline requirements, separate venvs); `claude/training-monitor` (C2): `rich` monitor. Next: D shared
+eval metrics — [`roadmap/next.md`](.memory/roadmap/next.md) 2.
 
 **Model part never runs in a cloud session** (no GPU): every model stage is NOT VERIFIED —
 [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md). Auto-merge of `claude/*` PRs works.

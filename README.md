@@ -27,6 +27,7 @@ A new model for the `llamafactory` pipeline is a new folder `configs/llamafactor
 ## Install (llamafactory pipeline)
 - `pip install -r requirements-llamafactory.txt`
 - `train.yaml` uses `flash_attn: fa2`; if flash-attn is not installed, set it to `auto` for that profile
+- Watch a run from a second terminal: `python scripts/llamafactory/watch_training.py` (Ctrl+C quits; `rich`, any OS)
 - GGUF export needs llama.cpp built in `llama.cpp/` (see below; `llama-quantize` is found under `build/bin/`)
 
 ## Install (unsloth pipeline)
