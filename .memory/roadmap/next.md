@@ -1,5 +1,21 @@
 # Next — candidates, in order
 
+## Start here in the next session (maintainer, 2026-10-01: "will start from a new session")
+The pipeline work A-D is merged (#3-#7). What is left is the model work, which needs the
+Windows/CUDA machine for the runs; a cloud session can prepare the files.
+1. **Re-baseline the shipped model** (Kade, on the GPU machine): `python scripts/llamafactory/eval.py
+   --prompt chat-template` and `--prompt training` on `data/eval/bp-eval-dataset.jsonl`. The old chrF/BLEU/TER
+   are invalid (`active-issues/old-eval-numbers.md`); the two prompt modes show the cost of the prompt mismatch.
+2. **One `llamafactory` profile per shortlist candidate** (`roadmap/translator-shortlist-2026-10-01.md`):
+   Hy-MT2-1.8B, Hy-MT2-7B, Gemma 4 E4B, TranslateGemma-12B. Each is a folder
+   `configs/llamafactory/<profile>/{train,merge}.yaml` (tests check they agree) plus, for a new chat
+   template, a `TRAINING_PROMPTS` entry in `lf_tools.py` and the model's own eval prompt in
+   `llamafactory/eval.py`. Test first; Kade runs the zero-shot eval of each.
+3. Then pick the family, decide the prompt (`active-issues/stream-contract.md` §1), train on exactly
+   what the app will send, and copy the prompt to resonance-stream in its own PR there.
+Done since: `RESONANCE_RAW_LOGS` points the pipeline at a hand-curated raw log (it still goes through
+the preprocess filters — check the report counts).
+
 1. **Model choice + prompt** — this repo decides, resonance-stream follows
    (`active-issues/stream-contract.md` §1). Plan: `translator-shortlist-2026-10-01.md`
    (zero-shot eval round, then fine-tune the top family on the app's exact prompt).
