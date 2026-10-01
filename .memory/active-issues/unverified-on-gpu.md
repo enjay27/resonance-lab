@@ -2,6 +2,11 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **Manifest check (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `preprocess.py` writes `data/processed/lora_train_data.meta.json`; `update_dataset_info.py`
+  and `train.py` refuse to run without a matching one. Unit-tested only. Old processed data has no manifest: run the Preprocessing stage again
+  (`python run_pipeline.py` does). Check that a full `run_pipeline.py` still reaches Fine-Tuning, and that `update_dataset_info.py` (now takes `--model`)
+  still works as a pipeline stage.
+
 - **`preprocess.py` eval exclusion (2026-10-01, `claude/relaxed-pascal-xjeh11`):** unit-tested (`tests/test_overlap.py`, `test_preprocess.py`); not run on the real
   raw log. Run `preprocess.py` once and read the `eval overlap` / `eval overlap (near)` counts: they are the size of the leak. Then retrain
   and re-run `eval.py` (every earlier score is on contaminated data). Near matches use difflib ratio >=0.9 on lines of >=10 normalised characters.

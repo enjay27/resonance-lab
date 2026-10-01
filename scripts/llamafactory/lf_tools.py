@@ -15,6 +15,7 @@ from typing import NamedTuple
 import yaml
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from manifest import ManifestError, require_for_style  # noqa: E402
 from prompts import build_prompt, style_for_template  # noqa: E402
 from config import (  # noqa: E402
     BASE_DIR,
@@ -100,6 +101,21 @@ def dataset_info(file_name, name=LF_DATASET_NAME):
 def dataset_info_for_processed_logs():
     file_name = os.path.relpath(PROCESSED_LOGS, LF_DATASET_DIR).replace(os.sep, "/")
     return dataset_info(file_name)
+
+
+def check_training_data(profile, data_path=PROCESSED_LOGS):
+    """The manifest of the training file, after checking it was made for `profile`'s prompt style and is unchanged.
+
+    Raises ManifestError (naming the profile and the command that fixes it) otherwise.
+    """
+    style = style_for_template(profile.template)
+    try:
+        return require_for_style(data_path, style)
+    except ManifestError as e:
+        raise ManifestError(
+            f"profile {profile.name} (template {profile.template}): {e}\n"
+            f"  fix: python scripts/preprocess.py --format pair --prompt auto --model {profile.name}"
+        ) from None
 
 
 # What the model saw as a training example, per LLaMA-Factory template: the raw line as the user
