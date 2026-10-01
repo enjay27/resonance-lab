@@ -10,7 +10,7 @@ from typing import NamedTuple
 
 from config import BASE_DIR
 
-DEFAULT = "unsloth"
+DEFAULT = "llamafactory"
 
 
 class Stage(NamedTuple):
@@ -24,6 +24,16 @@ def _script(*parts):
 
 
 PIPELINES = {
+    # LLaMA-Factory SFT + LoRA, one model per profile (configs/llamafactory/<profile>/;
+    # RESONANCE_LF_PROFILE picks it). Ends in a q4_k_m GGUF for resonance-stream.
+    "llamafactory": [
+        Stage("Validate", _script("validate.py")),
+        Stage("Preprocessing", _script("preprocess.py"), ("--format", "pair")),
+        Stage("Update Dataset", _script("llamafactory", "update_dataset_info.py")),
+        Stage("Fine-Tuning", _script("llamafactory", "train.py")),
+        Stage("Merge LoRA", _script("llamafactory", "merge.py")),
+        Stage("Export GGUF", _script("llamafactory", "gguf.py")),
+    ],
     # Qwen3 1.7B, LoRA with unsloth, merged to F16 (fix_metadata drops the classifier head).
     "unsloth": [
         Stage("Validate", _script("validate.py")),

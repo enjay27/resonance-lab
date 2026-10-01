@@ -12,3 +12,10 @@ Code or config changed in a session without CUDA. Delete an item once it has run
 - **`preprocess.py` filters (2026-10-01, `claude/preprocess-filters`):** unit-tested; not run on a
   real raw log. It now drops more rows than before (the branch's filters) — compare the
   Preprocessing Report counts on the real data before training, and re-run `eval.py` after.
+- **`llamafactory` pipeline (2026-10-01, `claude/llamafactory-pipeline`):** `update_dataset_info.py`,
+  `train.py`, `merge.py`, `gguf.py` ran here only as far as their error paths (missing
+  `llamafactory-cli`, adapter, merged model); `lf_tools` is unit-tested. Never run end to end:
+  check `python run_pipeline.py` on the Windows/CUDA machine — in particular that
+  `llamafactory-cli` accepts the profile yaml from the repo root, that `dataset_info.json`
+  is found (`data/`), `flash_attn: fa2` installs, and that `gguf.py` finds `llama-quantize`.
+  `requirements-llamafactory.txt` leaves `llamafactory` unpinned — pin what you trained with.

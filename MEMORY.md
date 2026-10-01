@@ -4,26 +4,20 @@
 
 ## Now — 2026-10-01
 
-**Aligned with resonance-stream: done (PRs #1, #2).** Auto-merge of `claude/*` PRs works (#2 merged itself
-on green CI) — [`sessions/2026-10-01-align-with-resonance-stream.md`](.memory/sessions/2026-10-01-align-with-resonance-stream.md).
-
-**This repo owns the prompt; resonance-stream follows (maintainer, 2026-10-01).** Shipped
-model = TranslateGemma-4B LoRA from `experiment/translategemma` (raw line, gemma3, no
-system); the app sends an English instruction + `[P0]` rule + `<bos>` it never trained on.
-Model is being re-chosen — [`translator-shortlist-2026-10-01.md`](.memory/roadmap/translator-shortlist-2026-10-01.md);
+**This repo owns the prompt; resonance-stream follows (maintainer, 2026-10-01).** Shipped model =
+TranslateGemma-4B LoRA (raw line, gemma3, no system); the app sends an English instruction + `[P0]`
+rule + `<bos>` it never trained on. Model is being re-chosen —
+[`translator-shortlist-2026-10-01.md`](.memory/roadmap/translator-shortlist-2026-10-01.md);
 contract: [`stream-contract.md`](.memory/active-issues/stream-contract.md).
 
-**`translated: null` rows (2026-10-01):** `preprocess.py` skips them (and blank/missing
-fields) instead of crashing `split_dataset`. Fixed on `main` only, not on the experiment branch.
+**Switchable pipelines (2026-10-01):** `run_pipeline.py --pipeline llamafactory|unsloth` (default
+`llamafactory`; `pipelines.py`). Merged: A registry+move (#3), B shared preprocess filters (#4 — drops
+more rows, so re-eval after the next training; also skips `translated: null`). `claude/llamafactory-pipeline`
+(C1): the `llamafactory` pipeline, profile yaml, per-pipeline requirements (separate venvs). Next: C2
+`rich` training monitor, D shared eval metrics — [`roadmap/next.md`](.memory/roadmap/next.md) 2.
 
-**Switchable pipelines (2026-10-01, `claude/pipeline-registry`):** `run_pipeline.py --pipeline unsloth`
-(only one so far; `pipelines.py`, scripts in `scripts/unsloth/`). A merged (#3); B (`claude/preprocess-filters`) shared preprocess filters, tested — changes the
-training data, re-eval after the next training. Next: C `llamafactory` (becomes default), D eval metrics — [`roadmap/next.md`](.memory/roadmap/next.md) 2. NOT VERIFIED: moved scripts (no GPU).
-
-**Model part never runs in a cloud session** (no GPU). What changed without a run:
-[`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md).
-
-**Next:** [`roadmap/next.md`](.memory/roadmap/next.md).
+**Model part never runs in a cloud session** (no GPU): every model stage is NOT VERIFIED —
+[`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md). Auto-merge of `claude/*` PRs works.
 
 ## Where the detail is
 

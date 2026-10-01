@@ -28,6 +28,8 @@ lora_dataset/
 /datasets/
 model_f16/
 model_f16_clean/
+model_gemma_merged/
+model_gguf/
 BlueProtocol_JP_KO_Translator/
 BlueProtocol_JP_KO_Translator-merged-16bit/
 # Ignore all files in data, but keep the folder structure

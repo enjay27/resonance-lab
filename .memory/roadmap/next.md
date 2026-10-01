@@ -14,16 +14,24 @@
      training data** (rows are dropped) — a feature, so re-run `eval.py` after the next
      training. Not taken yet: the branch's `{system,original,translated}` output format
      (its consumer is `update_dataset_info.py`, which reads a different file; decide in C).
-   - **C — `llamafactory` pipeline:** `configs/training/*.yaml` (one yaml = one model
-     profile, so Hy-MT2 / Gemma 4 / Qwen3.5 from the shortlist are config files), `train.py`
-     (wraps `llamafactory-cli`), `export.py` (merge -> F16 GGUF -> q4_k_m),
-     `update_dataset_info.py`, a training monitor on `rich` (OS-neutral; replaces the
-     curses `watch_training.py`, helpers `classify_loss`/`classify_grad` tested), `config.py`
-     loads the system prompt lazily (the branch's import-time read breaks CI), one
-     requirements file per pipeline (trl 0.24.0 vs 0.29.0 conflict -> separate venvs),
-     default switches to `llamafactory`.
+   - **C1 — `llamafactory` pipeline (done, default):** `configs/llamafactory/translategemma-4b/`
+     (the branch's yaml, dataset renamed `bp_translation`), `scripts/llamafactory/` (`lf_tools.py`
+     pure + tested; `update_dataset_info.py`, `train.py`, `merge.py`, `gguf.py`),
+     `requirements-llamafactory.txt` / `requirements-unsloth.txt` (separate venvs), `preprocess
+     --format pair`, registry `Stage` with args. Deviations from the branch, on purpose: Merge
+     runs before any eval (the branch ran eval.py before export.py, but eval loads the merged
+     model); commands are argument lists run from the repo root (no `shell=True`);
+     `llama-quantize` is found under any `build/bin/` layout (the branch hardcoded
+     `Release/llama-quantize.exe`); the dataset is preprocess's own output
+     (`processed/lora_train_data.jsonl`) — the branch pointed at a hand-made
+     `raw/bp-training-dataset-final.jsonl`; the unused with-system dataset and the system
+     prompt file are dropped (training is system-less); GGUF names `bp-<profile>-*.gguf`.
+   - **C2 — training monitor:** `rich` replacement for the curses `watch_training.py`
+     (helpers `classify_loss`/`classify_grad` tested); follows `outputs/train_stdout.log`
+     and LLaMA-Factory's `trainer_log.jsonl`.
    - **D — shared eval metrics:** chrF, COMET, JP leakage, think leakage, term accuracy
      (`TERM_DICT`) as a tested module both pipelines' `eval.py` use, so numbers compare.
+   Not decided yet: eval stage for `llamafactory` sits after Merge LoRA (D).
    Prompt format is not in the registry yet (one pipeline carries the contract); revisit
    when the model is chosen (`translator-shortlist-2026-10-01.md`).
 3. **Ingest the app's per-channel files** (`dataset_<CHANNEL>.jsonl`) instead of one

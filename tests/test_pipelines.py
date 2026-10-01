@@ -28,6 +28,7 @@ def test_stage_paths_are_absolute_and_inside_the_repo():
 
 def test_a_stage_without_arguments_has_an_empty_tuple():
     assert all(stage.args == () for stage in pipelines.stages("unsloth"))
+    assert pipelines.Stage("x", "x.py").args == ()
 
 
 def test_default_pipeline_is_registered():
@@ -37,3 +38,34 @@ def test_default_pipeline_is_registered():
 def test_unknown_pipeline_lists_the_choices():
     with pytest.raises(ValueError, match="unsloth"):
         pipelines.stages("nope")
+
+
+def test_llamafactory_runs_merge_before_gguf_export():
+    assert stage_names("llamafactory") == [
+        "Validate",
+        "Preprocessing",
+        "Update Dataset",
+        "Fine-Tuning",
+        "Merge LoRA",
+        "Export GGUF",
+    ]
+
+
+def test_llamafactory_preprocesses_into_the_pair_layout():
+    preprocessing = next(s for s in pipelines.stages("llamafactory") if s.name == "Preprocessing")
+    assert preprocessing.args == ("--format", "pair")
+
+
+def test_unsloth_keeps_the_default_instruction_layout():
+    preprocessing = next(s for s in pipelines.stages("unsloth") if s.name == "Preprocessing")
+    assert preprocessing.args == ()
+
+
+def test_llamafactory_is_the_default_pipeline():
+    assert pipelines.DEFAULT == "llamafactory"
+
+
+def test_pipelines_share_validate_and_preprocess():
+    shared = {"Validate", "Preprocessing"}
+    paths = {name: {s.name: s.path for s in pipelines.stages(name) if s.name in shared} for name in pipelines.PIPELINES}
+    assert paths["unsloth"] == paths["llamafactory"]

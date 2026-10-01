@@ -3,27 +3,25 @@
 resonance-lab fine-tunes the translator model of
 [resonance-stream](https://github.com/enjay27/resonance-stream): Japanese Blue Protocol:
 Star Resonance chat → natural Korean, as a GGUF `q4_k_m` for resonance-stream's llama.cpp
-server.
-
-**Which pipeline is which.** `main` holds the first pipeline (Qwen3 1.7B, unsloth). The model
-the app ships today (TranslateGemma-4B + LoRA, gist model 1.1.0) was trained on branch
-`experiment/translategemma` (LLaMA-Factory, `configs/training/bp_train.yaml`); that branch is
-not on `main`. The base model is being re-chosen —
+server. The base model is being re-chosen —
 `.memory/roadmap/translator-shortlist-2026-10-01.md` is the plan.
 
 **Pipelines are switchable:** `python run_pipeline.py --pipeline <name>` (registry:
-`pipelines.py`). `unsloth` (Qwen3 1.7B, the default for now) is the only one so far; the
-LLaMA-Factory pipeline of `experiment/translategemma` is being brought in step by step —
-plan in `.memory/roadmap/next.md`. Each pipeline has its own folder under `scripts/`, its
-own stage list in the registry, and (later) its own requirements file / virtualenv.
+`pipelines.py`). `llamafactory` (default; LLaMA-Factory SFT + LoRA, one model per profile in
+`configs/llamafactory/<profile>/`, ends in a q4_k_m GGUF) and `unsloth` (Qwen3 1.7B). Each has its
+own folder under `scripts/`, its own stage list, and its own requirements file / virtualenv
+(`requirements-<pipeline>.txt`; the stacks pin different trl/transformers). They share
+`validate.py` and `preprocess.py` (`--format instruction|pair` is the row layout each one reads).
+The shipped model (TranslateGemma-4B, gist 1.1.0) was trained on `experiment/translategemma`,
+whose features are being brought in — plan and what is left in `.memory/roadmap/next.md`.
 
 The repo is two parts. **Which part you touch decides which gate applies.** That is the
 most important thing on this page.
 
 | tree | part | runs on | gate |
 |---|---|---|---|
-| `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `config.py` `pipelines.py` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
-| `scripts/unsloth/train.py` `scripts/unsloth/eval.py` `scripts/unsloth/fix_metadata.py` `run_pipeline.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements.txt`) | none automated — a manual run, reported |
+| `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
+| `scripts/unsloth/train.py` `scripts/unsloth/eval.py` `scripts/unsloth/fix_metadata.py` `scripts/llamafactory/train.py` `merge.py` `gguf.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements-<pipeline>.txt`) | none automated — a manual run, reported |
 
 `just check` needs only `requirements-dev.txt` (`pip install -r requirements-dev.txt`;
 `pip install rust-just` for `just`). CI (`.github/workflows/ci.yml`) runs it on Linux on
@@ -46,13 +44,16 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
 ## Tech Stack
 
 - **Python 3.13** (README; CI runs the data gate on 3.13). Windows for the model part.
-- **Training on `main`:** unsloth (pinned commit), transformers, peft, trl, bitsandbytes
-  4-bit, torch 2.10 + CUDA 12.6 (`requirements.txt`; `triton-windows`).
-  Base `rd211/Qwen3-1.7B-Instruct` (`config.py`), LoRA r=64, alpha=128.
-- **Shipped model (`experiment/translategemma`):** LLaMA-Factory SFT + LoRA on
-  `google/translategemma-4b-it`, template `gemma3`, dataset `bp_translation_nosystem`
-  (user turn = the raw Japanese line only), `cutoff_len` 128.
-- **Conversion:** llama.cpp `convert_hf_to_gguf.py` → `llama-quantize q4_k_m` (README).
+- **Gate dev deps** (`requirements-dev.txt`): pytest, ruff, pyyaml (reads the profile yaml files).
+- **`llamafactory` pipeline** (`requirements-llamafactory.txt`): LLaMA-Factory SFT + LoRA; profile
+  `translategemma-4b` = `google/translategemma-4b-it`, template `gemma3`, dataset `bp_translation`
+  (user turn = the raw Japanese line only, no system prompt), `cutoff_len` 128, LoRA r=32.
+  Profile = `configs/llamafactory/<profile>/{train,merge}.yaml`, chosen by `RESONANCE_LF_PROFILE`.
+- **`unsloth` pipeline** (`requirements-unsloth.txt`): unsloth (pinned commit), transformers, peft,
+  trl 0.24, bitsandbytes 4-bit, torch 2.10 + CUDA 12.6 (`triton-windows`). Base
+  `rd211/Qwen3-1.7B-Instruct` (`config.py`), LoRA r=64, alpha=128.
+- **Conversion:** llama.cpp `convert_hf_to_gguf.py` → `llama-quantize q4_k_m` (README; the
+  `llamafactory` pipeline's `gguf.py` does it, finding `llama-quantize` under `llama.cpp/build/bin/`).
 - **Gate tooling:** pytest, ruff (`pyproject.toml`), `just`.
 
 ---
@@ -78,6 +79,13 @@ scripts/
     train.py              model: LoRA fine-tune (unsloth), merge -> model_f16/
     fix_metadata.py       model: drop `score.weight` -> model_f16_clean/
     eval.py               model: translate fixed test lines with model_f16_clean/
+  llamafactory/         pipeline `llamafactory` (default)
+    lf_tools.py           data: profiles, dataset_info.json, command lines (argument lists), run helpers
+    update_dataset_info.py  data: writes data/dataset_info.json -> the processed pair file
+    train.py              model: `llamafactory-cli train`, output -> outputs/train_stdout.log
+    merge.py              model: `llamafactory-cli export` (adapter -> full model)
+    gguf.py               model: convert to F16 GGUF, quantize to q4_k_m -> model_gguf/
+configs/llamafactory/<profile>/   train.yaml + merge.yaml per model (tests check they agree)
 tests/                pytest for the data part; conftest.py has the JSONL fixtures
 data/raw/ data/processed/   stage inputs/outputs (config.py paths) -- GITIGNORED
 graft/                graft's generated cards -- GITIGNORED, regenerable (`graft build`)
@@ -109,7 +117,7 @@ Reach for graft before grep/read — see `.claude/skills/graft/SKILL.md`.
   on bad data.
 - **Scripts import `config` via `sys.path.append(<repo root>)`** (one `dirname` per folder
   level: three in `scripts/<pipeline>/`); tests get the same through `pyproject.toml`
-  (`pythonpath` lists the root and each script folder) and import scripts as modules
+  (`pythonpath` lists the root and each script folder, `scripts/llamafactory` included) and import scripts as modules
   (`import preprocess`). A new script folder goes into `pythonpath`.
 - **A new pipeline is a folder under `scripts/` plus an entry in `pipelines.py`**;
   `tests/test_pipelines.py` checks every registered stage script exists.
