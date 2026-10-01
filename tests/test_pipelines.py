@@ -11,7 +11,7 @@ def stage_names(name):
 
 
 def test_unsloth_runs_the_stages_run_pipeline_always_ran():
-    assert stage_names("unsloth") == ["Validate", "Preprocessing", "Dataset Split", "Fine-Tuning", "Metadata Fix", "Evaluation"]
+    assert stage_names("unsloth") == ["Fetch Data", "Validate", "Preprocessing", "Dataset Split", "Fine-Tuning", "Metadata Fix", "Evaluation"]
 
 
 def test_every_stage_script_exists():
@@ -42,6 +42,7 @@ def test_unknown_pipeline_lists_the_choices():
 
 def test_llamafactory_runs_merge_before_gguf_export_and_evaluates_last():
     assert stage_names("llamafactory") == [
+        "Fetch Data",
         "Validate",
         "Preprocessing",
         "Update Dataset",
@@ -92,3 +93,8 @@ def test_llamafactory_requirements_do_not_pull_liger_kernel_by_name():
         requirements = [line.split("#")[0].strip() for line in f]
 
     assert not any(line.startswith("liger-kernel") for line in requirements)
+
+
+def test_both_pipelines_fetch_the_data_first():
+    for name in pipelines.PIPELINES:
+        assert stage_names(name)[0] == "Fetch Data"

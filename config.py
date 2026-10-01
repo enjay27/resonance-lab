@@ -56,3 +56,9 @@ INSTRUCTION = (
 VALIDATE_MAX_STRUCTURE_ERRORS = 0.01  # share of raw lines that are invalid JSON or lack `original` / `translated`
 VALIDATE_MAX_HANGEUL_IN_ORIGINAL = 0.10  # share of rows whose Japanese `original` holds Hangeul (preprocess drops those rows)
 PREPROCESS_MAX_SUSPICIOUS = 0.30  # share of usable rows dropped as Hangeul-in-source, JP-in-output or runaway-long output
+
+# --- Dataset on Hugging Face (scripts/fetch_data.py) ---
+# configs/hf_dataset.yaml pins repo + revision; the app's per-channel dataset_<CHANNEL>.jsonl files are downloaded
+# into HF_DATA_DIR and merged into RAW_LOGS. RESONANCE_RAW_LOGS (a hand-made raw log) switches the stage off.
+HF_DATASET_CONFIG = os.path.join(BASE_DIR, "configs", "hf_dataset.yaml")
+HF_DATA_DIR = os.path.join(BASE_DIR, "data", "hf")

@@ -2,6 +2,11 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **Fetch Data stage (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `scripts/fetch_data.py` is unit-tested with a faked `hf download`; the real `hf` CLI was never run
+  (no HF access in the cloud session). Check on the desktop: set `repo:` in `configs/hf_dataset.yaml`, `python scripts/fetch_data.py --pin`, then run it: the
+  `hf download ... --include "dataset_*.jsonl" --local-dir data/hf` flags, the merged `data/raw/raw_translated_logs.jsonl`, and that a second run says "up to date".
+  `huggingface_hub`'s `HfApi().dataset_info(repo).sha` is what `--pin` uses. The state (`data/hf/fetch_state.json`) is what MLflow will log as the dataset revision.
+
 - **Data-check limits (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `validate.py` (1% damaged / 10% Hangeul originals) and the `preprocess.py` guard (30% suspicious)
   are unit-tested on made-up rows; the numbers are guesses, never run on the real raw log. Both stages print their shares: read them on the first real
   run and move the limits in `config.py` (or pass `--max-drop`) if they stop a healthy file or let a bad one through.

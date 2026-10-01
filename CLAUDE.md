@@ -20,7 +20,7 @@ most important thing on this page.
 
 | tree | part | runs on | gate |
 |---|---|---|---|
-| `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `eval_metrics.py` `text_rules.py` `overlap.py` `valsplit.py` `manifest.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
+| `scripts/fetch_data.py` `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `eval_metrics.py` `text_rules.py` `hf_data.py` `overlap.py` `valsplit.py` `manifest.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
 | `scripts/unsloth/train.py` `scripts/unsloth/eval.py` `scripts/unsloth/fix_metadata.py` `scripts/llamafactory/train.py` `merge.py` `gguf.py` `eval.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements-<pipeline>.txt`) | none automated — a manual run, reported |
 
 `just check` needs only `requirements-dev.txt` (`pip install -r requirements-dev.txt`;
@@ -68,6 +68,7 @@ justfile              the gates as commands
 config.py             every path and hyper-parameter; INSTRUCTION (system prompt)
 eval_metrics.py       shared eval scoring + report (chrF/BLEU/TER, COMET, JP/think leakage, terms); tested
 text_rules.py         JP / Hangeul patterns shared by preprocess and the eval metrics
+hf_data.py            the HF dataset: config, `hf download` command, merge of the per-channel files, fetch state; tested (no network)
 overlap.py            is a training line also an eval line? (normalised + near-duplicate); preprocess drops them; tested
 valsplit.py           which lines are validation: sha1 of the normalised line, so pairs/variants stay together and lines keep their side as data grows; tested
 manifest.py           lora_train_data.meta.json: how the training file was made (style, reverse, shas, counts); update_dataset_info/train check it; tested
@@ -75,6 +76,8 @@ pipelines.py          registry: pipeline name -> ordered stage scripts (no torch
 prompts.py            instruction text per model family and direction (translategemma, hy); used by preprocess + eval; tested
 run_pipeline.py       --pipeline <name>: runs its stages in order, stops at the first failure
 scripts/
+  fetch_data.py         shared data: `hf download` the app's dataset_<CHANNEL>.jsonl at the revision pinned in configs/hf_dataset.yaml, merge -> raw log;
+                          only when missing/changed; skipped without a repo or with RESONANCE_RAW_LOGS; `--pin` writes the latest commit; `--force`
   validate.py           shared data: raw-log sanity gate (empty/missing file, >1% damaged lines, >10% Hangeul in `original` -> ValidationError; limits in config.py)
   preprocess.py         shared data: raw {original, translated} -> {instruction, input, output};
                           `clean_reason` drops empty/untranslated, Hangeul-in-source,
@@ -120,7 +123,7 @@ Reach for graft before grep/read — see `.claude/skills/graft/SKILL.md`.
 
 - **Paths and hyper-parameters live in `config.py`**, built from `BASE_DIR`. A script
   never hardcodes a path; it imports it. Two environment overrides exist:
-  `RESONANCE_RAW_LOGS` (raw log file) and `RESONANCE_LF_PROFILE` (llamafactory model profile; the `--model` parameter wins over it).
+  `RESONANCE_RAW_LOGS` (raw log file; also switches the Fetch Data stage off) and `RESONANCE_LF_PROFILE` (llamafactory model profile; the `--model` parameter wins over it).
 - **A stage that fails exits non-zero** (`sys.exit(1)` or an exception) — that is how
   `run_pipeline.py` stops. A stage that only prints an error lets the pipeline continue
   on bad data.

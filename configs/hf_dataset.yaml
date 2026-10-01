@@ -1,0 +1,10 @@
+# The training data on Hugging Face: the app's per-channel dataset_<CHANNEL>.jsonl files (resonance-stream).
+# scripts/fetch_data.py downloads them with `hf download` at the pinned revision and merges them into the raw log.
+#
+#   repo      the dataset repo id, e.g. owner/name. null = the stage is skipped and data/raw/ is used as it is.
+#   revision  a commit SHA, never a branch: a branch moves, a run must be reproducible. Set it with
+#             `python scripts/fetch_data.py --pin` (latest commit); every dataset refresh (~2 months) is a new pin.
+#   include   which files of the repo are channel files.
+repo: null
+revision: null
+include: "dataset_*.jsonl"

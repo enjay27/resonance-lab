@@ -29,7 +29,7 @@ so the privacy item (14) is closed.
 | 19 | ~4.3k training rows | learning-curve run (25/50/100%) |
 | 20 | `run_pipeline.py` has no `--from/--only` | todo |
 | 21 | one fixed `train_stdout.log` | todo — per run |
-| 22 | no Fetch Data stage | todo — `hf download <repo> --repo-type dataset --revision <sha>` first, revision pinned in `configs/hf_dataset.yaml` |
+| 22 | no Fetch Data stage | **done** — `scripts/fetch_data.py` + `hf_data.py`: `hf download` at the revision pinned in `configs/hf_dataset.yaml`, per-channel `dataset_<CHANNEL>.jsonl` merged into the raw log, only when missing/changed. **`repo:` is still null: the maintainer sets it, then `fetch_data.py --pin`** |
 
 ## Order
 1. **Data safety** (data part, gate `just check`): #1 (done), #3, #5, #10/#11, #22.
