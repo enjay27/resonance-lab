@@ -7,8 +7,13 @@ torch==2.9.1
 torchvision==0.24.1
 torchaudio==2.9.1
 
-# Not pinned yet: pin to the version a model was trained with (`pip show llamafactory`).
-llamafactory
+# Pinned to the commit the Hy-MT2 profiles were checked with (2026-10-01). PyPI 0.9.5 does NOT have the
+# hy_dense_1_8b / hy_dense_7b templates; replace this line with a release once one does.
+# transformers/peft/trl are what that install resolved to (pip freeze), pinned so a later pull does not drift.
+llamafactory @ git+https://github.com/hiyouga/LLaMA-Factory.git@ce9dc9e072f80fa3abe0989d4ab90da25f083438
+transformers==4.57.1
+peft==0.18.1
+trl==0.24.0
 
 # Used by the eval stage (chrF); COMET etc. arrive with the shared eval metrics.
 sacrebleu

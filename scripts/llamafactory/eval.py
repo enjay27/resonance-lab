@@ -12,7 +12,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config import EVAL_DATASET_PATH, EVAL_OUTPUT_DIR, LF_PROFILE
 from eval_metrics import comet_score, evaluate, format_report, load_eval_dataset, strip_think
-from lf_tools import chat_messages, load_profile, training_prompt, with_bos
+from lf_tools import chat_messages, generate_inputs, load_profile, training_prompt, with_bos
 
 PROMPTS = {
     "chat-template": "the model's own documented prompt through its chat template (TranslateGemma: language codes -> long "
@@ -52,14 +52,14 @@ def main(argv=None):
         if args.prompt == "training":
             ids = with_bos(tokenizer(training_prompt(profile.template, jp_text))["input_ids"], tokenizer.bos_token_id)
             return {"input_ids": torch.tensor([ids]).to("cuda"), "attention_mask": torch.ones(1, len(ids), dtype=torch.long).to("cuda")}
-        return tokenizer.apply_chat_template(
+        return generate_inputs(tokenizer.apply_chat_template(
             chat_messages(profile.template, jp_text),
             tokenize=True,
             add_generation_prompt=True,
             return_dict=True,
             return_tensors="pt",
             enable_thinking=False,
-        ).to("cuda")
+        ).to("cuda"))
 
     predictions, raw_outputs = [], []
     print(f"\n--- Running Translation on {len(samples)} Samples ---")

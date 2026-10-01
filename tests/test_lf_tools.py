@@ -287,3 +287,17 @@ def test_with_bos_leaves_ids_that_already_start_with_it():
 
 def test_with_bos_is_a_noop_without_a_bos_token():
     assert lf_tools.with_bos([5, 6], bos_id=None) == [5, 6]
+
+
+# --- generate() inputs ---------------------------------------------------------------------------
+
+
+def test_generate_inputs_keep_only_what_generate_accepts():
+    # Hy-MT2's tokenizer also returns token_type_ids; model.generate rejects it (transformers 4.57).
+    encoding = {"input_ids": [[1, 2]], "attention_mask": [[1, 1]], "token_type_ids": [[0, 0]]}
+
+    assert lf_tools.generate_inputs(encoding) == {"input_ids": [[1, 2]], "attention_mask": [[1, 1]]}
+
+
+def test_generate_inputs_work_without_an_attention_mask():
+    assert lf_tools.generate_inputs({"input_ids": [[1]]}) == {"input_ids": [[1]]}

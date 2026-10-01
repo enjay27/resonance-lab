@@ -103,6 +103,12 @@ def with_bos(ids, bos_id):
     return [bos_id, *ids]
 
 
+def generate_inputs(encoding):
+    """The tokenizer output narrowed to what model.generate accepts: some tokenizers (Hy-MT2) also
+    return token_type_ids, which generate rejects."""
+    return {k: encoding[k] for k in ("input_ids", "attention_mask") if k in encoding}
+
+
 def translategemma_messages(text, source="ja", target="ko"):
     """The structured message TranslateGemma's own chat template turns into its long English prompt."""
     return [{"role": "user", "content": [{"type": "text", "source_lang_code": source, "target_lang_code": target, "text": text}]}]
