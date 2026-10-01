@@ -44,7 +44,7 @@ def test_main_halts_at_the_first_failing_stage(tmp_path, monkeypatch):
     ]
     monkeypatch.setattr(run_pipeline.pipelines, "stages", lambda name: stages)
     monkeypatch.setattr(run_pipeline, "check_system", lambda: None)
-    monkeypatch.setattr(run_pipeline, "run_step", lambda name, path, args=(): ran.append(name) or name != "two")
+    monkeypatch.setattr(run_pipeline, "run_step", lambda name, path, args=(), env=None: ran.append(name) or name != "two")
     monkeypatch.setattr(sys, "argv", ["run_pipeline.py"])
 
     with pytest.raises(SystemExit) as exc:
@@ -52,3 +52,31 @@ def test_main_halts_at_the_first_failing_stage(tmp_path, monkeypatch):
 
     assert exc.value.code == 1
     assert ran == ["one", "two"]
+
+
+def test_run_step_passes_the_environment_to_the_script(tmp_path):
+    out = tmp_path / "env.txt"
+    path = script(tmp_path, f"import os; open({str(out)!r}, 'w').write(os.environ['RESONANCE_LF_PROFILE'])")
+
+    assert run_pipeline.run_step("Stage", path, env={"RESONANCE_LF_PROFILE": "hy-mt2-1.8b"}) is True
+    assert out.read_text() == "hy-mt2-1.8b"
+
+
+def test_stage_env_puts_the_model_parameter_over_the_environment():
+    base = {"RESONANCE_LF_PROFILE": "hy-mt2-7b", "PATH": "x"}
+
+    assert run_pipeline.stage_env("hy-mt2-1.8b", base) == {"RESONANCE_LF_PROFILE": "hy-mt2-1.8b", "PATH": "x"}
+    assert run_pipeline.stage_env(None, base) == base  # no parameter: the environment stands
+
+
+def test_main_runs_every_stage_with_the_model_parameter_in_the_environment(monkeypatch):
+    envs = []
+    monkeypatch.setattr(run_pipeline.pipelines, "stages", lambda name: [run_pipeline.pipelines.Stage("one", "1.py")])
+    monkeypatch.setattr(run_pipeline, "check_system", lambda: None)
+    monkeypatch.setattr(run_pipeline, "run_step", lambda name, path, args=(), env=None: envs.append(env) or True)
+    monkeypatch.setenv("RESONANCE_LF_PROFILE", "hy-mt2-7b")
+    monkeypatch.setattr(sys, "argv", ["run_pipeline.py", "--model", "hy-mt2-1.8b"])
+
+    run_pipeline.main()
+
+    assert envs[0]["RESONANCE_LF_PROFILE"] == "hy-mt2-1.8b"

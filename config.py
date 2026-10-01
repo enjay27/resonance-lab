@@ -23,7 +23,11 @@ OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
 
 # --- LLaMA-Factory pipeline (scripts/llamafactory/) ---
 # One profile = one model = configs/llamafactory/<profile>/{train,merge}.yaml.
-LF_PROFILE = os.environ.get("RESONANCE_LF_PROFILE", "translategemma-4b")
+# Which profile a script uses: --model parameter > RESONANCE_LF_PROFILE (remote jobs) > this default
+# (see lf_tools.model_name). LF_PROFILE is that default resolved from the environment only; scripts
+# do not read it themselves.
+LF_PROFILE_DEFAULT = "translategemma-4b"
+LF_PROFILE = os.environ.get("RESONANCE_LF_PROFILE") or LF_PROFILE_DEFAULT
 LF_CONFIG_ROOT = os.path.join(BASE_DIR, "configs", "llamafactory")
 LF_DATASET_DIR = os.path.join(BASE_DIR, "data")  # where LLaMA-Factory looks for dataset_info.json
 LF_DATASET_INFO_PATH = os.path.join(LF_DATASET_DIR, "dataset_info.json")

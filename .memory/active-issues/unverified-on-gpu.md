@@ -37,7 +37,7 @@ Code or config changed in a session without CUDA. Delete an item once it has run
   huggingface.co is blocked in cloud sessions, so the strings come from Tencent's README and from
   LLaMA-Factory's `template.py` (templates `hy_dense_1_8b`, `hy_dense_7b` are registered upstream; both read
   from GitHub). **Check locally, in this order:**
-  1. `RESONANCE_LF_PROFILE=hy-mt2-1.8b python scripts/llamafactory/inspect_template.py` (then `hy-mt2-7b`):
+  1. `python scripts/llamafactory/inspect_template.py --model hy-mt2-1.8b` (then `hy-mt2-7b`):
      must print `MATCH`; also read whether the tokenizer adds BOS on its own (`eval.py --prompt training`
      encodes with `tokenizer(...)`, so a missing BOS there is an eval-only mismatch).
   2. The installed LLaMA-Factory knows the two template names (`pip show llamafactory`; they are new).
@@ -49,3 +49,4 @@ Code or config changed in a session without CUDA. Delete an item once it has run
      add `quantization_bit: 4` to its train.yaml if so. Nothing trained.
   5. Recommended sampling (README): temperature 0.7, top_p 0.6, top_k 20, repetition_penalty 1.05;
      `eval.py` uses greedy — fine for comparison, note it.
+- **`--model` parameter (2026-10-01):** parsing and precedence are unit-tested and the error paths ran here; train/eval/inspect/watch with a real model not run. `inspect_template.py`'s old `--model` (tokenizer id) is now `--tokenizer`.

@@ -10,9 +10,9 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from config import EVAL_DATASET_PATH, EVAL_OUTPUT_DIR, LF_PROFILE
+from config import EVAL_DATASET_PATH, EVAL_OUTPUT_DIR
 from eval_metrics import comet_score, evaluate, format_report, load_eval_dataset, strip_think
-from lf_tools import chat_messages, generate_inputs, load_profile, training_prompt, with_bos
+from lf_tools import add_model_argument, chat_messages, generate_inputs, load_profile, model_name, training_prompt, with_bos
 
 PROMPTS = {
     "chat-template": "the model's own documented prompt through its chat template (TranslateGemma: language codes -> long "
@@ -25,9 +25,10 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Evaluate the merged model on the eval dataset.")
     parser.add_argument("--prompt", choices=sorted(PROMPTS), default="chat-template",
                         help="which prompt to evaluate with (default: %(default)s)")
+    add_model_argument(parser)
     args = parser.parse_args(argv)
 
-    profile = load_profile(LF_PROFILE)
+    profile = load_profile(model_name(args.model))
     try:
         samples = load_eval_dataset(EVAL_DATASET_PATH)
     except (FileNotFoundError, ValueError) as e:

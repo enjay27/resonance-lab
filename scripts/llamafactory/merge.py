@@ -2,12 +2,11 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from config import LF_PROFILE
-from lf_tools import load_profile, merge_command, run
+from lf_tools import merge_command, profile_from_args, run
 
 
-def merge():
-    profile = load_profile(LF_PROFILE)
+def merge(argv=None):
+    profile, _ = profile_from_args(argv, "Merge the LoRA adapter into the base model.")
     if not os.path.isdir(profile.adapter_dir):
         print(f"[ERROR] No trained adapter at {profile.adapter_dir}. Run the Fine-Tuning stage first.")
         sys.exit(1)

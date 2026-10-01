@@ -25,6 +25,9 @@ TG-4B `--prompt training`, Hy-7B. Templates verified locally against both tokeni
 prepends it). Not trained/evaluated. **Next: rest of the local checklist in** [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md)
 (`inspect_template.py`), then zero-shot eval vs the re-baselined TranslateGemma-4B. Other candidates: later.
 
+**Model selection: `--model <profile>` on every llamafactory script and `run_pipeline.py` (parameter > `RESONANCE_LF_PROFILE` >
+default `translategemma-4b`);** local Windows runs pass the parameter, remote jobs keep the env var.
+
 **Model part never runs in a cloud session** (no GPU): every model stage is NOT VERIFIED —
 [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md). Auto-merge of `claude/*` PRs works.
 
