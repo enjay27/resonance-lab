@@ -47,3 +47,4 @@ load_best_model_at_end: true
 output_dir: outputs/hy-mt2-7b_lora
 logging_steps: 1
 plot_loss: true
+report_to: none  # tracking is tracker.py (after the training), not the trainer's own MLflow callback

@@ -40,6 +40,13 @@ def test_train_and_merge_use_the_same_base_model_and_template(profile):
     assert train["template"] == merge["template"] == profile.template
 
 
+@pytest.mark.parametrize("name", lf_tools.available_profiles())
+def test_no_profile_lets_the_trainer_report_to_a_tracker_on_its_own(name):
+    """transformers' default is report_to=all: with mlflow-skinny installed (for tracker.py) its MLflow callback starts a
+    run against a local sqlite store the skinny client cannot open, and the training dies. Tracking is ours (tracker.py)."""
+    assert read_yaml(lf_tools.load_profile(name).train_yaml)["report_to"] == "none"
+
+
 def test_train_reads_the_dataset_update_dataset_info_writes(profile):
     assert read_yaml(profile.train_yaml)["dataset"] == config.LF_DATASET_NAME == profile.dataset
 

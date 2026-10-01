@@ -46,6 +46,8 @@
   tracking), `train_records` (params: recipe + data; tags: dataset revision/hashes, prompt fingerprint, git, packages), `train_result_records`, `merge_tags`, `gguf_tags`, `eval_records`.
   `config.MLFLOW_EXPERIMENT`, `config.EVAL_MAX_NEW_TOKENS`. Params are logged by train only; eval decoding/prompt are tags (a param cannot change once logged). Known limit: two evals with different
   `--prompt` in one run write the same `eval.*` metric keys (history of one metric, tag = the last prompt).
+- **Found on the first GPU run (2026-10-01): `report_to` unset = transformers' `all`**, so with `mlflow-skinny` installed the trainer's own MLflow callback started and died on a local
+  `sqlite:///mlflow.db` the skinny client cannot open (`UnsupportedModelRegistryStoreURIException`, Fine-Tuning FAILED after 22 s). Every `train.yaml` now has `report_to: none` (a test guards it).
 - **PR 4b (next, model part, NOT VERIFIED without the GPU): the thin wiring.** Callers checked: `train.py` (`start_run`/`finish_run`), `merge.py` (`resolve_adapter`/`write_merge_record`), `gguf.py`, `eval.py`
   (hardcodes `max_new_tokens=256` -> use `config.EVAL_MAX_NEW_TOKENS`). `train.py`: `tracker.from_environment()`, `begin(MLFLOW_EXPERIMENT, name, local_run_id)`, params + tags (`git_info`, `package_versions`,
   `read_state(data/hf/fetch_state.json)`, `read_manifest`), after training `step_log(trainer_log.jsonl)` + `train_result_records` (read `train_results.json`/`trainer_state.json` from the run dir) + `finish`,
