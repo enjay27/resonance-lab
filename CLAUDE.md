@@ -2,8 +2,14 @@
 
 resonance-lab fine-tunes the translator model of
 [resonance-stream](https://github.com/enjay27/resonance-stream): Japanese Blue Protocol:
-Star Resonance chat → natural Korean. Base model Qwen3 1.7B, LoRA with unsloth, merged to
-F16, converted to GGUF `q4_k_m` for resonance-stream's llama.cpp server.
+Star Resonance chat → natural Korean, as a GGUF `q4_k_m` for resonance-stream's llama.cpp
+server.
+
+**Which pipeline is which.** `main` holds the first pipeline (Qwen3 1.7B, unsloth). The model
+the app ships today (TranslateGemma-4B + LoRA, gist model 1.1.0) was trained on branch
+`experiment/translategemma` (LLaMA-Factory, `configs/training/bp_train.yaml`); that branch is
+not on `main`. The base model is being re-chosen —
+`.memory/roadmap/translator-shortlist-2026-10-01.md` is the plan.
 
 The repo is two parts. **Which part you touch decides which gate applies.** That is the
 most important thing on this page.
@@ -21,20 +27,25 @@ no GPU, and torch/unsloth are not installed there.
 **New pure logic goes in the data part**, where it is tested on every OS. Model-part
 scripts run at import time (no `main()`); keep anything worth testing out of them.
 
-**The model is consumed by resonance-stream.** Its prompt format is pinned there
-(`crates/core/src/text.rs`, `translation_prompt`), and its training data comes from there
-(`dataset_<CHANNEL>.jsonl`: `pid`, `original`, `translated` — `null` when untranslated,
-`timestamp`). A change to the prompt, the chat template or the expected fields is a
-change to both repos — see `.memory/active-issues/stream-contract.md`.
+**This repo owns the prompt.** The prompt the model is trained on is decided here, and
+resonance-stream follows it (`crates/core/src/text.rs`, `translation_prompt`) — decision of
+the maintainer, 2026-10-01. So a change to the prompt or chat template is made here first,
+written down in `.memory/active-issues/stream-contract.md`, and then copied to
+resonance-stream in its own PR there; the app must send exactly what training saw.
+The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `original`,
+`translated` — `null` when untranslated, `timestamp`).
 
 ---
 
 ## Tech Stack
 
 - **Python 3.13** (README; CI runs the data gate on 3.13). Windows for the model part.
-- **Training:** unsloth (pinned commit), transformers, peft, trl, bitsandbytes 4-bit,
-  torch 2.10 + CUDA 12.6 (`requirements.txt`; `triton-windows`).
-- **Base model:** `rd211/Qwen3-1.7B-Instruct` (`config.py`). LoRA r=64, alpha=128.
+- **Training on `main`:** unsloth (pinned commit), transformers, peft, trl, bitsandbytes
+  4-bit, torch 2.10 + CUDA 12.6 (`requirements.txt`; `triton-windows`).
+  Base `rd211/Qwen3-1.7B-Instruct` (`config.py`), LoRA r=64, alpha=128.
+- **Shipped model (`experiment/translategemma`):** LLaMA-Factory SFT + LoRA on
+  `google/translategemma-4b-it`, template `gemma3`, dataset `bp_translation_nosystem`
+  (user turn = the raw Japanese line only), `cutoff_len` 128.
 - **Conversion:** llama.cpp `convert_hf_to_gguf.py` → `llama-quantize q4_k_m` (README).
 - **Gate tooling:** pytest, ruff (`pyproject.toml`), `just`.
 

@@ -29,3 +29,13 @@ Branch `claude/align-project-structure-s21g7q`.
 - The app's prompt is Gemma-format with an English instruction; training here is Qwen3
   ChatML with a Korean one — `active-issues/stream-contract.md`.
 - `translated: null` rows (the app writes them) crash `split_dataset` — same file.
+
+## Follow-up (same day)
+- Maintainer: **this repo decides the prompt; resonance-stream follows.** CLAUDE.md and
+  `stream-contract.md` were written the other way round at first (prompt "pinned there") —
+  corrected.
+- The first contract note compared the app with `main`'s Qwen3 pipeline. Wrong baseline:
+  the shipped model (TranslateGemma-4B, gist 1.1.0) comes from `experiment/translategemma`
+  (LLaMA-Factory, raw line, gemma3). Read that branch; `experiment/qwen3.5` is the step
+  between (same LLaMA-Factory move, Qwen3 4B).
+- The maintainer's model shortlist is kept in `roadmap/translator-shortlist-2026-10-01.md`.

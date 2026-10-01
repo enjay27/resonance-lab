@@ -10,10 +10,11 @@ graft-indexed, CLAUDE.md rules (data part = `just check`, model part = manual GP
 **Open:** first CI run is this PR; auto-merge takes effect once it is on `main`
 (this PR merged by hand) — [`sessions/2026-10-01-align-with-resonance-stream.md`](.memory/sessions/2026-10-01-align-with-resonance-stream.md).
 
-**Contract with resonance-stream is broken in two places** — the app sends a Gemma prompt
-(English instruction), training here is Qwen3 ChatML (Korean instruction); and the app's
-`translated: null` rows crash `split_dataset`. Needs the maintainer's call before the
-re-fine-tune (stream's A4) — [`stream-contract.md`](.memory/active-issues/stream-contract.md).
+**This repo owns the prompt; resonance-stream follows (maintainer, 2026-10-01).** Shipped
+model = TranslateGemma-4B LoRA from `experiment/translategemma` (raw line, gemma3, no
+system); the app sends an English instruction + `[P0]` rule + `<bos>` it never trained on.
+Model is being re-chosen — [`translator-shortlist-2026-10-01.md`](.memory/roadmap/translator-shortlist-2026-10-01.md);
+contract and the `translated: null` crash: [`stream-contract.md`](.memory/active-issues/stream-contract.md).
 
 **Model part never runs in a cloud session** (no GPU). What changed without a run:
 [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md).
