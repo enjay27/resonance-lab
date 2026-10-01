@@ -407,3 +407,29 @@ def test_fast_profile_keeps_the_effective_batch_and_has_its_own_dirs(base, fast)
     assert pf.base_model == pb.base_model and pf.template == pb.template
     assert pf.adapter_dir != pb.adapter_dir and pf.merged_dir != pb.merged_dir
     assert read_yaml(pf.merge_yaml)["adapter_name_or_path"] == f["output_dir"]
+
+
+# --- reading training pairs for inspection ---------------------------------------------------------
+
+
+def test_first_pairs_reads_original_and_translated_in_order(tmp_path):
+    path = tmp_path / "pairs.jsonl"
+    path.write_text(
+        '{"original": "a", "translated": "가"}\n\n{"original": "b", "translated": "나"}\n{"original": "c", "translated": "다"}\n',
+        encoding="utf-8",
+    )
+
+    assert lf_tools.first_pairs(str(path), 2) == [("a", "가"), ("b", "나")]
+
+
+def test_first_pairs_says_when_the_file_is_missing(tmp_path):
+    with pytest.raises(FileNotFoundError, match="preprocess"):
+        lf_tools.first_pairs(str(tmp_path / "nope.jsonl"), 1)
+
+
+def test_first_pairs_rejects_rows_without_the_pair_columns(tmp_path):
+    path = tmp_path / "bad.jsonl"
+    path.write_text('{"instruction": "x", "input": "a", "output": "b"}\n', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="--format pair"):
+        lf_tools.first_pairs(str(path), 1)
