@@ -171,3 +171,11 @@ def test_the_real_env_files_and_the_local_run_queue_are_gitignored():
     for pattern in ("deploy/mlflow/.env", ".env.mlflow", ".run.result.backup.json", ".run.result.backup.files/"):
         assert pattern in ignored, pattern
     assert ".env.mlflow.example" not in ignored and "deploy/mlflow/.env.example" not in ignored
+
+
+def test_the_desktop_client_is_pinned_to_the_servers_version():
+    # a client and server of different versions break the API and the database schema
+    server = _env(("deploy", "mlflow", ".env.example"))["MLFLOW_VERSION"]
+    requirements = _text("requirements-llamafactory.txt")
+
+    assert re.search(rf"(?m)^mlflow-skinny=={re.escape(server)}\s*(#.*)?$", requirements)

@@ -27,6 +27,13 @@
   (`MLFLOW_SERVER_ENABLE_JOB_EXECUTION`) and are switched off, with the assistant/sandbox; telemetry is switched off; `/health` is the only open URL, `/signup`
   and user creation are 401; a foreign Host header is 403; `log_batch` took 1000 metrics, `start_time` can be backdated, `search_runs` finds a run by tag
   (the replay's idempotence check). Files: `deploy/mlflow/`, `.env.mlflow.example`.
+- **PR 2 (`tracking.py`, pure) done 2026-10-01:** `.env.mlflow` loader (env over file; only an http(s) URL is accepted, never a local store), client env with a 10 s timeout /
+  1 retry / backoff 1 (the package defaults are 120 s and many retries), params (`flatten_params`, MLflow limits: key 250, param 6000, tag 8000, 100 params+tags and
+  1000 metrics per batch), `dataset_tags` (HF repo/revision/url from `data/hf/fetch_state.json`, file hashes and eval overlap from the preprocess manifest),
+  `data_params`, `prompt_fingerprint`, `eval_metrics`, `train_result_metrics`, `step_metrics` (points from `trainer_log.jsonl`, timestamped start + elapsed_time),
+  `git_info`, `package_versions`, `gguf_info`. **`mlflow-skinny==3.16.1` is enough for the desktop** (checked on Python 3.11 against a real server: params, 1000-metric batch,
+  tags, artifact, search by tag; no torch/Flask); the pin equals the server's version (test). Not checked on Python 3.13 / Windows. A refused connection fails in ~1 s;
+  a NAS that drops packets takes the 10 s timeout. With `MLFLOW_SERVER_ENABLE_JOB_EXECUTION=false` the server has no huey job-worker processes (checked).
 - PR order: 1 server (`deploy/mlflow/` + guard tests), 2 `tracking.py` pure helpers, 3 the queue (TinyDB + sync, fake client in tests), 4 stage
   wiring (model part, NOT VERIFIED), 5 `mlflow_compare.py` + docs.
 

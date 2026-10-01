@@ -2,6 +2,10 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **`mlflow-skinny` on the desktop (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `requirements-llamafactory.txt` now pins `mlflow-skinny==3.16.1` (the NAS server's version). Checked here on
+  Python 3.11 only; install it in the llamafactory venv (Python 3.13, Windows) with the other pins and check `pip` resolves it next to torch 2.9.1 / transformers 4.57.1 / trl 0.24.0.
+  `tracking.py` itself is unit-tested and sends nothing yet.
+
 - **MLflow server (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `deploy/mlflow/` was checked as far as a cloud session can: a real MLflow 3.16.1 server with the same flags/env
   (401/403/200 behaviour, logging, artifacts) and `docker compose config`. Never built or run in Docker (no daemon here): on the NAS check the image build
   (`python:3.12-slim` + `mlflow[auth]`), that the container starts with `read_only: true` + tmpfs `/tmp`, the health check, and the README's `curl` checks from the desktop.
