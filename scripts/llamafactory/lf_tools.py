@@ -6,6 +6,7 @@ repo root because the yaml files use paths relative to it.
 """
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -123,6 +124,24 @@ def with_bos(ids, bos_id):
     if bos_id is None or (ids and ids[0] == bos_id):
         return list(ids)
     return [bos_id, *ids]
+
+
+def first_pairs(path, count):
+    """The first `count` (original, translated) rows of a `--format pair` training file."""
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"{path} not found; run the Preprocessing stage (preprocess.py --format pair) first")
+    pairs = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if "original" not in row or "translated" not in row:
+                raise ValueError(f"{path}: row has no original/translated columns; it must be made with preprocess.py --format pair")
+            pairs.append((row["original"], row["translated"]))
+            if len(pairs) == count:
+                break
+    return pairs
 
 
 def generate_inputs(encoding):
