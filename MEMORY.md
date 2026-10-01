@@ -5,9 +5,10 @@
 ## Now — 2026-10-01
 
 **This repo owns the prompt; resonance-stream follows (maintainer, 2026-10-01).** Shipped model =
-TranslateGemma-4B LoRA, trained (hand-made file, **both directions**) on the TranslateGemma instruction + line, gemma3; the app
+TranslateGemma-4B LoRA, trained (both directions) on the TranslateGemma instruction + line, gemma3; the app
 sends the same plus a `[P0]` rule and a literal `<bos>` it never trained on. `preprocess.py --prompt auto [--reverse]` + `prompts.py` now
-build those rows (2026-10-01); the shipped file's reverse rule is unknown. Model is being re-chosen —
+build those rows (2026-10-01); `--reverse` follows the shipped branch's rule
+(`aab6b66`); TG cutoff is 256 now. Model is being re-chosen —
 [`translator-shortlist-2026-10-01.md`](.memory/roadmap/translator-shortlist-2026-10-01.md);
 contract: [`stream-contract.md`](.memory/active-issues/stream-contract.md).
 

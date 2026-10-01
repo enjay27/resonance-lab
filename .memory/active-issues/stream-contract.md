@@ -40,9 +40,14 @@ same instruction + the `[P0]` placeholder rule + the line. Remaining differences
 **This repo now builds that file's rows (2026-10-01):** `preprocess.py --format pair --prompt auto [--reverse]`, instruction
 texts in `prompts.py` (TranslateGemma's copied from the maintainer's sample, Hy's = its documented default prompt), pinned in
 `tests/test_prompts.py`. The pipeline's Preprocessing stage runs `--prompt auto` (style from `--model`'s template), no `--reverse`.
-Not reproduced: the shipped file's **reverse rule**. In the maintainer's sample a long recruitment line had no ko→ja partner while
-two short lines did; the one-off script that made `bp-training-dataset-processed.jsonl` is in neither git history nor this repo.
-`--reverse` reverses every clean row. Hy's ko→ja prompt is derived (README template, target "Japanese"), unverified.
+**Reverse rule (found 2026-10-01 in `experiment/translategemma` commit `aab6b66`, "process bidirectual training", pushed late):**
+the ko→ja row is tried only for a row whose ja→ko direction passed, with its own filters, counted separately, sharing the
+`seen_inputs` set: Korean (the input) must hold no kana/kanji, Japanese (the answer) no Hangeul — both can never fire after the
+forward filters passed —, answer not 10x longer than the input, no recruitment spam (>150 chars, 2+ `ID:`), and the Korean input
+must not already be a seen input. `preprocess.py --reverse` now does exactly that. The same commit raised `cutoff_len` 128 → 256
+(our `translategemma-4b` profile had copied the older 128; fixed). The maintainer's sample, though, had a long recruitment line
+without a reverse partner, which this rule would write: the sample was probably trimmed — unconfirmed.
+Hy's ko→ja prompt is derived (README template, target "Japanese"), unverified.
 
 **Next:** decide per model the exact prompt (instruction text, directions, `[P0]`), build it in a data-part stage (test first), pin
 one sample's full text here, then resonance-stream copies it.

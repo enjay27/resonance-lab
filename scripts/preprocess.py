@@ -15,6 +15,8 @@ REASONS = (
     "empty field",
     "hangeul in original",
     "JP residual in translation",
+    "JP in original (ko_ja)",
+    "Hangeul residual in translation (ko_ja)",
     "hallucination",
     "recruitment spam",
     "duplicate",
@@ -31,16 +33,25 @@ FORMATS = {
 DEFAULT_FORMAT = "instruction"
 
 
+def forward_row(original, translated, style=None):
+    """The ja->ko `pair` row with the instruction of `style` (None = the raw line)."""
+    return {"original": build_prompt(style, "ja-ko", original), "translated": translated}
+
+
+def reverse_row(original, translated, style=None):
+    """The ko->ja row of the same pair: the Korean is the input, the Japanese the answer."""
+    return {"original": build_prompt(style, "ko-ja", translated), "translated": original}
+
+
 def pair_rows(original, translated, style=None, reverse=False):
-    """The `pair` rows of one clean line: ja->ko with the instruction of `style` (None = the raw line), and, with
-    `reverse`, the ko->ja row (the Korean as the input) built the same way."""
-    rows = [{"original": build_prompt(style, "ja-ko", original), "translated": translated}]
+    """The forward row, and with `reverse` the ko->ja row after it (no filtering here)."""
+    rows = [forward_row(original, translated, style)]
     if reverse:
-        rows.append({"original": build_prompt(style, "ko-ja", translated), "translated": original})
+        rows.append(reverse_row(original, translated, style))
     return rows
 
 
-def clean_reason(original, translated):
+def clean_reason(original, translated, direction="ja-ko"):
     """Why a row must not be trained on, or None when it is clean.
 
     Duplicates are not decided here (they need the rows seen so far).
@@ -50,12 +61,19 @@ def clean_reason(original, translated):
     # resonance-stream writes `translated: null` for lines it never translated.
     if not original or not translated:
         return "empty field"
-    # The source is Japanese chat; Hangeul means a wrong row.
-    if HANGEUL_PATTERN.search(original):
-        return "hangeul in original"
-    # Kana/kanji left in the Korean output: the line was not translated.
-    if JP_PATTERN.search(translated):
-        return "JP residual in translation"
+    if direction == "ko-ja":
+        # Reverse rows (Korean in, Japanese out): kana/kanji in the Korean input, or Hangeul left in the Japanese answer.
+        if JP_PATTERN.search(original):
+            return "JP in original (ko_ja)"
+        if HANGEUL_PATTERN.search(translated):
+            return "Hangeul residual in translation (ko_ja)"
+    else:
+        # The source is Japanese chat; Hangeul means a wrong row.
+        if HANGEUL_PATTERN.search(original):
+            return "hangeul in original"
+        # Kana/kanji left in the Korean output: the line was not translated.
+        if JP_PATTERN.search(translated):
+            return "JP residual in translation"
     # Looping output: the translation is more than 10x longer than the input.
     if len(translated) > len(original) * 10:
         return "hallucination"
@@ -85,7 +103,6 @@ def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, 
         raise ValueError(f"unknown format {fmt!r}; choose one of: {', '.join(sorted(FORMATS))}")
     if (style or reverse) and fmt != "pair":
         raise ValueError("a prompt style or --reverse needs the pair format (--format pair)")
-    make_rows = (lambda o, t: pair_rows(o, t, style, reverse)) if fmt == "pair" else (lambda o, t: [FORMATS[fmt](o, t)])
     if not os.path.exists(input_file):
         print(f"[ERROR] Raw data not found at: {input_file}")
         sys.exit(1)
@@ -115,8 +132,24 @@ def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, 
 
             seen_inputs.add(original)
             counts["passed"] += 1
-            for row in make_rows(original, translated):
-                f_out.write(json.dumps(row, ensure_ascii=False) + '\n')
+            if fmt == "pair":
+                f_out.write(json.dumps(forward_row(original, translated, style), ensure_ascii=False) + '\n')
+            else:
+                f_out.write(json.dumps(FORMATS[fmt](original, translated), ensure_ascii=False) + '\n')
+
+            # The reverse direction is tried only for rows whose forward direction passed, with its own filters and
+            # counted on its own (as experiment/translategemma's bidirectional preprocess did).
+            if reverse:
+                counts["total"] += 1
+                reason = clean_reason(translated, original, direction="ko-ja")
+                if reason is None and translated in seen_inputs:
+                    reason = "duplicate"
+                if reason:
+                    counts[reason] += 1
+                    continue
+                seen_inputs.add(translated)
+                counts["passed"] += 1
+                f_out.write(json.dumps(reverse_row(original, translated, style), ensure_ascii=False) + '\n')
 
     _report(counts)
     if counts["passed"] == 0:
