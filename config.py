@@ -50,3 +50,9 @@ INSTRUCTION = (
         "특히 게임 고유 용어 및 은어(예: ファスト -> 속공, 器用 -> 숙련, 完凸 -> 풀돌, 消化 -> 숙제)는 "
         "한국 유저들이 실제 사용하는 로컬라이징 용어로 엄격하게 번역하십시오."
     )
+# --- Data checks (validate.py, preprocess.py) ---
+# A file that fails these is the wrong file or a broken export, not a dataset. First guesses, not measurements:
+# both stages always print the shares, so calibrate them on the first real raw log.
+VALIDATE_MAX_STRUCTURE_ERRORS = 0.01  # share of raw lines that are invalid JSON or lack `original` / `translated`
+VALIDATE_MAX_HANGEUL_IN_ORIGINAL = 0.10  # share of rows whose Japanese `original` holds Hangeul (preprocess drops those rows)
+PREPROCESS_MAX_SUSPICIOUS = 0.30  # share of usable rows dropped as Hangeul-in-source, JP-in-output or runaway-long output

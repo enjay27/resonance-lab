@@ -75,11 +75,11 @@ pipelines.py          registry: pipeline name -> ordered stage scripts (no torch
 prompts.py            instruction text per model family and direction (translategemma, hy); used by preprocess + eval; tested
 run_pipeline.py       --pipeline <name>: runs its stages in order, stops at the first failure
 scripts/
-  validate.py           shared data: raw logs -- no Hangeul in `original` (ValidationError)
+  validate.py           shared data: raw-log sanity gate (empty/missing file, >1% damaged lines, >10% Hangeul in `original` -> ValidationError; limits in config.py)
   preprocess.py         shared data: raw {original, translated} -> {instruction, input, output};
                           `clean_reason` drops empty/untranslated, Hangeul-in-source,
                           JP-left-in-output, 10x-long, recruitment-spam, duplicate rows
-                          and counts each reason
+                          and counts each reason; exits 1 when >30% of the usable rows are suspicious (--max-drop)
   unsloth/              pipeline `unsloth` (Qwen3 1.7B)
     split_dataset.py      data: dedup by input, shuffle (seed 42), train/val -> lora_dataset/
     train.py              model: LoRA fine-tune (unsloth), merge -> model_f16/

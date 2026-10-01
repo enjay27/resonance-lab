@@ -17,8 +17,8 @@ so the privacy item (14) is closed.
 | 7 | 51 eval samples / 21 term checks: differences are noise | todo — grow to 200-300, bootstrap CI |
 | 8 | COMET never ran (`unbabel-comet` in no requirements); `sacrebleu`/`rich` unpinned in the llamafactory file; BLEU uses `13a` on Korean | todo |
 | 9 | eval decoding (batch 1, `max_new_tokens=256`) is not recorded | with MLflow |
-| 10 | `validate.py` halts on ONE Hangeul line though `preprocess` drops such rows; JSON errors uncounted | todo — fail on structure/threshold |
-| 11 | no drop-rate guard in preprocess | todo — threshold, report saved as the sidecar |
+| 10 | `validate.py` halts on ONE Hangeul line though `preprocess` drops such rows; JSON errors uncounted | **done** — `validate.py` is a sanity gate: fails on empty/missing file, >1% damaged lines, >10% Hangeul originals; reports the rest |
+| 11 | no drop-rate guard in preprocess | **done** (guard) — `--max-drop`, default 30% of usable rows dropped as suspicious (Hangeul source / JP output / runaway length); counts are in the manifest. Limits in `config.py` are guesses: calibrate on the first real raw log |
 | 12 | dedup: exact only, first wins; `total` counts reverse rows; spam filter only half-width `ID:` | todo |
 | 13 | label provenance: if `translated` is the app's model output we train on its own errors | ask / record share of human-edited rows |
 | 14 | privacy of the public HF dataset | closed (pid is a sequence id, user info stripped by the app) |
