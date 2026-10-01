@@ -2,6 +2,10 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **Data-check limits (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `validate.py` (1% damaged / 10% Hangeul originals) and the `preprocess.py` guard (30% suspicious)
+  are unit-tested on made-up rows; the numbers are guesses, never run on the real raw log. Both stages print their shares: read them on the first real
+  run and move the limits in `config.py` (or pass `--max-drop`) if they stop a healthy file or let a bad one through.
+
 - **Validation split (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `preprocess.py --format pair` writes `lora_train_data.val.jsonl` (5%, by line hash); every
   `train.yaml` now has `eval_dataset: bp_translation_val` and no `val_size`; `dataset_info.json` has two entries. Unit-tested; `eval_dataset` and its
   exclusion of `val_size` read in the pinned LLaMA-Factory source (`hparams/data_args.py` 34, 171), never run. Check on the first real run that

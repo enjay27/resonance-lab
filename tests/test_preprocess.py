@@ -567,3 +567,82 @@ def test_main_refuses_a_fraction_outside_zero_to_one(write_jsonl, tmp_path, monk
 
     with pytest.raises(SystemExit):
         preprocess.main(["--format", "pair", "--val-fraction", "1.5"])
+
+
+# --- the drop-rate guard: a file that is mostly suspicious is the wrong file, not a dataset --------------
+
+
+def _guard_rows(clean, bad_source=0, bad_output=0, hallucinated=0):
+    rows = [{"original": f"レイド {i} 集合", "translated": f"레이드 {i} 집합"} for i in range(clean)]
+    rows += [{"original": f"한글 {i}", "translated": "x"} for i in range(bad_source)]  # hangeul in original
+    rows += [{"original": f"集合 {i}", "translated": f"集合 {i}"} for i in range(bad_output)]  # JP residual
+    rows += [{"original": "あ" + "い" * (i % 2), "translated": "가" * 40} for i in range(hallucinated)]
+    return rows
+
+
+def test_a_mostly_suspicious_file_stops_preprocessing(write_jsonl, tmp_path, capsys):
+    src = write_jsonl("raw.jsonl", _guard_rows(clean=6, bad_source=2, bad_output=2))  # 4 of 10 usable rows
+
+    with pytest.raises(SystemExit) as exc:
+        preprocess.transform_for_lora(src, str(tmp_path / "out.jsonl"), max_drop=0.3)
+
+    assert exc.value.code == 1
+    out = capsys.readouterr().out
+    assert "40.0%" in out and "--max-drop" in out
+
+
+def test_a_file_under_the_limit_passes(write_jsonl, tmp_path, capsys):
+    src = write_jsonl("raw.jsonl", _guard_rows(clean=8, bad_source=1, bad_output=1))  # 20%
+
+    counts = preprocess.transform_for_lora(src, str(tmp_path / "out.jsonl"), max_drop=0.3)
+
+    assert counts["passed"] == 8
+    assert "20.0%" in capsys.readouterr().out  # the share is always shown, so the limit can be calibrated
+
+
+def test_hallucinated_outputs_count_as_suspicious_too(write_jsonl, tmp_path):
+    src = write_jsonl("raw.jsonl", _guard_rows(clean=4, hallucinated=6))
+
+    with pytest.raises(SystemExit):
+        preprocess.transform_for_lora(src, str(tmp_path / "out.jsonl"), max_drop=0.3)
+
+
+def test_untranslated_duplicate_and_spam_rows_are_expected_and_not_counted(write_jsonl, tmp_path):
+    rows = _guard_rows(clean=5)
+    rows += [{"original": f"未訳 {i}", "translated": None} for i in range(50)]  # the app never translated these
+    rows += [rows[0]] * 20  # duplicates
+    rows += [{"original": "ID:1 " + "あ" * 150 + " ID:2", "translated": "모집"}] * 20  # recruitment spam
+    src = write_jsonl("raw.jsonl", rows)
+
+    counts = preprocess.transform_for_lora(src, str(tmp_path / "out.jsonl"), max_drop=0.3)
+
+    assert counts["passed"] == 5
+
+
+def test_without_a_limit_nothing_is_checked(write_jsonl, tmp_path):
+    src = write_jsonl("raw.jsonl", _guard_rows(clean=1, bad_source=9))
+
+    assert preprocess.transform_for_lora(src, str(tmp_path / "out.jsonl"))["passed"] == 1
+
+
+def test_main_applies_the_configured_limit_and_max_drop_overrides_it(write_jsonl, tmp_path, monkeypatch):
+    import manifest
+
+    src = write_jsonl("raw.jsonl", _guard_rows(clean=6, bad_source=4))
+    out = tmp_path / "out.jsonl"
+    monkeypatch.setattr(preprocess, "RAW_LOGS", src)
+    monkeypatch.setattr(preprocess, "PROCESSED_LOGS", str(out))
+    monkeypatch.setattr(preprocess, "EVAL_DATASET_PATH", str(tmp_path / "missing.jsonl"))
+
+    with pytest.raises(SystemExit):
+        preprocess.main(["--format", "pair"])  # 40% against the configured limit
+    assert not os.path.exists(manifest.manifest_path(str(out)))  # the failed run leaves no manifest: training refuses it
+
+    preprocess.main(["--format", "pair", "--max-drop", "0.5"])
+    assert os.path.exists(manifest.manifest_path(str(out)))
+
+
+def test_the_default_limit_comes_from_config():
+    import config
+
+    assert preprocess.MAX_SUSPICIOUS == config.PREPROCESS_MAX_SUSPICIOUS

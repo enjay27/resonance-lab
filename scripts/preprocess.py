@@ -5,7 +5,7 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import RAW_LOGS, PROCESSED_LOGS, INSTRUCTION, EVAL_DATASET_PATH
+from config import RAW_LOGS, PROCESSED_LOGS, INSTRUCTION, EVAL_DATASET_PATH, PREPROCESS_MAX_SUSPICIOUS
 from eval_metrics import load_eval_dataset
 import manifest
 from overlap import EvalOverlap
@@ -29,6 +29,14 @@ REASONS = (
     "duplicate",
     "json error",
 )
+
+
+MAX_SUSPICIOUS = PREPROCESS_MAX_SUSPICIOUS
+
+# Rows dropped because the line is bad data: too many of them means the wrong file or a broken export (see max_drop).
+SUSPICIOUS = ("hangeul in original", "JP residual in translation", "hallucination")
+# Drops that are normal for chat logs and say nothing about the file's health: not counted in the guard's share.
+EXPECTED = ("empty field", "recruitment spam", "eval overlap", "eval overlap (near)", "duplicate")
 
 
 # Output row layouts, by pipeline: unsloth trains on instruction/input/output rows,
@@ -104,13 +112,15 @@ def _report(counts):
 
 
 def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, reverse=False, eval_originals=(),
-                       val_file=None, val_fraction=0.0):
+                       val_file=None, val_fraction=0.0, max_drop=None):
     """Clean raw {original, translated} rows into training rows of layout `fmt`.
 
     Rows whose original is one of `eval_originals` (exactly or nearly: see overlap.py) are dropped, so the
     model is never trained on what it is evaluated on; their reverse rows go with them.
     With `val_file` and `val_fraction`, about that share of the lines is written to `val_file` instead of `output_file`,
     chosen per line by valsplit.py (both directions of a pair go to the same file).
+    With `max_drop`, exits 1 when more than that share of the usable rows (not untranslated, duplicate, spam or eval
+    lines) were dropped as suspicious (Hangeul in the source, Japanese left in the output, runaway-long output).
     Returns the counts per outcome (`total`, `passed` -- training and validation rows together --, `validation`
     and one per reason).
     """
@@ -128,6 +138,7 @@ def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, 
     counts = {"total": 0, "passed": 0, **{reason: 0 for reason in REASONS}, "validation": 0}
     seen_inputs = set()
     eval_overlap = EvalOverlap(eval_originals)
+    usable = suspicious = 0  # forward direction only: the guard's denominator and numerator
 
     with contextlib.ExitStack() as files:
         f_in = files.enter_context(open(input_file, 'r', encoding='utf-8'))
@@ -150,6 +161,8 @@ def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, 
                     reason = "eval overlap" if found == "exact" else "eval overlap (near)"
             if reason is None and original in seen_inputs:
                 reason = "duplicate"  # the first occurrence wins
+            usable += reason not in EXPECTED
+            suspicious += reason in SUSPICIOUS
             if reason:
                 counts[reason] += 1
                 continue
@@ -180,6 +193,14 @@ def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, 
                 sink.write(json.dumps(reverse_row(original, translated, style), ensure_ascii=False) + '\n')
 
     _report(counts)
+    share = suspicious / usable if usable else 0.0
+    print(f"{'Suspicious drops':<18}: {suspicious}/{usable} usable rows ({share:.1%})"
+          + (f", limit {max_drop:.0%}" if max_drop is not None else ""))
+    if max_drop is not None and share > max_drop:
+        print(f"[ERROR] {share:.1%} of the usable rows were dropped as suspicious (Hangeul in the source, Japanese left in the output, "
+              f"runaway-long output); the limit is {max_drop:.0%}. Is this the right raw log? Look at the counts above; "
+              "--max-drop raises the limit once you know why.")
+        sys.exit(1)
     if counts["passed"] == 0:
         print("[ERROR] Preprocessing produced 0 lines. Check your raw input file.")
         sys.exit(1)
@@ -209,6 +230,8 @@ def main(argv=None):
     parser.add_argument("--val-fraction", type=float, default=None,
                         help="share of the lines written to the validation file lora_train_data.val.jsonl "
                              "(default: 0.05 for --format pair, which LLaMA-Factory validates on; 0 for instruction)")
+    parser.add_argument("--max-drop", type=float, default=MAX_SUSPICIOUS,
+                        help="stop when more than this share of the usable rows is dropped as suspicious (default: %(default)s; 1 = never)")
     parser.add_argument("--reverse", action="store_true",
                         help="pair format only: also write every clean row as ko->ja, Korean as the input")
     args = parser.parse_args(argv)
@@ -221,7 +244,7 @@ def main(argv=None):
     eval_set, eval_originals = _eval_originals(args)
     manifest.remove_manifest(PROCESSED_LOGS)  # a failed run must not leave the old file's manifest or validation rows behind
     val_file = manifest.val_path(PROCESSED_LOGS) if val_fraction > 0 else None
-    counts = transform_for_lora(RAW_LOGS, PROCESSED_LOGS, args.fmt, style, args.reverse, eval_originals, val_file, val_fraction)
+    counts = transform_for_lora(RAW_LOGS, PROCESSED_LOGS, args.fmt, style, args.reverse, eval_originals, val_file, val_fraction, args.max_drop)
     if val_file and not counts["validation"]:
         print("[WARNING] No line fell into the validation split (too few lines?): training will refuse this data.")
     path = manifest.write_manifest(PROCESSED_LOGS, args.fmt, style, args.reverse, RAW_LOGS, counts, eval_set, len(eval_originals), val_fraction)
