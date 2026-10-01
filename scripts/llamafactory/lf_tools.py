@@ -15,13 +15,14 @@ from typing import NamedTuple
 import yaml
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from manifest import ManifestError, require_for_style  # noqa: E402
+from manifest import ManifestError, require_for_style, val_path  # noqa: E402
 from prompts import build_prompt, style_for_template  # noqa: E402
 from config import (  # noqa: E402
     BASE_DIR,
     LF_CONFIG_ROOT,
     LF_DATASET_DIR,
     LF_DATASET_NAME,
+    LF_VAL_DATASET_NAME,
     LF_PROFILE_DEFAULT,
     PROCESSED_LOGS,
 )
@@ -99,8 +100,11 @@ def dataset_info(file_name, name=LF_DATASET_NAME):
 
 
 def dataset_info_for_processed_logs():
-    file_name = os.path.relpath(PROCESSED_LOGS, LF_DATASET_DIR).replace(os.sep, "/")
-    return dataset_info(file_name)
+    """The training rows and the validation rows preprocess.py writes, as the two datasets train.yaml names."""
+    def relative(path):
+        return os.path.relpath(path, LF_DATASET_DIR).replace(os.sep, "/")
+
+    return {**dataset_info(relative(PROCESSED_LOGS)), **dataset_info(relative(val_path(PROCESSED_LOGS)), LF_VAL_DATASET_NAME)}
 
 
 def check_training_data(profile, data_path=PROCESSED_LOGS):

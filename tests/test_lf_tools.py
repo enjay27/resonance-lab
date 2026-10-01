@@ -506,7 +506,11 @@ def _made_for(tmp_path, style, **kwargs):
 
     data = tmp_path / "lora_train_data.jsonl"
     data.write_text('{"original": "a", "translated": "b"}\n', encoding="utf-8")
-    manifest.write_manifest(str(data), fmt="pair", style=style, reverse=False, raw_path=str(data), counts={}, eval_set=None, eval_lines=0)
+    manifest.val_path(str(data))
+    with open(manifest.val_path(str(data)), "w", encoding="utf-8") as f:
+        f.write('{"original": "v", "translated": "w"}\n')
+    manifest.write_manifest(str(data), fmt="pair", style=style, reverse=False, raw_path=str(data), counts={}, eval_set=None,
+                            eval_lines=0, val_fraction=0.05)
     return str(data)
 
 
@@ -573,3 +577,23 @@ def test_update_dataset_info_stops_when_the_data_does_not_match(monkeypatch, cap
 
     assert exc.value.code == 1
     assert "wrong style" in capsys.readouterr().out
+
+
+# --- LLaMA-Factory reads the validation rows from their own dataset -----------------------------------------
+
+
+def test_dataset_info_has_a_training_and_a_validation_entry():
+    info = lf_tools.dataset_info_for_processed_logs()
+
+    assert set(info) == {config.LF_DATASET_NAME, config.LF_VAL_DATASET_NAME}
+    assert info[config.LF_DATASET_NAME]["file_name"].endswith("lora_train_data.jsonl")
+    assert info[config.LF_VAL_DATASET_NAME]["file_name"].endswith("lora_train_data.val.jsonl")
+    assert info[config.LF_VAL_DATASET_NAME]["columns"] == info[config.LF_DATASET_NAME]["columns"]
+
+
+@pytest.mark.parametrize("name", lf_tools.available_profiles())
+def test_every_profile_validates_on_the_validation_dataset_not_a_random_row_split(name):
+    train = read_yaml(lf_tools.load_profile(name).train_yaml)
+
+    assert train["eval_dataset"] == config.LF_VAL_DATASET_NAME
+    assert "val_size" not in train  # LLaMA-Factory refuses both together (hparams/data_args.py)

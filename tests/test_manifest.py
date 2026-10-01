@@ -13,10 +13,13 @@ def _data(tmp_path, text='{"original": "a", "translated": "b"}\n'):
     return str(path)
 
 
-def _write(tmp_path, **overrides):
+def _write(tmp_path, val_text='{"original": "v", "translated": "w"}\n', **overrides):
     data = _data(tmp_path)
+    if val_text is not None:
+        with open(manifest.val_path(data), "w", encoding="utf-8") as f:
+            f.write(val_text)
     args = dict(fmt="pair", style="hy", reverse=False, raw_path=data, counts={"total": 1, "passed": 1},
-                eval_set=None, eval_lines=0)
+                eval_set=None, eval_lines=0, val_fraction=0.05)
     args.update(overrides)
     return data, manifest.write_manifest(data, **args)
 
@@ -103,4 +106,46 @@ def test_an_unreadable_manifest_is_a_manifest_error(tmp_path):
         f.write("{not json")
 
     with pytest.raises(ManifestError, match="preprocess"):
+        manifest.require_for_style(data, "hy")
+
+
+def test_the_validation_file_lives_next_to_the_data_file():
+    assert manifest.val_path("/x/processed/lora_train_data.jsonl") == "/x/processed/lora_train_data.val.jsonl"
+
+
+def test_write_records_the_validation_file(tmp_path):
+    data, path = _write(tmp_path)
+
+    meta = manifest.read_manifest(path)
+    assert meta["val_fraction"] == 0.05 and meta["val_rows"] == 1
+    assert meta["val_sha256"] == manifest.file_sha256(manifest.val_path(data))
+
+
+def test_without_a_validation_file_none_is_recorded(tmp_path):
+    _, path = _write(tmp_path, val_text=None, val_fraction=0.0)
+
+    meta = manifest.read_manifest(path)
+    assert meta["val_rows"] == 0 and meta["val_sha256"] is None
+
+
+def test_an_empty_validation_file_is_refused_because_training_needs_eval_data(tmp_path):
+    data, _ = _write(tmp_path, val_text="")
+
+    with pytest.raises(ManifestError, match="validation"):
+        manifest.require_for_style(data, "hy")
+
+
+def test_a_missing_validation_file_is_refused(tmp_path):
+    data, _ = _write(tmp_path, val_text=None, val_fraction=0.0)
+
+    with pytest.raises(ManifestError, match="validation"):
+        manifest.require_for_style(data, "hy")
+
+
+def test_a_validation_file_changed_after_preprocessing_is_refused(tmp_path):
+    data, _ = _write(tmp_path)
+    with open(manifest.val_path(data), "a", encoding="utf-8") as f:
+        f.write('{"original": "x", "translated": "y"}\n')
+
+    with pytest.raises(ManifestError, match="changed"):
         manifest.require_for_style(data, "hy")

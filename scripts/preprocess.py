@@ -1,4 +1,5 @@
 import argparse
+import contextlib
 import json
 import os
 import sys
@@ -8,6 +9,7 @@ from config import RAW_LOGS, PROCESSED_LOGS, INSTRUCTION, EVAL_DATASET_PATH
 from eval_metrics import load_eval_dataset
 import manifest
 from overlap import EvalOverlap
+from valsplit import is_validation
 from prompts import STYLES, build_prompt, style_for_template
 from text_rules import HANGEUL_PATTERN, JP_PATTERN
 
@@ -97,30 +99,40 @@ def _report(counts):
     print(f"{'Skipped':<{width + 2}}: {skipped}")
     for reason in REASONS:
         print(f"  {reason:<{width}}: {counts[reason]}")
+    if counts["validation"]:
+        print(f"{'Validation rows':<{width + 2}}: {counts['validation']} of the passed rows (the rest are training rows)")
 
 
-def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, reverse=False, eval_originals=()):
+def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, reverse=False, eval_originals=(),
+                       val_file=None, val_fraction=0.0):
     """Clean raw {original, translated} rows into training rows of layout `fmt`.
 
     Rows whose original is one of `eval_originals` (exactly or nearly: see overlap.py) are dropped, so the
     model is never trained on what it is evaluated on; their reverse rows go with them.
-    Returns the counts per outcome (`total`, `passed` and one per reason).
+    With `val_file` and `val_fraction`, about that share of the lines is written to `val_file` instead of `output_file`,
+    chosen per line by valsplit.py (both directions of a pair go to the same file).
+    Returns the counts per outcome (`total`, `passed` -- training and validation rows together --, `validation`
+    and one per reason).
     """
     if fmt not in FORMATS:
         raise ValueError(f"unknown format {fmt!r}; choose one of: {', '.join(sorted(FORMATS))}")
     if (style or reverse) and fmt != "pair":
         raise ValueError("a prompt style or --reverse needs the pair format (--format pair)")
+    if val_file and fmt != "pair":
+        raise ValueError("a validation split needs the pair format (--format pair); the instruction format is split by unsloth/split_dataset.py")
     if not os.path.exists(input_file):
         print(f"[ERROR] Raw data not found at: {input_file}")
         sys.exit(1)
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    counts = {"total": 0, "passed": 0, **{reason: 0 for reason in REASONS}}
+    counts = {"total": 0, "passed": 0, **{reason: 0 for reason in REASONS}, "validation": 0}
     seen_inputs = set()
     eval_overlap = EvalOverlap(eval_originals)
 
-    with open(input_file, 'r', encoding='utf-8') as f_in, \
-            open(output_file, 'w', encoding='utf-8') as f_out:
+    with contextlib.ExitStack() as files:
+        f_in = files.enter_context(open(input_file, 'r', encoding='utf-8'))
+        f_out = files.enter_context(open(output_file, 'w', encoding='utf-8'))
+        f_val = files.enter_context(open(val_file, 'w', encoding='utf-8')) if val_file else None
         for line in f_in:
             counts["total"] += 1
             try:
@@ -144,10 +156,13 @@ def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, 
 
             seen_inputs.add(original)
             counts["passed"] += 1
+            # The pair's side is decided by its Japanese line, so the reverse row below follows the forward row.
+            sink = f_val if f_val and is_validation(original, val_fraction) else f_out
+            counts["validation"] += sink is f_val
             if fmt == "pair":
-                f_out.write(json.dumps(forward_row(original, translated, style), ensure_ascii=False) + '\n')
+                sink.write(json.dumps(forward_row(original, translated, style), ensure_ascii=False) + '\n')
             else:
-                f_out.write(json.dumps(FORMATS[fmt](original, translated), ensure_ascii=False) + '\n')
+                sink.write(json.dumps(FORMATS[fmt](original, translated), ensure_ascii=False) + '\n')
 
             # The reverse direction is tried only for rows whose forward direction passed, with its own filters and
             # counted on its own (as experiment/translategemma's bidirectional preprocess did).
@@ -161,7 +176,8 @@ def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, 
                     continue
                 seen_inputs.add(translated)
                 counts["passed"] += 1
-                f_out.write(json.dumps(reverse_row(original, translated, style), ensure_ascii=False) + '\n')
+                counts["validation"] += sink is f_val
+                sink.write(json.dumps(reverse_row(original, translated, style), ensure_ascii=False) + '\n')
 
     _report(counts)
     if counts["passed"] == 0:
@@ -190,16 +206,25 @@ def main(argv=None):
                         help="eval dataset whose lines are kept out of the training data (default: %(default)s)")
     parser.add_argument("--keep-eval", action="store_true",
                         help="do not drop the eval set's lines from the training data (experiments only: it inflates every score)")
+    parser.add_argument("--val-fraction", type=float, default=None,
+                        help="share of the lines written to the validation file lora_train_data.val.jsonl "
+                             "(default: 0.05 for --format pair, which LLaMA-Factory validates on; 0 for instruction)")
     parser.add_argument("--reverse", action="store_true",
                         help="pair format only: also write every clean row as ko->ja, Korean as the input")
     args = parser.parse_args(argv)
     style = {"none": None, "auto": None}.get(args.prompt, args.prompt)
     if args.prompt == "auto":
         style = style_for_template(_profile_template(args.model))
+    val_fraction = (0.05 if args.fmt == "pair" else 0.0) if args.val_fraction is None else args.val_fraction
+    if not 0 <= val_fraction < 1:
+        parser.error("--val-fraction must be at least 0 and below 1")
     eval_set, eval_originals = _eval_originals(args)
-    manifest.remove_manifest(PROCESSED_LOGS)  # a failed run must not leave the old file's manifest behind
-    counts = transform_for_lora(RAW_LOGS, PROCESSED_LOGS, args.fmt, style, args.reverse, eval_originals)
-    path = manifest.write_manifest(PROCESSED_LOGS, args.fmt, style, args.reverse, RAW_LOGS, counts, eval_set, len(eval_originals))
+    manifest.remove_manifest(PROCESSED_LOGS)  # a failed run must not leave the old file's manifest or validation rows behind
+    val_file = manifest.val_path(PROCESSED_LOGS) if val_fraction > 0 else None
+    counts = transform_for_lora(RAW_LOGS, PROCESSED_LOGS, args.fmt, style, args.reverse, eval_originals, val_file, val_fraction)
+    if val_file and not counts["validation"]:
+        print("[WARNING] No line fell into the validation split (too few lines?): training will refuse this data.")
+    path = manifest.write_manifest(PROCESSED_LOGS, args.fmt, style, args.reverse, RAW_LOGS, counts, eval_set, len(eval_originals), val_fraction)
     print(f"Manifest written -> {path}")
 
 

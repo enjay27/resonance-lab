@@ -9,10 +9,10 @@ so the privacy item (14) is closed.
 | # | finding | status |
 |---|---|---|
 | 1 | eval lines may be in the training data; nothing excludes them | **done** — `overlap.py`, `preprocess.py --eval-set/--keep-eval`; exact (normalised) + near (>=0.9, >=10 chars) |
-| 2 | fixed `output_dir` per profile: LLaMA-Factory resumes the old checkpoint on a retrain (verify on the pin) | todo — unique dir per run |
+| 2 | fixed `output_dir` per profile: LLaMA-Factory resumes the old checkpoint on a retrain (**confirmed in the pinned source**, `hparams/parser.py` 619-628: `get_last_checkpoint` -> `resume_from_checkpoint`) | todo — unique dir per run |
 | 3 | `lora_train_data.jsonl` is shared by all profiles and does not say which prompt style / `--reverse` made it | **done** — `manifest.py`; `preprocess.py` writes `lora_train_data.meta.json`, `update_dataset_info.py` and `train.py` refuse a missing/changed/other-style file |
 | 4 | eval runs the bf16 merged model, not the q4_k_m GGUF that ships | todo — GGUF eval stage (`llama-server`), log the bf16->q4 delta; also settles stream's A4 (double BOS) |
-| 5 | `val_size: 0.05` is a random row split: reverse rows and near-duplicates leak into validation | todo — split by pair (and newest ~2 months as time holdout) |
+| 5 | `val_size: 0.05` is a random row split: reverse rows and near-duplicates leak into validation | **done** (hash split; time holdout NOT done) — `valsplit.py`: sha1 of the normalised line, ~5%, to `lora_train_data.val.jsonl`; yamls use `eval_dataset: bp_translation_val` instead of `val_size`. Open: a time holdout (newest ~2 months) is still a choice for the maintainer |
 | 6 | term accuracy is a substring test (`ウルト -> 궁` hits 궁금) | todo |
 | 7 | 51 eval samples / 21 term checks: differences are noise | todo — grow to 200-300, bootstrap CI |
 | 8 | COMET never ran (`unbabel-comet` in no requirements); `sacrebleu`/`rich` unpinned in the llamafactory file; BLEU uses `13a` on Korean | todo |

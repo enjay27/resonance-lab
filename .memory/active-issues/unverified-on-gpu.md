@@ -2,6 +2,12 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **Validation split (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `preprocess.py --format pair` writes `lora_train_data.val.jsonl` (5%, by line hash); every
+  `train.yaml` now has `eval_dataset: bp_translation_val` and no `val_size`; `dataset_info.json` has two entries. Unit-tested; `eval_dataset` and its
+  exclusion of `val_size` read in the pinned LLaMA-Factory source (`hparams/data_args.py` 34, 171), never run. Check on the first real run that
+  training starts, that eval-loss rows appear in `trainer_log.jsonl`, and the Preprocessing report's `Validation rows` is about 5% of `Passed`.
+  Eval-loss numbers are NOT comparable with the earlier runs (different validation rows).
+
 - **Manifest check (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `preprocess.py` writes `data/processed/lora_train_data.meta.json`; `update_dataset_info.py`
   and `train.py` refuse to run without a matching one. Unit-tested only. Old processed data has no manifest: run the Preprocessing stage again
   (`python run_pipeline.py` does). Check that a full `run_pipeline.py` still reaches Fine-Tuning, and that `update_dataset_info.py` (now takes `--model`)

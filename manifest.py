@@ -20,6 +20,16 @@ def manifest_path(data_path):
     return os.path.splitext(data_path)[0] + ".meta.json"
 
 
+def val_path(data_path):
+    """The validation rows preprocess.py splits off `data_path` (lora_train_data.jsonl -> lora_train_data.val.jsonl)."""
+    return os.path.splitext(data_path)[0] + ".val.jsonl"
+
+
+def _count_rows(path):
+    with open(path, encoding="utf-8") as f:
+        return sum(1 for line in f if line.strip())
+
+
 def file_sha256(path):
     digest = hashlib.sha256()
     with open(path, "rb") as f:
@@ -28,11 +38,14 @@ def file_sha256(path):
     return digest.hexdigest()
 
 
-def write_manifest(data_path, fmt, style, reverse, raw_path, counts, eval_set, eval_lines):
+def write_manifest(data_path, fmt, style, reverse, raw_path, counts, eval_set, eval_lines, val_fraction=0.0):
     """Record how `data_path` was made; returns the manifest's path.
 
     `eval_set` is the eval file whose lines were kept out (None when nothing was excluded), `eval_lines` how many.
+    The validation file next to `data_path`, when there is one, is recorded too (`val_fraction` is what was asked for).
     """
+    val = val_path(data_path)
+    has_val = os.path.exists(val)
     meta = {
         "format": fmt,
         "style": style,
@@ -40,6 +53,9 @@ def write_manifest(data_path, fmt, style, reverse, raw_path, counts, eval_set, e
         "raw_sha256": file_sha256(raw_path),
         "data_sha256": file_sha256(data_path),
         "counts": counts,
+        "val_fraction": val_fraction,
+        "val_rows": _count_rows(val) if has_val else 0,
+        "val_sha256": file_sha256(val) if has_val else None,
         "eval_set": os.path.basename(eval_set) if eval_set else None,
         "eval_lines_excluded_from": eval_lines if eval_set else 0,
         "created": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -51,11 +67,13 @@ def write_manifest(data_path, fmt, style, reverse, raw_path, counts, eval_set, e
 
 
 def remove_manifest(data_path):
-    """Delete a manifest that belongs to an older version of the data file (preprocess is about to rewrite it)."""
-    try:
-        os.remove(manifest_path(data_path))
-    except FileNotFoundError:
-        pass
+    """Delete the manifest and the validation file that belong to an older version of the data file (preprocess is about
+    to rewrite them; a failed run must leave neither behind)."""
+    for path in (manifest_path(data_path), val_path(data_path)):
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
 
 
 def read_manifest(path):
@@ -82,4 +100,21 @@ def require_for_style(data_path, style):
         raise ManifestError(f"{data_path} not found: run the Preprocessing stage (preprocess.py) first") from None
     if not unchanged:
         raise ManifestError(f"{data_path} has changed since preprocess.py wrote it; run the Preprocessing stage again")
+    _require_validation(data_path, meta)
     return meta
+
+
+def _require_validation(data_path, meta):
+    """LLaMA-Factory validates on the validation file (`eval_dataset`): it must exist, hold rows and be unchanged."""
+    val = val_path(data_path)
+    if not meta.get("val_rows"):
+        raise ManifestError(
+            f"{data_path} has no validation rows ({val} is empty or was never written); "
+            "run the Preprocessing stage with --format pair (a --val-fraction above 0)"
+        )
+    try:
+        unchanged = meta.get("val_sha256") == file_sha256(val)
+    except FileNotFoundError:
+        raise ManifestError(f"validation file {val} not found: run the Preprocessing stage (preprocess.py) first") from None
+    if not unchanged:
+        raise ManifestError(f"validation file {val} has changed since preprocess.py wrote it; run the Preprocessing stage again")

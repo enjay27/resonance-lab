@@ -15,8 +15,8 @@ eval lines may be in the training data, unchecked** ([`first-training-run`](.mem
 [`reference/training-examples.md`](.memory/reference/training-examples.md). Old BLEU/chrF numbers invalid ([`old-eval-numbers`](.memory/active-issues/old-eval-numbers.md)).
 
 **Worked in this order** ([`pipeline-review-2026-10-01.md`](.memory/roadmap/pipeline-review-2026-10-01.md), one PR at a time): data safety
-(eval-overlap exclusion **done** — every score above must be re-measured after a retrain; sidecar manifest **done** — re-run Preprocessing before
-training, old data has none; next: pair/time split, validate vs preprocess, Fetch Data) -> run identity -> MLflow on the NAS ([`mlflow-plan.md`](.memory/roadmap/mlflow-plan.md), revised
+(eval-overlap exclusion **done** — every score above must be re-measured after a retrain; sidecar manifest **done** and validation split **done** — re-run Preprocessing before
+training, old data has neither, eval-loss is not comparable with old runs; next: validate vs preprocess, Fetch Data) -> run identity -> MLflow on the NAS ([`mlflow-plan.md`](.memory/roadmap/mlflow-plan.md), revised
 with the maintainer's decisions) -> eval upgrades -> model changes. Index of what comes next: [`roadmap/next.md`](.memory/roadmap/next.md).
 
 **Model part never runs in a cloud session** (no GPU): every model stage is NOT VERIFIED —
