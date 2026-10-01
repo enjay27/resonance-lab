@@ -16,8 +16,8 @@ contract: [`stream-contract.md`](.memory/active-issues/stream-contract.md).
 ([`old-eval-numbers.md`](.memory/active-issues/old-eval-numbers.md)). Hy-MT2 profiles `hy-mt2-1.8b|7b` exist, templates verified
 on the real tokenizers; zero-shot 1.8B chrF 39.3 vs shipped TG-4B 41.7, Hy needs the instruction prompt
 ([`zero-shot-results`](.memory/roadmap/zero-shot-results-2026-10-01.md)). Training examples per model:
-[`reference/training-examples.md`](.memory/reference/training-examples.md). **Open: `[P0]` rule**, `-fast` run + eval reports, Hy-7B. First run (hy-mt2-1.8b, 25 min, eval 0.69 vs train 0.15 = overfit):
-[`first-training-run`](.memory/roadmap/first-training-run-2026-10-01.md). Next: [`roadmap/next.md`](.memory/roadmap/next.md).
+[`reference/training-examples.md`](.memory/reference/training-examples.md). **Open: `[P0]` rule**, `-fast` run + eval reports, Hy-7B. First runs: base 25 min chrF 66.7, `-fast` 4.6 min chrF 59.3 (shipped TG-4B 41.7) — **probably inflated: eval lines may be in
+the training data, unchecked**: [`first-training-run`](.memory/roadmap/first-training-run-2026-10-01.md). Next: [`roadmap/next.md`](.memory/roadmap/next.md).
 
 **Selecting a model:** `--model <profile>` on every llamafactory script and `run_pipeline.py` (parameter > `RESONANCE_LF_PROFILE`
 > default `translategemma-4b`); `<model>-fast` profiles (packing + Liger + bigger batch) are never run yet.
