@@ -40,8 +40,17 @@ def service(compose):
     return compose["services"]["postgres"]
 
 
-def test_the_image_is_postgres_18_pinned_to_its_major_version(service):
-    assert re.fullmatch(r"postgres:18(\.\d+)?-alpine", service["image"])  # 18-alpine = the newest 18.x; 18.N-alpine pins a minor
+def test_the_image_is_postgres_18_pinned_to_its_major_version_with_the_init_script_baked_in(service):
+    dockerfile = _text("deploy", "postgres", "Dockerfile")
+
+    assert service["build"] == "."
+    assert service["image"] == "resonance-postgres:18"
+    assert re.search(r"(?m)^FROM postgres:18(\.\d+)?-alpine\s*$", dockerfile)  # 18-alpine = the newest 18.x; 18.N-alpine pins a minor
+    assert "COPY initdb/ /docker-entrypoint-initdb.d/" in dockerfile
+    # Copied into the image, not bind-mounted: a folder on the NAS has the NAS's permissions, which the postgres user (70) may
+    # not be allowed to read ("ls: can't open '/docker-entrypoint-initdb.d/': Permission denied"), and the init would be skipped.
+    assert re.search(r"RUN chmod -R a\+rX /docker-entrypoint-initdb\.d", dockerfile)
+    assert "latest" not in dockerfile
 
 
 def test_the_database_is_never_published_on_the_lan(compose, service):
@@ -55,7 +64,8 @@ def test_the_database_is_never_published_on_the_lan(compose, service):
 def test_the_container_is_unprivileged_read_only_and_limited(service):
     assert service["user"] == "70:70"  # the image's own postgres user: no root start, no chown, no capabilities
     assert service["read_only"] is True
-    assert set(service["tmpfs"]) == {"/tmp", "/run/postgresql"}
+    # /run/postgresql is owned by the postgres user: the image's entrypoint chmods it, which root-owned tmpfs refuses to user 70
+    assert set(service["tmpfs"]) == {"/tmp", "/run/postgresql:uid=70,gid=70,mode=1777"}
     assert service["cap_drop"] == ["ALL"] and "cap_add" not in service
     assert "no-new-privileges:true" in service["security_opt"]
     assert service.get("privileged") is not True
@@ -63,14 +73,13 @@ def test_the_container_is_unprivileged_read_only_and_limited(service):
     assert service["restart"] == "unless-stopped"
 
 
-def test_the_data_is_a_named_volume_and_the_init_script_is_read_only(compose, service):
+def test_the_data_is_a_named_volume_and_nothing_is_bind_mounted(compose, service):
     mounts = service["volumes"]
 
     # A named volume keeps the image's postgres ownership. Since 18 the image keeps its data in /var/lib/postgresql/18/docker:
     # the volume goes on /var/lib/postgresql (a mount on .../data would be a second, anonymous volume).
     assert "resonance-postgres-data:/var/lib/postgresql" in mounts
-    assert "./initdb:/docker-entrypoint-initdb.d:ro" in mounts
-    assert all(not str(v).startswith("/") for v in mounts)  # no host path, no docker.sock
+    assert mounts == ["resonance-postgres-data:/var/lib/postgresql"]  # no host path, no docker.sock
     assert "resonance-postgres-data" in compose["volumes"]
 
 

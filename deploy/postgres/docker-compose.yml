@@ -6,7 +6,8 @@ name: resonance-postgres
 
 services:
   postgres:
-    image: postgres:18-alpine
+    build: .
+    image: resonance-postgres:18
     container_name: resonance-postgres
     restart: unless-stopped
 
@@ -30,7 +31,6 @@ services:
       # A named volume keeps the image's own ownership (postgres, 70), so no root start and no capabilities are needed.
       # Postgres 18+ images keep the data in /var/lib/postgresql/18/docker: mount the parent, never .../data.
       - resonance-postgres-data:/var/lib/postgresql
-      - ./initdb:/docker-entrypoint-initdb.d:ro
 
     networks:
       - resonance-db
@@ -40,7 +40,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp
-      - /run/postgresql
+      - /run/postgresql:uid=70,gid=70,mode=1777 # the image's entrypoint chmods it as user 70
     cap_drop:
       - ALL
     security_opt:
