@@ -12,12 +12,12 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config import EVAL_DATASET_PATH, EVAL_OUTPUT_DIR
 from eval_metrics import comet_score, evaluate, format_report, load_eval_dataset, strip_think
-from lf_tools import add_model_argument, chat_messages, generate_inputs, load_profile, model_name, training_prompt, with_bos
+from lf_tools import add_model_argument, chat_messages, generate_inputs, load_profile, model_name, training_prompt, training_user_text, with_bos
 
 PROMPTS = {
     "chat-template": "the model's own documented prompt through its chat template (TranslateGemma: language codes -> long "
     "English prompt, what resonance-stream sends today; Hy-MT2: its English 'Translate the following text into Korean')",
-    "training": "the raw line in the training turn format -- exactly what fine-tuning saw",
+    "training": "the line behind the template's instruction, in the training turn format -- what `preprocess.py --prompt auto` trains on",
 }
 
 
@@ -51,7 +51,7 @@ def main(argv=None):
 
     def encode(jp_text):
         if args.prompt == "training":
-            ids = with_bos(tokenizer(training_prompt(profile.template, jp_text))["input_ids"], tokenizer.bos_token_id)
+            ids = with_bos(tokenizer(training_prompt(profile.template, training_user_text(profile.template, jp_text)))["input_ids"], tokenizer.bos_token_id)
             return {"input_ids": torch.tensor([ids]).to("cuda"), "attention_mask": torch.ones(1, len(ids), dtype=torch.long).to("cuda")}
         return generate_inputs(tokenizer.apply_chat_template(
             chat_messages(profile.template, jp_text),

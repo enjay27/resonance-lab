@@ -28,7 +28,7 @@ PIPELINES = {
     # RESONANCE_LF_PROFILE picks it). Ends in a q4_k_m GGUF for resonance-stream.
     "llamafactory": [
         Stage("Validate", _script("validate.py")),
-        Stage("Preprocessing", _script("preprocess.py"), ("--format", "pair")),
+        Stage("Preprocessing", _script("preprocess.py"), ("--format", "pair", "--prompt", "auto")),
         Stage("Update Dataset", _script("llamafactory", "update_dataset_info.py")),
         Stage("Fine-Tuning", _script("llamafactory", "train.py")),
         Stage("Merge LoRA", _script("llamafactory", "merge.py")),

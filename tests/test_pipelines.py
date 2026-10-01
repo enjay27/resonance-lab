@@ -54,7 +54,7 @@ def test_llamafactory_runs_merge_before_gguf_export_and_evaluates_last():
 
 def test_llamafactory_preprocesses_into_the_pair_layout():
     preprocessing = next(s for s in pipelines.stages("llamafactory") if s.name == "Preprocessing")
-    assert preprocessing.args == ("--format", "pair")
+    assert preprocessing.args == ("--format", "pair", "--prompt", "auto")
 
 
 def test_unsloth_keeps_the_default_instruction_layout():
