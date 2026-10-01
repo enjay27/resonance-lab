@@ -1,0 +1,15 @@
+# Tool config only -- resonance-lab is a set of scripts, not an installable package.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Tests import the scripts as modules: `import preprocess`, `from config import ...`.
+pythonpath = [".", "scripts"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+extend-exclude = ["llama.cpp", "unsloth_compiled_cache"]
+
+[tool.ruff.lint]
+# pyflakes + import errors only for now; `ruff format` is not enforced yet (see CLAUDE.md).
+select = ["E9", "F"]
