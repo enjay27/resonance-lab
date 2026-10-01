@@ -45,6 +45,8 @@ deploy/mlflow/.env
 .env.mlflow
 .run.result.backup.json
 .run.result.backup.files/
+.run.result.backup.json.tmp
+.run.result.backup.json.corrupt-*
 
 # --- [GITHUB TEMPLATE] Byte-compiled / optimized / DLL files ---
 __pycache__/

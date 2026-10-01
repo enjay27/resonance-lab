@@ -210,7 +210,7 @@ def _log(*rows):
     return [json.dumps(r) for r in rows] + ["", "{broken"]
 
 
-def test_step_metrics_become_timestamped_points_from_the_trainer_log():
+def test_step_metrics_become_points_in_mlflows_order_from_the_trainer_log():
     lines = _log(
         {"current_steps": 1, "total_steps": 1605, "loss": 2.5, "lr": 1e-05, "epoch": 0.002, "elapsed_time": "0:00:01"},
         {"current_steps": 100, "total_steps": 1605, "eval_loss": 0.9, "epoch": 0.19, "elapsed_time": "0:01:35"},
@@ -218,8 +218,9 @@ def test_step_metrics_become_timestamped_points_from_the_trainer_log():
 
     points = tracking.step_metrics(lines, start_ms=1_000_000)
 
-    assert ("loss", 2.5, 1, 1_001_000) in points and ("learning_rate", 1e-05, 1, 1_001_000) in points and ("epoch", 0.002, 1, 1_001_000) in points
-    assert ("eval_loss", 0.9, 100, 1_095_000) in points
+    # (name, value, timestamp_ms, step): MLflow's own order
+    assert ("loss", 2.5, 1_001_000, 1) in points and ("learning_rate", 1e-05, 1_001_000, 1) in points and ("epoch", 0.002, 1_001_000, 1) in points
+    assert ("eval_loss", 0.9, 1_095_000, 100) in points
 
 
 def test_step_metrics_skip_non_numbers_and_unreadable_lines():
@@ -227,7 +228,7 @@ def test_step_metrics_skip_non_numbers_and_unreadable_lines():
 
     points = tracking.step_metrics(lines, start_ms=5)
 
-    assert points == [("loss", 1.0, 6, 5)]
+    assert points == [("loss", 1.0, 5, 6)]  # the run's start as the time (no elapsed_time), step 6
     assert not any(math.isnan(p[1]) for p in points)
 
 

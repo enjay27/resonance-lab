@@ -66,3 +66,7 @@ HF_DATA_DIR = os.path.join(BASE_DIR, "data", "hf")
 # --- Experiment tracking (tracking.py) ---
 # The NAS server's URL and credentials: gitignored, see .env.mlflow.example and deploy/mlflow/README.md.
 MLFLOW_ENV_FILE = os.path.join(BASE_DIR, ".env.mlflow")
+
+# The local queue of runs not yet sent to the MLflow server (run_queue.py): gitignored, written before anything is sent.
+RUN_QUEUE_PATH = os.path.join(BASE_DIR, ".run.result.backup.json")
+RUN_QUEUE_FILES = os.path.join(BASE_DIR, ".run.result.backup.files")  # the small files (reports, trainer log) of queued runs
