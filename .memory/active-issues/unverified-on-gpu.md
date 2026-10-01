@@ -19,3 +19,8 @@ Code or config changed in a session without CUDA. Delete an item once it has run
   `llamafactory-cli` accepts the profile yaml from the repo root, that `dataset_info.json`
   is found (`data/`), `flash_attn: fa2` installs, and that `gguf.py` finds `llama-quantize`.
   `requirements-llamafactory.txt` leaves `llamafactory` unpinned — pin what you trained with.
+- **`watch_training.py` (2026-10-01, `claude/training-monitor`):** state/render unit-tested; `main`
+  ran here against fake logs only. On a real run check that LLaMA-Factory's `trainer_log.jsonl`
+  really has `current_steps` / `loss` / `epoch` / `eval_loss` (the branch's monitor assumed so),
+  that `train_stdout.log` carries the `'grad_norm'` dict lines and the tqdm bar, and that
+  `nvidia-smi` is on the PATH.

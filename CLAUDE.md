@@ -20,7 +20,7 @@ most important thing on this page.
 
 | tree | part | runs on | gate |
 |---|---|---|---|
-| `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
+| `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
 | `scripts/unsloth/train.py` `scripts/unsloth/eval.py` `scripts/unsloth/fix_metadata.py` `scripts/llamafactory/train.py` `merge.py` `gguf.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements-<pipeline>.txt`) | none automated — a manual run, reported |
 
 `just check` needs only `requirements-dev.txt` (`pip install -r requirements-dev.txt`;
@@ -44,7 +44,7 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
 ## Tech Stack
 
 - **Python 3.13** (README; CI runs the data gate on 3.13). Windows for the model part.
-- **Gate dev deps** (`requirements-dev.txt`): pytest, ruff, pyyaml (reads the profile yaml files).
+- **Gate dev deps** (`requirements-dev.txt`): pytest, ruff, pyyaml (profile yaml files), rich (the monitor).
 - **`llamafactory` pipeline** (`requirements-llamafactory.txt`): LLaMA-Factory SFT + LoRA; profile
   `translategemma-4b` = `google/translategemma-4b-it`, template `gemma3`, dataset `bp_translation`
   (user turn = the raw Japanese line only, no system prompt), `cutoff_len` 128, LoRA r=32.
@@ -85,6 +85,7 @@ scripts/
     train.py              model: `llamafactory-cli train`, output -> outputs/train_stdout.log
     merge.py              model: `llamafactory-cli export` (adapter -> full model)
     gguf.py               model: convert to F16 GGUF, quantize to q4_k_m -> model_gguf/
+    watch_training.py     data: live training monitor (`rich`); TrainingState parses the two logs, tested
 configs/llamafactory/<profile>/   train.yaml + merge.yaml per model (tests check they agree)
 tests/                pytest for the data part; conftest.py has the JSONL fixtures
 data/raw/ data/processed/   stage inputs/outputs (config.py paths) -- GITIGNORED

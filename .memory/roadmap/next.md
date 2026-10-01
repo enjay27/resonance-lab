@@ -26,9 +26,12 @@
      (`processed/lora_train_data.jsonl`) — the branch pointed at a hand-made
      `raw/bp-training-dataset-final.jsonl`; the unused with-system dataset and the system
      prompt file are dropped (training is system-less); GGUF names `bp-<profile>-*.gguf`.
-   - **C2 — training monitor:** `rich` replacement for the curses `watch_training.py`
-     (helpers `classify_loss`/`classify_grad` tested); follows `outputs/train_stdout.log`
-     and LLaMA-Factory's `trainer_log.jsonl`.
+   - **C2 — training monitor (done):** `rich` replacement for the curses `watch_training.py`
+     `scripts/llamafactory/watch_training.py`; `TrainingState` (pure, tested) follows
+     `outputs/train_stdout.log` and `<adapter dir>/trainer_log.jsonl`. Changed from the branch:
+     tok/s uses batch x accumulation x cutoff from the yaml (the branch hard-coded 8 x 256,
+     but cutoff is 128); only JSON errors are swallowed (the branch had a bare `except`);
+     Ctrl+C instead of `q`; needs a ~110-column terminal.
    - **D — shared eval metrics:** chrF, COMET, JP leakage, think leakage, term accuracy
      (`TERM_DICT`) as a tested module both pipelines' `eval.py` use, so numbers compare.
    Not decided yet: eval stage for `llamafactory` sits after Merge LoRA (D).

@@ -12,3 +12,6 @@ llamafactory
 
 # Used by the eval stage (chrF); COMET etc. arrive with the shared eval metrics.
 sacrebleu
+
+# The training monitor (scripts/llamafactory/watch_training.py): OS-neutral terminal UI.
+rich
