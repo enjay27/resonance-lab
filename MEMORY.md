@@ -14,8 +14,10 @@ profiles exist. Eval: zero-shot Hy-1.8B chrF 39.3, fine-tuned base 66.7 (25 min)
 eval lines may be in the training data, unchecked** ([`first-training-run`](.memory/roadmap/first-training-run-2026-10-01.md)). Training examples:
 [`reference/training-examples.md`](.memory/reference/training-examples.md). Old BLEU/chrF numbers invalid ([`old-eval-numbers`](.memory/active-issues/old-eval-numbers.md)).
 
-**Next session starts at** [`roadmap/next.md`](.memory/roadmap/next.md): leak check + fixes, then the MLflow plan
-([`mlflow-plan.md`](.memory/roadmap/mlflow-plan.md); plan only, nothing built).
+**Worked in this order** ([`pipeline-review-2026-10-01.md`](.memory/roadmap/pipeline-review-2026-10-01.md), one PR at a time): data safety
+(eval-overlap exclusion **done** — `preprocess.py` drops eval lines, so every score above must be re-measured after a retrain; next: sidecar manifest,
+pair/time split, validate vs preprocess, Fetch Data) -> run identity -> MLflow on the NAS ([`mlflow-plan.md`](.memory/roadmap/mlflow-plan.md), revised
+with the maintainer's decisions) -> eval upgrades -> model changes. Index of what comes next: [`roadmap/next.md`](.memory/roadmap/next.md).
 
 **Model part never runs in a cloud session** (no GPU): every model stage is NOT VERIFIED —
 [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md). Auto-merge of `claude/*` PRs works.

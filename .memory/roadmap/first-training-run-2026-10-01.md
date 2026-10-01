@@ -34,7 +34,7 @@ Eval loss, base profile (validation split, 226 rows): 0.897@100 → 0.728@500 �
 boundary) → 0.69 flat to 0.6926@1600. So the 3rd epoch adds nothing; ~2 epochs is enough. `-fast` has **no eval-loss rows**: its `eval_steps`/`save_steps`
 (100) exceed its ~90 steps — a mistake in the profile, to fix (scale them to the step count).
 
-## Caution — probable train/eval overlap (unchecked)
+## Caution — probable train/eval overlap (unchecked; `preprocess.py` now excludes eval lines, so retrain before trusting any number)
 The held-out validation loss is poor (0.67–0.70) yet the eval set scores chrF 66.7 with exact matches of idiosyncratic references (`ばんわ`→`존밤!`,
 `ウルト溜まった`→`궁 찼다!`, `器用特化で組んでる`→`숙련 특화로 맞추고 있어`). That pattern fits eval lines being in the training data. If so, 66.7 vs the shipped
 model's 41.7 is not a fair comparison (the shipped TG-4B was trained on older data). Check: do the eval originals occur in `lora_train_data.jsonl`? If yes: exclude

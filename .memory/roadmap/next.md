@@ -1,5 +1,9 @@
 # Next — candidates, in order
 
+## Worked in this order (2026-10-01, maintainer approved): [`pipeline-review-2026-10-01.md`](pipeline-review-2026-10-01.md)
+Data safety (eval-overlap exclusion **done**; sidecar manifest, pair/time split, validate vs preprocess, Fetch Data) -> run identity (unique adapter
+dir, per-run log, `--from/--only`) -> MLflow PRs (revised in `mlflow-plan.md`) -> eval upgrades -> model changes. The two items below are inside it.
+
 ## Start here in the next session (maintainer, 2026-10-01: "I'll start from a new session")
 1. **Leak check + fixes** (small): are eval originals in `lora_train_data.jsonl`? (`roadmap/first-training-run-2026-10-01.md` §Caution); `-fast`
    profiles' `eval_steps`/`save_steps`; the base profile needs ~2 epochs. Details: that file.

@@ -2,6 +2,10 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **`preprocess.py` eval exclusion (2026-10-01, `claude/relaxed-pascal-xjeh11`):** unit-tested (`tests/test_overlap.py`, `test_preprocess.py`); not run on the real
+  raw log. Run `preprocess.py` once and read the `eval overlap` / `eval overlap (near)` counts: they are the size of the leak. Then retrain
+  and re-run `eval.py` (every earlier score is on contaminated data). Near matches use difflib ratio >=0.9 on lines of >=10 normalised characters.
+
 - **`run_pipeline.py` after `claude/align-project-structure-s21g7q` (2026-10-01):** lint
   removed an unused `shutil` import and the unused `result =` in `run_step` — no
   behaviour change, but never run since. `validate.py` raises its own `ValidationError`
