@@ -1,6 +1,10 @@
 # resonance-lab
 Python project for Resonance Stream, which generate output for translator model, based from Qwen 3 1.7B
 
+## Development
+- Rules, gates and layout: [`CLAUDE.md`](CLAUDE.md); current state: [`MEMORY.md`](MEMORY.md)
+- `pip install -r requirements-dev.txt` then `just check` (lint + data-stage tests, CPU only)
+
 ## Prerequisites
 - Python 3.13
 - Windows OS (Linux not tested yet)

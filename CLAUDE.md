@@ -1,0 +1,182 @@
+# Agent Operating Rules — resonance-lab
+
+resonance-lab fine-tunes the translator model of
+[resonance-stream](https://github.com/enjay27/resonance-stream): Japanese Blue Protocol:
+Star Resonance chat → natural Korean. Base model Qwen3 1.7B, LoRA with unsloth, merged to
+F16, converted to GGUF `q4_k_m` for resonance-stream's llama.cpp server.
+
+The repo is two parts. **Which part you touch decides which gate applies.** That is the
+most important thing on this page.
+
+| tree | part | runs on | gate |
+|---|---|---|---|
+| `scripts/validate.py` `scripts/preprocess.py` `scripts/split_dataset.py` `config.py` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
+| `scripts/train.py` `scripts/eval.py` `scripts/fix_metadata.py` `run_pipeline.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements.txt`) | none automated — a manual run, reported |
+
+`just check` needs only `requirements-dev.txt` (`pip install -r requirements-dev.txt`;
+`pip install rust-just` for `just`). CI (`.github/workflows/ci.yml`) runs it on Linux on
+every push to `main` and every PR. The model part never runs in CI or in a cloud session:
+no GPU, and torch/unsloth are not installed there.
+
+**New pure logic goes in the data part**, where it is tested on every OS. Model-part
+scripts run at import time (no `main()`); keep anything worth testing out of them.
+
+**The model is consumed by resonance-stream.** Its prompt format is pinned there
+(`crates/core/src/text.rs`, `translation_prompt`), and its training data comes from there
+(`dataset_<CHANNEL>.jsonl`: `pid`, `original`, `translated` — `null` when untranslated,
+`timestamp`). A change to the prompt, the chat template or the expected fields is a
+change to both repos — see `.memory/active-issues/stream-contract.md`.
+
+---
+
+## Tech Stack
+
+- **Python 3.13** (README; CI runs the data gate on 3.13). Windows for the model part.
+- **Training:** unsloth (pinned commit), transformers, peft, trl, bitsandbytes 4-bit,
+  torch 2.10 + CUDA 12.6 (`requirements.txt`; `triton-windows`).
+- **Base model:** `rd211/Qwen3-1.7B-Instruct` (`config.py`). LoRA r=64, alpha=128.
+- **Conversion:** llama.cpp `convert_hf_to_gguf.py` → `llama-quantize q4_k_m` (README).
+- **Gate tooling:** pytest, ruff (`pyproject.toml`), `just`.
+
+---
+
+## Repository Layout
+
+```
+.claude/              graft wiring (hooks, helpers), skills/: graft, workflow-control
+.memory/              working memory; see .memory/README.md
+.github/workflows/    CI (data gate) + auto-merge
+justfile              the gates as commands
+config.py             every path and hyper-parameter; INSTRUCTION (system prompt)
+run_pipeline.py       runs the stages below in order, stops at the first failure
+scripts/
+  validate.py           data: raw logs -- no Hangeul in `original` (ValidationError)
+  preprocess.py         data: raw {original, translated} -> {instruction, input, output}
+  split_dataset.py      data: dedup by input, shuffle (seed 42), train/val -> lora_dataset/
+  train.py              model: LoRA fine-tune (unsloth), merge -> model_f16/
+  fix_metadata.py       model: drop `score.weight` -> model_f16_clean/
+  eval.py               model: translate fixed test lines with model_f16_clean/
+tests/                pytest for the data part; conftest.py has the JSONL fixtures
+data/raw/ data/processed/   stage inputs/outputs (config.py paths) -- GITIGNORED
+graft/                graft's generated cards -- GITIGNORED, regenerable (`graft build`)
+```
+
+Model and dataset outputs (`lora_dataset/`, `model_f16*/`, `outputs/`, `*.gguf`,
+`*.safetensors`, `llama.cpp/`) are gitignored. Never commit them.
+
+---
+
+## Using graft (the repo is indexed)
+
+Reach for graft before grep/read — see `.claude/skills/graft/SKILL.md`.
+
+- **Before moving, renaming or splitting a symbol:** `graft callers <sym> --depth all`.
+  Editing the primary file and stopping is the classic miss. `config.py` constants are
+  imported by name from every script — `graft grep "<NAME>"` before renaming one.
+- `graft skeleton <file>` before reading a large file whole.
+- After structural changes graft rebuilds via the PostToolUse hook; `graft build` if stale.
+
+---
+
+## Conventions
+
+- **Paths and hyper-parameters live in `config.py`**, built from `BASE_DIR`. A script
+  never hardcodes a path; it imports it.
+- **A stage that fails exits non-zero** (`sys.exit(1)` or an exception) — that is how
+  `run_pipeline.py` stops. A stage that only prints an error lets the pipeline continue
+  on bad data.
+- **Scripts import `config` via `sys.path.append(<repo root>)`**; tests get the same
+  through `pyproject.toml` (`pythonpath = [".", "scripts"]`) and import scripts as
+  modules (`import preprocess`).
+- JSONL is read and written as UTF-8 with `ensure_ascii=False`.
+
+## Guardrails
+
+- **Plan first.** Do not modify scripts, config, manifests or CI on the first turn of a
+  task. Present an impact analysis (graft `callers` output is the evidence) and wait for
+  explicit confirmation. See `.claude/skills/workflow-control/SKILL.md`.
+- **Refactors do not change behaviour.** A move/split commit changes no logic, no
+  hyper-parameter, no prompt and no file format. Changing `INSTRUCTION`, the chat
+  template or a training hyper-parameter changes the model — that is a feature, with its
+  own PR and an eval run.
+- **Zero hardcoded credentials.** No HF tokens or keys in committed files.
+- **No data or weights in git.** Chat logs are players' messages; they stay local.
+  Test fixtures are short, made-up lines.
+- **TDD for every task flow.** Test first: write the failing unit test that pins the
+  wanted behaviour, run it and see it fail for the right reason, then write the code that
+  makes it pass, then refactor with the tests green. A bug fix starts with a test that
+  reproduces the bug. If a change cannot be unit-tested (GPU / model code), say so in the
+  commit body.
+- **Auto-correction restraint.** Self-correct at most **2** times, then stop and ask.
+- **Never report a gate as passed when it could not run.** A cloud session cannot train
+  or evaluate; say so (`NOT VERIFIED: ...`).
+
+---
+
+## Definition of Done
+
+0. **Test first.** New behaviour or a bug fix has its failing unit test before its code.
+1. **Run the gate for every part touched** (table above): `just check`.
+2. **Model-part changes need a manual run** on the Windows/CUDA machine (the affected
+   stage, plus `eval.py` when the model changes); say in the commit body whether it was
+   done, or `NOT VERIFIED: model part -- no GPU in this session`.
+3. **Record the outcome in the memory tree.** `MEMORY.md` is an index under ~40 lines —
+   update its *Now* section. Detail goes in `.memory/` (see its README).
+4. **Push the branch and open the PR** — see *Version Control*; CI merges it when green.
+
+---
+
+## Version Control
+
+**One task, one branch, one PR.** Claude runs the whole flow without being asked.
+
+1. **Start.** Every new task gets its own branch from an up-to-date `main`:
+   `git checkout main && git pull && git checkout -b claude/<short-task-name>`.
+   Never commit to `main`. A follow-up to a merged task is a new task: new branch.
+2. **During the task, commit freely** -- as many local commits as help. Unpushed history may
+   be tidied (`git commit --amend`, or `git reset --soft <base>` + one commit to squash).
+   Never rewrite history that is already pushed.
+3. **Finish = test, then push.** When the task is done, run the gate for every part
+   touched and fix failures. Only a green local gate is pushed:
+   `git push -u origin claude/<name>`. A check that could not run here is named in the
+   last commit body (`NOT VERIFIED: train.py -- no GPU in this session`) and left to a
+   manual run.
+4. **Open the PR** against `main` (check for a PR template first). Do not merge it by
+   hand: `.github/workflows/auto-merge.yml` merges it and deletes its `claude/*` branch
+   (never any other branch) once the CI workflow passes on the PR's latest commit. If CI
+   fails, fix on the same branch and push again -- the run for the new commit decides.
+   Never skip, disable or edit a test/gate to get green.
+
+### Several tasks in one session
+
+1. **One PR at a time, in order.** Finish a task (gate green, pushed), open its PR, then
+   **wait until the PR is merged**. Do not start the next task, or push anything for it,
+   before that.
+2. **CI failed?** Fix it first, on the same branch, and push again. Retry until the PR
+   merges; if a failure is not this PR's (red on `main` too), say so on the PR.
+3. **Before the next task, check it is really done:** the PR is closed as *merged* and its
+   `claude/*` branch is gone. Then start from `main` again: `git fetch origin main &&
+   git checkout -B claude/<next> origin/main`. A later task never stacks on an unmerged one.
+4. Waiting is done with the PR event subscription (`subscribe_pr_activity`) and a
+   check-in (`send_later`), not with `sleep` loops. Update `MEMORY.md` in each task's own
+   branch, so a merged task never leaves the index behind.
+
+```bash
+git status            # check BEFORE -A, never after
+git add -A && git commit
+```
+
+- **Commit subject states the point of the change**, not the files touched
+  (`Data stages are unit-tested on any OS`, not `add tests`). The body says what
+  changed, why, and **what is verified vs open**.
+- `MEMORY.md` and `.memory/` updates go in the branch, before the push.
+- **Claude never commits work it did not do.** Pre-existing changes stay untouched.
+- Only `claude/*` branches auto-merge. `workflow_run` workflows are read from `main`, so a
+  change to `auto-merge.yml` itself takes effect after it has been merged once.
+
+### Never commit
+- Secrets, `.env`, HF tokens.
+- Chat logs and datasets (`data/**`, `lora_dataset/`), weights (`*.safetensors`,
+  `*.gguf`, `model_f16*/`, `outputs/`), `llama.cpp/`, `unsloth_compiled_cache/`.
+- `graft/` (regenerable), `__pycache__/`, virtualenvs, IDE folders.
+- A half-applied tree "to save progress". Use a branch.
