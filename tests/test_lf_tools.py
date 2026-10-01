@@ -373,3 +373,37 @@ def test_no_llamafactory_script_reads_the_profile_from_config_directly():
         if name.endswith(".py") and name != "lf_tools.py":
             with open(os.path.join(folder, name), encoding="utf-8") as f:
                 assert "LF_PROFILE" not in f.read(), name
+
+
+# --- "-fast" profiles: the same model and recipe, only the speed settings differ --------------------
+
+FAST_PAIRS = [("translategemma-4b", "translategemma-4b-fast"), ("hy-mt2-1.8b", "hy-mt2-1.8b-fast"), ("hy-mt2-7b", "hy-mt2-7b-fast")]
+# What a fast profile may change: where it writes, and throughput (batch shape, packing, kernels, attention).
+FAST_MAY_DIFFER = {
+    "output_dir", "per_device_train_batch_size", "gradient_accumulation_steps", "gradient_checkpointing",
+    "packing", "neat_packing", "enable_liger_kernel", "flash_attn", "eval_steps", "save_steps",
+}
+
+
+@pytest.mark.parametrize("base,fast", FAST_PAIRS)
+def test_fast_profile_changes_only_speed_settings(base, fast):
+    b, f = (read_yaml(lf_tools.load_profile(n).train_yaml) for n in (base, fast))
+
+    changed = {k for k in b.keys() | f.keys() if b.get(k) != f.get(k)}
+
+    assert changed <= FAST_MAY_DIFFER, changed - FAST_MAY_DIFFER
+    assert f["packing"] is True and f["enable_liger_kernel"] is True
+    for key in ("model_name_or_path", "template", "dataset", "cutoff_len", "learning_rate", "num_train_epochs", "lora_rank"):
+        assert f[key] == b[key]
+
+
+@pytest.mark.parametrize("base,fast", FAST_PAIRS)
+def test_fast_profile_keeps_the_effective_batch_and_has_its_own_dirs(base, fast):
+    pb, pf = lf_tools.load_profile(base), lf_tools.load_profile(fast)
+    b, f = read_yaml(pb.train_yaml), read_yaml(pf.train_yaml)
+
+    eff = lambda y: y["per_device_train_batch_size"] * y["gradient_accumulation_steps"]  # noqa: E731
+    assert eff(f) >= eff(b)
+    assert pf.base_model == pb.base_model and pf.template == pb.template
+    assert pf.adapter_dir != pb.adapter_dir and pf.merged_dir != pb.merged_dir
+    assert read_yaml(pf.merge_yaml)["adapter_name_or_path"] == f["output_dir"]

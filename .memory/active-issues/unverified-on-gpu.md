@@ -50,3 +50,8 @@ Code or config changed in a session without CUDA. Delete an item once it has run
   5. Recommended sampling (README): temperature 0.7, top_p 0.6, top_k 20, repetition_penalty 1.05;
      `eval.py` uses greedy — fine for comparison, note it.
 - **`--model` parameter (2026-10-01):** parsing and precedence are unit-tested and the error paths ran here; train/eval/inspect/watch with a real model not run. `inspect_template.py`'s old `--model` (tokenizer id) is now `--tokenizer`.
+- **`*-fast` profiles (2026-10-01):** `translategemma-4b-fast`, `hy-mt2-1.8b-fast`, `hy-mt2-7b-fast` = the base profile with
+  packing + Liger + a bigger batch (4B 16x2, 1.8B 32x1, 7B 8x4 with checkpointing), own output/export dirs. Never run.
+  Check: `pip install liger-kernel` (Windows needs triton-windows; else set `enable_liger_kernel: false`); `flash_attn: auto`
+  picks fa2/sdpa; the batch fits VRAM; then compare time (watch_training tok/s) and eval chrF against the base profile.
+  `python run_pipeline.py --model hy-mt2-1.8b-fast`. If fa2 works, add `neat_packing: true`.
