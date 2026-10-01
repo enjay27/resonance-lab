@@ -123,3 +123,34 @@ def test_cleaned_text_is_stripped(write_jsonl, tmp_path):
 
     assert read_jsonl(out)[0]["input"] == "おやすみ！"
     assert read_jsonl(out)[0]["output"] == "잘 자!"
+
+
+def test_pair_format_is_what_llamafactory_reads(write_jsonl, tmp_path):
+    src = write_jsonl("raw.jsonl", [{"pid": 1, "original": "遺跡1F", "translated": "유적 1F", "timestamp": 5}])
+    out = tmp_path / "out.jsonl"
+
+    preprocess.transform_for_lora(src, str(out), fmt="pair")
+
+    assert read_jsonl(out) == [{"original": "遺跡1F", "translated": "유적 1F"}]
+
+
+def test_unknown_format_is_refused_before_anything_is_written(write_jsonl, tmp_path):
+    src = write_jsonl("raw.jsonl", [{"original": "遺跡1F", "translated": "유적 1F"}])
+    out = tmp_path / "out.jsonl"
+
+    with pytest.raises(ValueError, match="instruction"):
+        preprocess.transform_for_lora(src, str(out), fmt="nope")
+    assert not out.exists()
+
+
+def test_main_takes_the_format_from_the_command_line(write_jsonl, tmp_path, monkeypatch):
+    src = write_jsonl("raw.jsonl", [{"original": "遺跡1F", "translated": "유적 1F"}])
+    out = tmp_path / "out.jsonl"
+    monkeypatch.setattr(preprocess, "RAW_LOGS", src)
+    monkeypatch.setattr(preprocess, "PROCESSED_LOGS", str(out))
+
+    preprocess.main(["--format", "pair"])
+    assert list(read_jsonl(out)[0]) == ["original", "translated"]
+
+    preprocess.main([])  # the default stays the unsloth format
+    assert list(read_jsonl(out)[0]) == ["instruction", "input", "output"]

@@ -6,7 +6,7 @@ set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-Command"]
 default: check
 
 # Every gate that runs on any OS. The model part (train/eval/fix_metadata)
-# needs CUDA and the full requirements.txt; it has no automated gate.
+# needs CUDA and its pipeline's requirements-<pipeline>.txt; it has no automated gate.
 check: lint data-check
 
 # Lint (pyflakes + syntax), whole repo. Formatting is not enforced yet.

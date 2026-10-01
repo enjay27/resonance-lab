@@ -50,3 +50,10 @@ Branch `claude/align-project-structure-s21g7q`.
 - Decisions: pipeline = backend, model profile = yaml; folder per pipeline; one
   requirements file per pipeline (trl pins conflict); monitor on `rich` instead of curses
   (OS-neutral); prompt format stays out of the registry for now.
+- Step C1 read the branch's pipeline closely and found: eval before export (eval needs the
+  merged model that export creates), `shell=True` + a Windows-only `llama-quantize.exe` path,
+  and a dataset file (`bp-training-dataset-final.jsonl`) nothing in the pipeline produces.
+  Fixed in the port, listed in `roadmap/next.md` C1.
+- Test environment trap: the sandbox's `pytest` is a uv tool with its own venv, so a dev
+  dependency (pyyaml) is invisible to it until installed there (`uv pip install --python
+  <tool venv>/bin/python ...`); CI installs `requirements-dev.txt` and is unaffected.

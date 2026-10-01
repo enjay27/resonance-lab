@@ -7,7 +7,7 @@ from config import BASE_DIR
 
 
 def stage_names(name):
-    return [stage_name for stage_name, _ in pipelines.stages(name)]
+    return [stage.name for stage in pipelines.stages(name)]
 
 
 def test_unsloth_runs_the_stages_run_pipeline_always_ran():
@@ -16,14 +16,19 @@ def test_unsloth_runs_the_stages_run_pipeline_always_ran():
 
 def test_every_stage_script_exists():
     for name in pipelines.PIPELINES:
-        for stage_name, path in pipelines.stages(name):
-            assert os.path.isfile(path), f"{name}/{stage_name}: {path} is missing"
+        for stage in pipelines.stages(name):
+            assert os.path.isfile(stage.path), f"{name}/{stage.name}: {stage.path} is missing"
 
 
 def test_stage_paths_are_absolute_and_inside_the_repo():
-    for _, path in pipelines.stages("unsloth"):
-        assert os.path.isabs(path)
-        assert path.startswith(BASE_DIR)
+    for stage in pipelines.stages("unsloth"):
+        assert os.path.isabs(stage.path)
+        assert stage.path.startswith(BASE_DIR)
+
+
+def test_a_stage_without_arguments_has_an_empty_tuple():
+    assert all(stage.args == () for stage in pipelines.stages("unsloth"))
+    assert pipelines.Stage("x", "x.py").args == ()
 
 
 def test_default_pipeline_is_registered():
@@ -33,3 +38,34 @@ def test_default_pipeline_is_registered():
 def test_unknown_pipeline_lists_the_choices():
     with pytest.raises(ValueError, match="unsloth"):
         pipelines.stages("nope")
+
+
+def test_llamafactory_runs_merge_before_gguf_export():
+    assert stage_names("llamafactory") == [
+        "Validate",
+        "Preprocessing",
+        "Update Dataset",
+        "Fine-Tuning",
+        "Merge LoRA",
+        "Export GGUF",
+    ]
+
+
+def test_llamafactory_preprocesses_into_the_pair_layout():
+    preprocessing = next(s for s in pipelines.stages("llamafactory") if s.name == "Preprocessing")
+    assert preprocessing.args == ("--format", "pair")
+
+
+def test_unsloth_keeps_the_default_instruction_layout():
+    preprocessing = next(s for s in pipelines.stages("unsloth") if s.name == "Preprocessing")
+    assert preprocessing.args == ()
+
+
+def test_llamafactory_is_the_default_pipeline():
+    assert pipelines.DEFAULT == "llamafactory"
+
+
+def test_pipelines_share_validate_and_preprocess():
+    shared = {"Validate", "Preprocessing"}
+    paths = {name: {s.name: s.path for s in pipelines.stages(name) if s.name in shared} for name in pipelines.PIPELINES}
+    assert paths["unsloth"] == paths["llamafactory"]

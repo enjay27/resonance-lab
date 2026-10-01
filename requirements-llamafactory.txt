@@ -1,0 +1,14 @@
+# --- llamafactory pipeline (scripts/llamafactory/) -- its own virtualenv ---
+# Not installable next to requirements-unsloth.txt: the stacks pin different trl/transformers.
+# Python 3.13 / CUDA 12.6, same torch index as the unsloth pipeline.
+--extra-index-url https://download.pytorch.org/whl/cu126
+
+torch==2.9.1
+torchvision==0.24.1
+torchaudio==2.9.1
+
+# Not pinned yet: pin to the version a model was trained with (`pip show llamafactory`).
+llamafactory
+
+# Used by the eval stage (chrF); COMET etc. arrive with the shared eval metrics.
+sacrebleu

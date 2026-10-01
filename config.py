@@ -17,6 +17,16 @@ MASTER_MODEL_DIR = os.path.join(BASE_DIR, "model_f16")
 CLEAN_MODEL_DIR = os.path.join(BASE_DIR, "model_f16_clean")
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
 
+# --- LLaMA-Factory pipeline (scripts/llamafactory/) ---
+# One profile = one model = configs/llamafactory/<profile>/{train,merge}.yaml.
+LF_PROFILE = os.environ.get("RESONANCE_LF_PROFILE", "translategemma-4b")
+LF_CONFIG_ROOT = os.path.join(BASE_DIR, "configs", "llamafactory")
+LF_DATASET_DIR = os.path.join(BASE_DIR, "data")  # where LLaMA-Factory looks for dataset_info.json
+LF_DATASET_INFO_PATH = os.path.join(LF_DATASET_DIR, "dataset_info.json")
+LF_DATASET_NAME = "bp_translation"
+LLAMA_CPP_DIR = os.path.join(BASE_DIR, "llama.cpp")
+GGUF_OUTPUT_DIR = os.path.join(BASE_DIR, "model_gguf")
+
 # --- Training Config ---
 MAX_SEQ_LENGTH = 512
 MAX_STEPS = 1000

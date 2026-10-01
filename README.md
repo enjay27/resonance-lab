@@ -1,17 +1,39 @@
 # resonance-lab
-Python project for Resonance Stream, which generate output for translator model, based from Qwen 3 1.7B
+Python project for Resonance Stream: fine-tunes its Japanese -> Korean translator model (pipelines: LLaMA-Factory, unsloth).
 
 ## Development
 - Rules, gates and layout: [`CLAUDE.md`](CLAUDE.md); current state: [`MEMORY.md`](MEMORY.md)
 - `pip install -r requirements-dev.txt` then `just check` (lint + data-stage tests, CPU only)
-- `python run_pipeline.py --pipeline unsloth` runs a training pipeline (`pipelines.py` lists them)
+- `python run_pipeline.py` runs a training pipeline (see *Pipelines*; `pipelines.py` lists them)
+
+## Pipelines
+`python run_pipeline.py [--pipeline llamafactory|unsloth]` (default `llamafactory`). Each pipeline has its
+own folder under `scripts/`, its own requirements file and needs its **own virtualenv** (the stacks pin
+different `trl`/`transformers`).
+
+| pipeline | trains | requirements | stages |
+|---|---|---|---|
+| `llamafactory` | any model with a profile in `configs/llamafactory/<profile>/` (now `translategemma-4b`; pick with `RESONANCE_LF_PROFILE`) | `requirements-llamafactory.txt` | Validate, Preprocessing, Update Dataset, Fine-Tuning, Merge LoRA, Export GGUF (`model_gguf/bp-<profile>-q4_k_m.gguf`) |
+| `unsloth` | Qwen3 1.7B | `requirements-unsloth.txt` | Validate, Preprocessing, Dataset Split, Fine-Tuning, Metadata Fix, Evaluation, then the manual GGUF steps below |
+
+A new model for the `llamafactory` pipeline is a new folder `configs/llamafactory/<profile>/` with `train.yaml` and
+`merge.yaml` (`tests/test_lf_tools.py` checks the two agree on adapter path, base model and template).
 
 ## Prerequisites
 - Python 3.13
 - Windows OS (Linux not tested yet)
 - CUDA Toolkit 2.6
 
-## Convert to Model (F16 -> GGUF -> q4_k_m)
+## Install (llamafactory pipeline)
+- `pip install -r requirements-llamafactory.txt`
+- `train.yaml` uses `flash_attn: fa2`; if flash-attn is not installed, set it to `auto` for that profile
+- GGUF export needs llama.cpp built in `llama.cpp/` (see below; `llama-quantize` is found under `build/bin/`)
+
+## Install (unsloth pipeline)
+- `pip install -r requirements-unsloth.txt` (in its own virtualenv)
+
+## Convert to Model (F16 -> GGUF -> q4_k_m) -- unsloth pipeline, by hand
+(The llamafactory pipeline does this itself in its last two stages.)
 - Make sure model_f16_clean config.json "architectures": "Qwen3ForCausalLM"
 - git clone --recursive https://github.com/ggerganov/llama.cpp
 - cmake -B build
