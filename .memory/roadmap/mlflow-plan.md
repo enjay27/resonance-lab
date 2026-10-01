@@ -21,6 +21,12 @@
 - Client package: prefer `mlflow-skinny` (check Python 3.13 / Windows / pinned torch). Cloud sessions cannot reach the NAS: `mlflow_compare.py`
   runs on the desktop.
 - Run-identity prerequisites (unique adapter dir per run, sidecar `.meta.json`, per-run log) come first: `pipeline-review-2026-10-01.md` #2, #3, #21.
+- **PR 1 (server) facts found by running a real MLflow 3.16.1 server (2026-10-01):** basic-auth needs `mlflow[auth]` (Flask-WTF) and
+  `MLFLOW_FLASK_SERVER_SECRET_KEY`, so the image is built from PyPI, not the official one; the shipped auth ini defaults to `default_permission = READ`
+  (we use `NO_PERMISSIONS`); the admin password can come from `MLFLOW_AUTH_ADMIN_PASSWORD`; **job workers are ON by default**
+  (`MLFLOW_SERVER_ENABLE_JOB_EXECUTION`) and are switched off, with the assistant/sandbox; telemetry is switched off; `/health` is the only open URL, `/signup`
+  and user creation are 401; a foreign Host header is 403; `log_batch` took 1000 metrics, `start_time` can be backdated, `search_runs` finds a run by tag
+  (the replay's idempotence check). Files: `deploy/mlflow/`, `.env.mlflow.example`.
 - PR order: 1 server (`deploy/mlflow/` + guard tests), 2 `tracking.py` pure helpers, 3 the queue (TinyDB + sync, fake client in tests), 4 stage
   wiring (model part, NOT VERIFIED), 5 `mlflow_compare.py` + docs.
 

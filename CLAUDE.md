@@ -20,7 +20,7 @@ most important thing on this page.
 
 | tree | part | runs on | gate |
 |---|---|---|---|
-| `scripts/fetch_data.py` `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `eval_metrics.py` `text_rules.py` `hf_data.py` `runs.py` `overlap.py` `valsplit.py` `manifest.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
+| `scripts/fetch_data.py` `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `eval_metrics.py` `text_rules.py` `hf_data.py` `runs.py` `overlap.py` `valsplit.py` `manifest.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` `deploy/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
 | `scripts/unsloth/train.py` `scripts/unsloth/eval.py` `scripts/unsloth/fix_metadata.py` `scripts/llamafactory/train.py` `merge.py` `gguf.py` `eval.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements-<pipeline>.txt`) | none automated — a manual run, reported |
 
 `just check` needs only `requirements-dev.txt` (`pip install -r requirements-dev.txt`;
@@ -98,6 +98,7 @@ scripts/
     eval.py               model: generate on the eval set (--prompt chat-template|training), shared report
     watch_training.py     data: live training monitor (`rich`); TrainingState parses the two logs, tested
 configs/llamafactory/<profile>/   train.yaml + merge.yaml per model (tests check they agree)
+deploy/mlflow/        the MLflow tracking server for the maintainer's NAS (Dockerfile, compose, basic_auth.ini, .env.example, README); tests/test_deploy_mlflow.py guards it
 tests/                pytest for the data part; conftest.py has the JSONL fixtures
 data/raw/ data/processed/   stage inputs/outputs (config.py paths) -- GITIGNORED
 graft/                graft's generated cards -- GITIGNORED, regenerable (`graft build`)
