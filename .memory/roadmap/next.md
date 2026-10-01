@@ -1,24 +1,11 @@
 # Next — candidates, in order
 
-## Start here in the next session (maintainer, 2026-10-01: "will start from a new session")
-The pipeline work A-D is merged (#3-#7). What is left is the model work, which needs the
-Windows/CUDA machine for the runs; a cloud session can prepare the files.
-1. **Re-baseline the shipped model** (Kade, on the GPU machine): `python scripts/llamafactory/eval.py
-   --prompt chat-template` and `--prompt training` on `data/eval/bp-eval-dataset.jsonl`. The old chrF/BLEU/TER
-   are invalid (`active-issues/old-eval-numbers.md`); the two prompt modes show the cost of the prompt mismatch.
-2. **Profiles: Hy-MT2-1.8B and 7B are written (2026-10-01; maintainer: Hy only for now)** — see
-   `active-issues/unverified-on-gpu.md` for the local checklist (`inspect_template.py` first). Run the
-   zero-shot eval of each (`--model hy-mt2-1.8b`; zero-shot needs the base model merged/exported
-   or `merged_dir` pointed at it). TranslateGemma-12B and Gemma 4 E4B profiles are NOT written yet.
-   Zero-shot 1.8B done: `zero-shot-results-2026-10-01.md`. Original item, for the rest: **one `llamafactory` profile per shortlist candidate** (`roadmap/translator-shortlist-2026-10-01.md`):
-   Hy-MT2-1.8B, Hy-MT2-7B, Gemma 4 E4B, TranslateGemma-12B. Each is a folder
-   `configs/llamafactory/<profile>/{train,merge}.yaml` (tests check they agree) plus, for a new chat
-   template, a `TRAINING_PROMPTS` entry in `lf_tools.py` and the model's own eval prompt in
-   `llamafactory/eval.py`. Test first; Kade runs the zero-shot eval of each.
-3. Then pick the family, decide the prompt (`active-issues/stream-contract.md` §1), train on exactly
-   what the app will send, and copy the prompt to resonance-stream in its own PR there.
-Done since: `RESONANCE_RAW_LOGS` points the pipeline at a hand-curated raw log (it still goes through
-the preprocess filters — check the report counts).
+## Start here in the next session (maintainer, 2026-10-01: "I'll start from a new session")
+1. **Leak check + fixes** (small): are eval originals in `lora_train_data.jsonl`? (`roadmap/first-training-run-2026-10-01.md` §Caution); `-fast`
+   profiles' `eval_steps`/`save_steps`; the base profile needs ~2 epochs. Details: that file.
+2. **MLflow tracking**: plan in `roadmap/mlflow-plan.md` (present it, wait for OK, then PR by PR).
+3. Then: `[P0]` rule, TG-4B retrained on the same cleaned data as the control, Hy-7B; pick the family, copy the prompt to resonance-stream.
+Everything below this block is older history of how the pipeline work was split; the A-D pipeline PRs are merged (#3-#7).
 
 1. **Model choice + prompt** — this repo decides, resonance-stream follows
    (`active-issues/stream-contract.md` §1). Plan: `translator-shortlist-2026-10-01.md`
