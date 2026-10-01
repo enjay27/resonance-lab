@@ -1,4 +1,5 @@
 import json
+import os
 import re
 
 import pytest
@@ -397,3 +398,61 @@ def test_main_stops_on_an_unreadable_eval_set(write_jsonl, tmp_path, monkeypatch
     with pytest.raises(SystemExit) as exc:
         preprocess.main(["--format", "pair"])
     assert exc.value.code == 1
+
+
+# --- the sidecar manifest says how the training file was made ---------------------------------------
+
+
+def test_main_writes_the_manifest_next_to_the_output(write_jsonl, tmp_path, monkeypatch):
+    import manifest
+
+    src = write_jsonl("raw.jsonl", [
+        {"original": "ウルト溜まった", "translated": "궁 찼다!"},
+        {"original": "スカイ", "translated": "스카이"},
+    ])
+    out = tmp_path / "out.jsonl"
+    eval_path = _eval_file(tmp_path, [{"original": "ウルト溜まった", "translated": "x"}])
+    monkeypatch.setattr(preprocess, "RAW_LOGS", src)
+    monkeypatch.setattr(preprocess, "PROCESSED_LOGS", str(out))
+    monkeypatch.setattr(preprocess, "EVAL_DATASET_PATH", eval_path)
+
+    preprocess.main(["--format", "pair", "--prompt", "hy", "--reverse"])
+
+    meta = manifest.read_manifest(manifest.manifest_path(str(out)))
+    assert (meta["format"], meta["style"], meta["reverse"]) == ("pair", "hy", True)
+    assert meta["data_sha256"] == manifest.file_sha256(str(out))
+    assert meta["raw_sha256"] == manifest.file_sha256(src)
+    assert meta["counts"]["eval overlap"] == 1 and meta["counts"]["passed"] == 2  # スカイ forward + reverse
+    assert meta["eval_lines_excluded_from"] == 1
+
+
+def test_main_without_a_prompt_records_no_style(write_jsonl, tmp_path, monkeypatch):
+    import manifest
+
+    src = write_jsonl("raw.jsonl", [{"original": "スカイ", "translated": "스카이"}])
+    out = tmp_path / "out.jsonl"
+    monkeypatch.setattr(preprocess, "RAW_LOGS", src)
+    monkeypatch.setattr(preprocess, "PROCESSED_LOGS", str(out))
+    monkeypatch.setattr(preprocess, "EVAL_DATASET_PATH", str(tmp_path / "missing.jsonl"))
+
+    preprocess.main([])
+
+    meta = manifest.read_manifest(manifest.manifest_path(str(out)))
+    assert (meta["format"], meta["style"], meta["reverse"], meta["eval_set"]) == ("instruction", None, False, None)
+
+
+def test_a_failed_preprocess_leaves_no_stale_manifest(write_jsonl, tmp_path, monkeypatch):
+    import manifest
+
+    out = tmp_path / "out.jsonl"
+    stale = manifest.manifest_path(str(out))
+    with open(stale, "w", encoding="utf-8") as f:
+        f.write("{}")
+    monkeypatch.setattr(preprocess, "RAW_LOGS", write_jsonl("raw.jsonl", [{"original": "x", "translated": None}]))
+    monkeypatch.setattr(preprocess, "PROCESSED_LOGS", str(out))
+    monkeypatch.setattr(preprocess, "EVAL_DATASET_PATH", str(tmp_path / "missing.jsonl"))
+
+    with pytest.raises(SystemExit):
+        preprocess.main([])
+
+    assert not os.path.exists(stale)

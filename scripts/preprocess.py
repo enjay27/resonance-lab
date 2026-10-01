@@ -6,6 +6,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import RAW_LOGS, PROCESSED_LOGS, INSTRUCTION, EVAL_DATASET_PATH
 from eval_metrics import load_eval_dataset
+import manifest
 from overlap import EvalOverlap
 from prompts import STYLES, build_prompt, style_for_template
 from text_rules import HANGEUL_PATTERN, JP_PATTERN
@@ -195,24 +196,28 @@ def main(argv=None):
     style = {"none": None, "auto": None}.get(args.prompt, args.prompt)
     if args.prompt == "auto":
         style = style_for_template(_profile_template(args.model))
-    transform_for_lora(RAW_LOGS, PROCESSED_LOGS, args.fmt, style, args.reverse, _eval_originals(args))
+    eval_set, eval_originals = _eval_originals(args)
+    manifest.remove_manifest(PROCESSED_LOGS)  # a failed run must not leave the old file's manifest behind
+    counts = transform_for_lora(RAW_LOGS, PROCESSED_LOGS, args.fmt, style, args.reverse, eval_originals)
+    path = manifest.write_manifest(PROCESSED_LOGS, args.fmt, style, args.reverse, RAW_LOGS, counts, eval_set, len(eval_originals))
+    print(f"Manifest written -> {path}")
 
 
 def _eval_originals(args):
-    """The eval lines to keep out of training, per the command line ([] when excluding is off or there is no set)."""
+    """(eval file, eval lines) to keep out of training, per the command line: (None, []) when excluding is off or there is no set."""
     if args.keep_eval:
         print("--keep-eval: the eval set's lines stay in the training data.")
-        return []
+        return None, []
     if not os.path.exists(args.eval_set):
         print(f"There is no eval set at {args.eval_set}: nothing is excluded from the training data.")
-        return []
+        return None, []
     try:
         samples = load_eval_dataset(args.eval_set)
     except ValueError as e:
         print(f"[ERROR] {e}")
         sys.exit(1)
     print(f"Excluding eval lines ({len(samples)}) from {args.eval_set}.")
-    return [sample["original"] for sample in samples]
+    return args.eval_set, [sample["original"] for sample in samples]
 
 
 if __name__ == "__main__":

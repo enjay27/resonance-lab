@@ -360,6 +360,7 @@ def test_train_stage_trains_the_model_parameters_yaml(monkeypatch):
     spec.loader.exec_module(train)
     seen = []
     monkeypatch.setattr(train, "run_logged", lambda cmd, log, what: seen.append(cmd))
+    monkeypatch.setattr(train, "check_training_data", lambda profile: None)  # the data check has its own tests
 
     train.train(["--model", "hy-mt2-7b"])
 
@@ -495,3 +496,80 @@ def test_hy_chat_messages_use_the_shared_prompt_module():
     [msg] = lf_tools.chat_messages("hy_dense_7b", "杖@2募集")
 
     assert msg["content"] == prompts.build_prompt("hy", "ja-ko", "杖@2募集")
+
+
+# --- the training file must have been made for the profile's prompt style -----------------------------
+
+
+def _made_for(tmp_path, style, **kwargs):
+    import manifest
+
+    data = tmp_path / "lora_train_data.jsonl"
+    data.write_text('{"original": "a", "translated": "b"}\n', encoding="utf-8")
+    manifest.write_manifest(str(data), fmt="pair", style=style, reverse=False, raw_path=str(data), counts={}, eval_set=None, eval_lines=0)
+    return str(data)
+
+
+def test_check_training_data_accepts_a_file_made_for_the_profiles_template(tmp_path):
+    data = _made_for(tmp_path, "hy")
+
+    meta = lf_tools.check_training_data(lf_tools.load_profile("hy-mt2-1.8b"), data)
+
+    assert meta["style"] == "hy"
+
+
+def test_check_training_data_refuses_another_models_prompt_style(tmp_path):
+    from manifest import ManifestError
+
+    data = _made_for(tmp_path, "translategemma")
+
+    with pytest.raises(ManifestError, match="hy-mt2-1.8b"):
+        lf_tools.check_training_data(lf_tools.load_profile("hy-mt2-1.8b"), data)
+
+
+def test_check_training_data_without_a_manifest_names_the_profile_and_the_fix(tmp_path):
+    from manifest import ManifestError
+
+    with pytest.raises(ManifestError, match="--model translategemma-4b"):
+        lf_tools.check_training_data(lf_tools.load_profile("translategemma-4b"), str(tmp_path / "missing.jsonl"))
+
+
+def test_the_train_stage_stops_when_the_data_does_not_match(monkeypatch, capsys):
+    import importlib.util
+
+    from manifest import ManifestError
+
+    spec = importlib.util.spec_from_file_location(
+        "lf_train2", os.path.join(config.BASE_DIR, "scripts", "llamafactory", "train.py"))
+    train = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(train)
+    ran = []
+    monkeypatch.setattr(train, "run_logged", lambda *a: ran.append(a))
+
+    def refuse(profile):
+        raise ManifestError("wrong style")
+
+    monkeypatch.setattr(train, "check_training_data", refuse)
+
+    with pytest.raises(SystemExit) as exc:
+        train.train(["--model", "hy-mt2-7b"])
+
+    assert exc.value.code == 1 and not ran
+    assert "wrong style" in capsys.readouterr().out
+
+
+def test_update_dataset_info_stops_when_the_data_does_not_match(monkeypatch, capsys):
+    import update_dataset_info
+    from manifest import ManifestError
+
+    def refuse(profile):
+        raise ManifestError("wrong style")
+
+    monkeypatch.setattr(update_dataset_info, "check_training_data", refuse)
+    monkeypatch.setattr(update_dataset_info, "LF_DATASET_INFO_PATH", "/nonexistent/dataset_info.json")
+
+    with pytest.raises(SystemExit) as exc:
+        update_dataset_info.main(["--model", "hy-mt2-1.8b"])
+
+    assert exc.value.code == 1
+    assert "wrong style" in capsys.readouterr().out
