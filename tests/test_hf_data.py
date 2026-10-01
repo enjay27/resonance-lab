@@ -246,6 +246,59 @@ def test_pin_writes_the_latest_revision_into_the_config(stage, monkeypatch, caps
     assert not stage.calls  # pinning does not download
 
 
+def test_pin_reports_whether_the_pin_moved(stage, monkeypatch, capsys):
+    monkeypatch.setattr(fetch_data, "latest_revision", lambda repo: "d" * 40)
+
+    fetch_data.main(["--pin"])  # the config holds "a" * 40
+    moved = capsys.readouterr().out
+    fetch_data.main(["--pin"])  # now it holds "d" * 40
+    same = capsys.readouterr().out
+
+    assert "pin moved" in moved and "a" * 12 in moved and "d" * 12 in moved
+    assert "already pinned" in same and "d" * 12 in same
+
+
+def test_pin_reports_a_first_pin(stage, monkeypatch, capsys):
+    stage.cfg.write_text("repo: someone/bp-chat\nrevision: null\n", encoding="utf-8")
+    monkeypatch.setattr(fetch_data, "latest_revision", lambda repo: "d" * 40)
+
+    fetch_data.main(["--pin"])
+
+    assert "was unset" in capsys.readouterr().out
+    assert "revision: " + "d" * 40 in stage.cfg.read_text(encoding="utf-8")
+
+
+def test_check_writes_nothing_and_exits_0_when_the_pin_is_current(stage, monkeypatch, capsys):
+    monkeypatch.setattr(fetch_data, "latest_revision", lambda repo: CFG["revision"])
+    before = stage.cfg.read_text(encoding="utf-8")
+
+    fetch_data.main(["--check"])
+
+    assert "already pinned" in capsys.readouterr().out
+    assert stage.cfg.read_text(encoding="utf-8") == before and not stage.calls
+
+
+def test_check_exits_1_and_writes_nothing_when_the_pin_moved(stage, monkeypatch, capsys):
+    monkeypatch.setattr(fetch_data, "latest_revision", lambda repo: "d" * 40)
+    before = stage.cfg.read_text(encoding="utf-8")
+
+    with pytest.raises(SystemExit) as exc:
+        fetch_data.main(["--check"])
+
+    assert exc.value.code == 1 and "pin moved" in capsys.readouterr().out
+    assert stage.cfg.read_text(encoding="utf-8") == before
+
+
+def test_check_exits_1_when_nothing_is_pinned(stage, monkeypatch, capsys):
+    stage.cfg.write_text("repo: someone/bp-chat\nrevision: null\n", encoding="utf-8")
+    monkeypatch.setattr(fetch_data, "latest_revision", lambda repo: "d" * 40)
+
+    with pytest.raises(SystemExit) as exc:
+        fetch_data.main(["--check"])
+
+    assert exc.value.code == 1 and "not pinned" in capsys.readouterr().out
+
+
 def test_pin_needs_a_repo(stage):
     stage.cfg.write_text("repo: null\nrevision: null\n", encoding="utf-8")
 

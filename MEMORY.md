@@ -16,9 +16,10 @@ profiles exist. Eval: zero-shot Hy-1.8B chrF 39.3, fine-tuned base 66.7 (25 min)
 **done** = eval-overlap exclusion (re-measure every score above after a retrain), manifest + validation split (re-run Preprocessing; eval loss is not comparable with
 old runs), validate/drop-rate guards (limits are guesses: calibrate on the real log), Fetch Data stage, run identity (each training = its own run dir; `run_pipeline.py --from/--only`),
 MLflow server files `deploy/mlflow/` (now on the NAS's **Postgres** `deploy/postgres/` + **MinIO**, 2026-10-01), `tracking.py`, offline queue (`run_queue.py`/`tracker.py`, run against a real server).
-**Done by the maintainer (2026-10-01):** `repo:` + `--pin` set (files `bp-training-dataset-*.jsonl`), Postgres 18 (`deploy/postgres/`) and the MLflow server (`deploy/mlflow/`, MinIO artifacts) run on the NAS.
-**Maintainer to do:** fill `.env.mlflow`; check `pip` resolves `mlflow-skinny`/`tinydb` on Python 3.13 / Windows; first real `fetch_data.py` run.
-**Small, do first next session:** `fetch_data.py --pin` says whether the pin moved (`--check` writes nothing) and `hf_data.DEFAULT_INCLUDE` / yaml comment follow the real file name `bp-training-dataset-*.jsonl`.
+**Done by the maintainer (2026-10-01):** `repo:` set and pinned (`b37c268f`, repo `enjay27/blue-protocol-star-resonance-chatting-message`), Postgres 18 (`deploy/postgres/`) and the MLflow server (`deploy/mlflow/`, MinIO artifacts) run on the NAS.
+The unified `bp-training-dataset-*.jsonl` in that repo is being archived: the repo goes back to the app's per-channel files, so `include` stays `dataset_*.jsonl`.
+**Maintainer to do:** fill `.env.mlflow`; check `pip` resolves `mlflow-skinny`/`tinydb` on Python 3.13 / Windows; first real `fetch_data.py` run (after the unified file is archived).
+**Done (2026-10-01):** `fetch_data.py --pin` says whether the pin moved; `--check` reports the same and writes nothing (exit 1 when unset/behind). `HfApi` call itself NOT VERIFIED (no network login in cloud).
 **Next session continues here: MLflow PR 4 — wire the stages to the tracker** (design notes in [`mlflow-plan.md`](.memory/roadmap/mlflow-plan.md) "PR 4"; model part, NOT VERIFIED
 without the GPU). Then eval upgrades -> model changes. Rule: **graft first** (`graft skeleton <file>` before reading a file, see CLAUDE.md). Index of what comes next: [`roadmap/next.md`](.memory/roadmap/next.md).
 

@@ -1,7 +1,8 @@
 """Fetch Data stage: the app's channel files from Hugging Face, at the pinned revision, merged into the raw log.
 
     python scripts/fetch_data.py            download (only when missing or the pinned revision changed) and merge
-    python scripts/fetch_data.py --pin      write the dataset repo's latest commit into configs/hf_dataset.yaml
+    python scripts/fetch_data.py --pin      write the dataset repo's latest commit into configs/hf_dataset.yaml, and say whether it moved
+    python scripts/fetch_data.py --check    the same report, writes nothing; exit 1 when the pin is unset or behind the latest commit
     python scripts/fetch_data.py --force    download again, and replace a raw log this stage did not write
 
 Skipped (the pipeline goes on with data/raw/ as it is) when no repo is configured or RESONANCE_RAW_LOGS names a
@@ -15,7 +16,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import HF_DATA_DIR, HF_DATASET_CONFIG, RAW_LOGS
-from hf_data import (FetchError, channel_files, download_command, is_current, load_config, merge_channels, read_state,
+from hf_data import (FetchError, channel_files, download_command, is_current, load_config, merge_channels, pin_report, read_state,
                      with_revision, write_state)
 
 
@@ -45,6 +46,7 @@ def latest_revision(repo):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Fetch the training data from Hugging Face.")
     parser.add_argument("--pin", action="store_true", help="pin the repo's latest commit in configs/hf_dataset.yaml; downloads nothing")
+    parser.add_argument("--check", action="store_true", help="report whether the pin is the repo's latest commit; writes nothing, exit 1 if not")
     parser.add_argument("--force", action="store_true", help="download again, and replace a raw log this stage did not write")
     args = parser.parse_args(argv)
 
@@ -53,14 +55,20 @@ def main(argv=None):
         return
     cfg = load_config(HF_DATASET_CONFIG)
     if not cfg["repo"]:
-        if args.pin:
+        if args.pin or args.check:
             print(f"[ERROR] set `repo:` in {HF_DATASET_CONFIG} first")
             sys.exit(1)
         print(f"no HF dataset configured ({HF_DATASET_CONFIG}): using data/raw/ as it is.")
         return
 
-    if args.pin:
+    if args.pin or args.check:
         revision = latest_revision(cfg["repo"])
+        message, current = pin_report(cfg["repo"], cfg["revision"], revision, written=args.pin)
+        if args.check:
+            print(message)
+            if not current:
+                sys.exit(1)
+            return
         with open(HF_DATASET_CONFIG, encoding="utf-8") as f:
             text = f.read()
         try:
@@ -70,7 +78,7 @@ def main(argv=None):
             sys.exit(1)
         with open(HF_DATASET_CONFIG, "w", encoding="utf-8") as f:
             f.write(text)
-        print(f"{cfg['repo']} pinned at {revision} in {HF_DATASET_CONFIG}")
+        print(f"{message} -> {HF_DATASET_CONFIG}")
         return
 
     state_file = os.path.join(HF_DATA_DIR, "fetch_state.json")
