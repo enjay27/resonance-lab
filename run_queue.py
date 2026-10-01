@@ -161,10 +161,11 @@ class RunQueue:
         self._update(local_run_id, lambda doc: doc["events"][index].update(sent=True))
 
     def prune(self, keep=20):
-        """Forget the oldest runs the server has completely (created, every event sent, finished), keeping the newest `keep`."""
+        """Forget the oldest runs the server has completely (created, every event sent, closed by a status event -- later stages
+        may have added events after it), keeping the newest `keep`."""
         done = [run for run in self.runs()
                 if run["remote_id"] is not None and run["events"] and all(e["sent"] for e in run["events"])
-                and run["events"][-1]["type"] == "status"]
+                and any(e["type"] == "status" for e in run["events"])]
         old = done[:-keep] if keep else done
         for run in old:
             self._runs_table.remove(Query().local_run_id == run["local_run_id"])

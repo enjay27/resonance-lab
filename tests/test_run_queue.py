@@ -160,6 +160,23 @@ def test_a_corrupt_queue_file_is_set_aside_not_lost_and_not_fatal(tmp_path):
     assert len(queue.pending()) == 1
 
 
+def test_a_run_that_later_stages_continued_is_pruned_once_everything_is_sent(queue):
+    """Merge, GGUF and eval add events after the training closed the run, so the last event is no longer its status."""
+    done = _new(queue, "continued", now=1)
+    queue.finish(done, "FINISHED")
+    queue.add_tags(done, {"stage.merge": "done"})
+    queue.set_remote_id(done, "r1")
+    for i in range(len(queue.get(done)["events"])):
+        queue.mark_sent(done, i)
+    unfinished = _new(queue, "never closed", now=2)
+    queue.add_params(unfinished, {"a": "1"})
+    queue.set_remote_id(unfinished, "r2")
+    queue.mark_sent(unfinished, 0)
+
+    assert queue.prune(keep=0) == 1
+    assert not queue.has_run(done) and queue.has_run(unfinished)  # a run no stage closed is kept
+
+
 def test_synced_runs_are_pruned_to_the_newest_few_with_their_files(queue, tmp_path):
     ids = []
     for n in range(5):

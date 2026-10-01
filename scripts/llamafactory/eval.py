@@ -10,9 +10,12 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from config import EVAL_DATASET_PATH, EVAL_OUTPUT_DIR
+from config import EVAL_DATASET_PATH, EVAL_MAX_NEW_TOKENS, EVAL_OUTPUT_DIR
 from eval_metrics import comet_score, evaluate, format_report, load_eval_dataset, strip_think
 from lf_tools import add_model_argument, chat_messages, generate_inputs, load_profile, model_name, training_prompt, training_user_text, with_bos
+from runs import read_merge_record
+from stage_tracking import open_tracker, record_stage, resume_stage
+from track_records import eval_records
 
 PROMPTS = {
     "chat-template": "the model's own documented prompt through its chat template (TranslateGemma: language codes -> long "
@@ -67,12 +70,13 @@ def main(argv=None):
     for sample in tqdm(samples):
         inputs = encode(sample["original"])
         with torch.no_grad():
-            outputs = model.generate(**inputs, max_new_tokens=256, pad_token_id=tokenizer.eos_token_id, do_sample=False)
+            outputs = model.generate(**inputs, max_new_tokens=EVAL_MAX_NEW_TOKENS, pad_token_id=tokenizer.eos_token_id, do_sample=False)
         new_tokens = outputs[0][inputs["input_ids"].shape[-1]:]
         raw_outputs.append(tokenizer.decode(new_tokens, skip_special_tokens=False))
         predictions.append(strip_think(tokenizer.decode(new_tokens, skip_special_tokens=True)))
 
-    report = format_report(evaluate(samples, predictions, raw_outputs), samples, predictions, comet=comet_score(samples, predictions))
+    scores, comet = evaluate(samples, predictions, raw_outputs), comet_score(samples, predictions)
+    report = format_report(scores, samples, predictions, comet=comet)
     print("\n" + report)
 
     os.makedirs(EVAL_OUTPUT_DIR, exist_ok=True)
@@ -80,6 +84,11 @@ def main(argv=None):
     with open(out, "w", encoding="utf-8") as f:
         f.write(report)
     print(f"\nReport saved: {out}")
+
+    tracker = open_tracker()
+    if resume_stage(tracker, read_merge_record(profile.merged_dir)):  # the run the merged model came from
+        metrics, tags = eval_records(scores, comet, args.prompt)
+        record_stage(tracker, tags, metrics, [(out, "eval")])
 
 
 if __name__ == "__main__":
