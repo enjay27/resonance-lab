@@ -9,8 +9,10 @@ LLaMA-Factory version or profile changes, and update both.
 
 Data in every case: `data/processed/lora_train_data.jsonl` rows `{original, translated}` (`preprocess.py --format pair`),
 mapped by `data/dataset_info.json` to prompt = `original`, response = `translated`. Same file for all profiles.
-The user turn is **the raw Japanese line only** — no instruction, no system prompt (the decision for Hy is open:
-`active-issues/stream-contract.md` §1, `roadmap/zero-shot-results-2026-10-01.md`).
+With **this repo's pipeline** the user turn is **the raw Japanese line only** — no instruction, no system prompt, one direction.
+**The shipped TG-4B was not trained like that:** its hand-made file had the TranslateGemma instruction inside `original` and
+every pair in both directions (`active-issues/stream-contract.md` §1, corrected 2026-10-01), i.e. the `chat-template` prompt below.
+The examples here show what this pipeline builds today; the Hy prompt decision is open (`roadmap/zero-shot-results-2026-10-01.md`).
 
 | profile(s) | template | base model | cutoff_len | eos token |
 |---|---|---|---|---|

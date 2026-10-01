@@ -47,7 +47,7 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
 - **Gate dev deps** (`requirements-dev.txt`): pytest, ruff, pyyaml (profile yaml files), rich (the monitor).
 - **`llamafactory` pipeline** (`requirements-llamafactory.txt`): LLaMA-Factory SFT + LoRA; profile
   `translategemma-4b` = `google/translategemma-4b-it`, template `gemma3`, dataset `bp_translation`
-  (user turn = the raw Japanese line only, no system prompt), `cutoff_len` 128, LoRA r=32.
+  (`--format pair` currently writes the raw Japanese line as the user turn; the shipped model's own file had the TranslateGemma instruction in it and both directions — `.memory/active-issues/stream-contract.md` §1), `cutoff_len` 128, LoRA r=32.
   Profile = `configs/llamafactory/<profile>/{train,merge}.yaml`, chosen by `--model <profile>` (every llamafactory script and `run_pipeline.py`), else `RESONANCE_LF_PROFILE` (remote jobs), else the default.
 - **`unsloth` pipeline** (`requirements-unsloth.txt`): unsloth (pinned commit), transformers, peft,
   trl 0.24, bitsandbytes 4-bit, torch 2.10 + CUDA 12.6 (`triton-windows`). Base

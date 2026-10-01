@@ -15,3 +15,11 @@ template with the real model, else note it for a local run.
 - `eval.py` now picks the message via `lf_tools.chat_messages(template, text)` (gemma3 unchanged).
 - Open for the prompt decision (`stream-contract.md` §1): Hy is instruction-tuned, so "raw line only" (what
   `training_prompt` encodes) vs the English instruction is a real choice, not a given as with TranslateGemma.
+
+## Correction, later the same day: the shipped model's training format
+The maintainer pasted a sample of `bp-training-dataset-final.jsonl` (hand-made; the file `experiment/translategemma`'s
+`update_dataset_info.py` points at — not `preprocess.py`'s output): `original` = TranslateGemma instruction + line, and every pair
+also reversed (ko→ja). The notes had said "raw line only" (read from yaml names, never from the data) — wrong, repeated in my
+answers for several turns (incl. "Hy needs the instruction, TG was trained on the raw line"). Fixed in `stream-contract.md` §1,
+`zero-shot-results` (TG `chat-template` row is like-for-like; `--prompt training` not needed), `reference/training-examples.md`,
+MEMORY.md, CLAUDE.md. Lesson: read the data file, not only the config that names it.

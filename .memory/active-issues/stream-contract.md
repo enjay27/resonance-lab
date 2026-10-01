@@ -4,40 +4,45 @@
 its `translation_prompt` (`crates/core/src/text.rs`) to whatever this repo trains on, in
 its own PR, after the training format is settled here.
 
-## 1 · The shipped model never saw the prompt the app sends — open
+## 1 · What the shipped model was trained on — corrected 2026-10-01, open items below
 
-Shipped: TranslateGemma-4B + LoRA (gist model 1.1.0), trained on `experiment/translategemma`
-(not on `main`). Training there, from `configs/training/bp_train.yaml` and
-`scripts/update_dataset_info.py`:
+**Correction.** This section used to say the shipped model was trained on the raw Japanese line. That was read from
+`experiment/translategemma`'s yaml and dataset names (`bp_translation_nosystem` = "no system prompt"), without the data file.
+The maintainer's sample of the file the branch actually trained on (`raw/bp-training-dataset-final.jsonl`, hand-made, **not**
+the output of that branch's `preprocess.py`) shows:
+
+- `original` already holds the **TranslateGemma instruction + the line**; `translated` is the answer. So the user turn was
+  (gemma3 template, LLaMA-Factory adds BOS once):
 
 ```
 <start_of_turn>user
-遺跡1Fから　29k↑　＠T1<end_of_turn>
+You are a professional Japanese (ja) to Korean (ko) translator. Your goal is to accurately convey the meaning and nuances of the original Japanese text while adhering to Korean grammar, vocabulary, and cultural sensitivities.
+Produce only the Korean translation, without any additional explanations or commentary. Please translate the following Japanese text into Korean:
+{line}<end_of_turn>
 <start_of_turn>model
+{korean}<end_of_turn>
 ```
+- The file is **bidirectional**: every pair also appears reversed (ko→ja, instruction "...Korean (ko) to Japanese (ja)
+  translator ... Please translate the following Korean text into Japanese:", answer = the Japanese line). Both directions
+  are in the same file, doubling the rows.
+- That instruction is the text TranslateGemma's own chat template builds from language codes, so `eval.py --prompt chat-template`
+  for TG-4B **is** its training prompt: the baseline in `roadmap/zero-shot-results-2026-10-01.md` is like-for-like, and
+  `--prompt training` (raw line) was never TG's training format.
 
-(`template: gemma3`, dataset `bp_translation_nosystem` = no system prompt, user turn is the
-raw line, `cutoff_len: 128`; LLaMA-Factory adds BOS once.)
+The app sends (`translation_prompt`, pinned by `translation_prompt_is_pinned` there): `<bos><start_of_turn>user\n` + the
+same instruction + the `[P0]` placeholder rule + the line. Remaining differences from training:
 
-The app sends (`translation_prompt`, pinned by `translation_prompt_is_pinned` there):
+- the `[P0]` placeholder rule was never in training;
+- the literal `<bos>` plus llama-server's own BOS is very likely a double BOS training never had — resonance-stream's open item **A4**
+  (still unchecked);
+- `main`'s Qwen3 pipeline (ChatML + Korean `config.INSTRUCTION`) is a third format; it is not what ships.
 
-```
-<bos><start_of_turn>user
-You are a professional Japanese (ja) to Korean (ko) translator. ... placeholders [P0] ...
-遺跡1Fから　29k↑　＠T1<end_of_turn>
-<start_of_turn>model
-```
+**This repo's pipeline does not yet reproduce that training file.** `preprocess.py --format pair` writes the raw line only (no
+instruction) and has no reverse direction; its filters (`Hangeul in original`, `JP residual in translation`) would drop every
+ko→ja row anyway. Where the final file came from (a one-off script?) is not in the repo — ask the maintainer.
 
-- The English instruction and the `[P0]` placeholder rule were never in training.
-- The literal `<bos>` plus llama-server's own BOS is very likely a double BOS training never
-  had — resonance-stream's open item **A4**.
-- `main`'s Qwen3 pipeline (ChatML + Korean `config.INSTRUCTION`) is a third format; it is
-  not what ships.
-
-**Next (per `roadmap/translator-shortlist-2026-10-01.md`):** pick the model family on the
-eval set, then train on one written-down prompt — the exact text the app will send, with
-`[P0]`-masked lines in part of the data — and pin it here with a test (the exact training
-text of one sample). resonance-stream then copies that text and its pin.
+**Next:** decide per model the exact prompt (instruction text, directions, `[P0]`), build it in a data-part stage (test first), pin
+one sample's full text here, then resonance-stream copies it.
 
 ## 2 · Untranslated rows crashed the data stages — fixed on `main`
 
