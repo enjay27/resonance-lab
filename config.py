@@ -66,6 +66,8 @@ HF_DATA_DIR = os.path.join(BASE_DIR, "data", "hf")
 # --- Experiment tracking (tracking.py) ---
 # The NAS server's URL and credentials: gitignored, see .env.mlflow.example and deploy/mlflow/README.md.
 MLFLOW_ENV_FILE = os.path.join(BASE_DIR, ".env.mlflow")
+MLFLOW_EXPERIMENT = "resonance-lab"  # every training (profile run) is one MLflow run in it (track_records.py)
+EVAL_MAX_NEW_TOKENS = 256  # greedy decoding, batch 1; recorded with every eval run (track_records.eval_records)
 
 # The local queue of runs not yet sent to the MLflow server (run_queue.py): gitignored, written before anything is sent.
 RUN_QUEUE_PATH = os.path.join(BASE_DIR, ".run.result.backup.json")

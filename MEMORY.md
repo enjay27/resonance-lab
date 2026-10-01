@@ -20,8 +20,9 @@ MLflow server files `deploy/mlflow/` (now on the NAS's **Postgres** `deploy/post
 The unified `bp-training-dataset-*.jsonl` in that repo is being archived: the repo goes back to the app's per-channel files, so `include` stays `dataset_*.jsonl`.
 **Maintainer to do:** fill `.env.mlflow`; check `pip` resolves `mlflow-skinny`/`tinydb` on Python 3.13 / Windows; first real `fetch_data.py` run (after the unified file is archived).
 **Done (2026-10-01):** `fetch_data.py --pin` says whether the pin moved; `--check` reports the same and writes nothing (exit 1 when unset/behind). `HfApi` call itself NOT VERIFIED (no network login in cloud).
-**Next session continues here: MLflow PR 4 — wire the stages to the tracker** (design notes in [`mlflow-plan.md`](.memory/roadmap/mlflow-plan.md) "PR 4"; model part, NOT VERIFIED
-without the GPU). Then eval upgrades -> model changes. Rule: **graft first** (`graft skeleton <file>` before reading a file, see CLAUDE.md). Index of what comes next: [`roadmap/next.md`](.memory/roadmap/next.md).
+**Done 2026-10-01:** MLflow PR 4a — `track_records.py` (pure records per stage; tracker run = `<profile>-<run id>`). **Next: PR 4b — wire train/merge/gguf/eval to the tracker** (model part, NOT VERIFIED without
+the GPU; design in [`mlflow-plan.md`](.memory/roadmap/mlflow-plan.md) "PR 4b"). Then eval upgrades -> model changes. Rule: **graft first** (`graft skeleton <file>` before reading a file, see CLAUDE.md).
+Maintainer: HF dataset is the unified file for ~2 months — local `include: "bp-training-dataset-*.jsonl"`, then `fetch_data.py --force` once (replaces the hand-made raw log; records the revision). Index: [`roadmap/next.md`](.memory/roadmap/next.md).
 
 **Model part never runs in a cloud session** (no GPU): every model stage is NOT VERIFIED —
 [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md). Auto-merge of `claude/*` PRs works.

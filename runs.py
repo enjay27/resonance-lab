@@ -133,3 +133,12 @@ def write_merge_record(merged_dir, profile_name, adapter_dir):
         "merged": _now().isoformat(timespec="seconds"),
     })
     return path
+
+
+def read_merge_record(merged_dir):
+    """The note write_merge_record left in a merged model's directory (None when there is none): which run it came from."""
+    try:
+        with open(os.path.join(merged_dir, MERGE_RECORD), encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, ValueError):
+        return None

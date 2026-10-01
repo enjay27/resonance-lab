@@ -20,7 +20,7 @@ most important thing on this page.
 
 | tree | part | runs on | gate |
 |---|---|---|---|
-| `scripts/fetch_data.py` `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `eval_metrics.py` `text_rules.py` `hf_data.py` `runs.py` `tracking.py` `run_queue.py` `tracker.py` `overlap.py` `valsplit.py` `manifest.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` `deploy/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
+| `scripts/fetch_data.py` `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `eval_metrics.py` `text_rules.py` `hf_data.py` `runs.py` `tracking.py` `run_queue.py` `tracker.py` `track_records.py` `overlap.py` `valsplit.py` `manifest.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` `deploy/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
 | `scripts/unsloth/train.py` `scripts/unsloth/eval.py` `scripts/unsloth/fix_metadata.py` `scripts/llamafactory/train.py` `merge.py` `gguf.py` `eval.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements-<pipeline>.txt`) | none automated — a manual run, reported |
 
 `just check` needs only `requirements-dev.txt` (`pip install -r requirements-dev.txt`;
@@ -72,6 +72,7 @@ hf_data.py            the HF dataset: config, `hf download` command, merge of th
 runs.py               one training = one run dir `<output_dir>/<run id>/` + run.json status; merge takes the latest complete run; tested
 tracking.py           what a run records in MLflow, pure: .env.mlflow settings, params/tags/metrics from yaml, manifest, fetch state, eval report, trainer files (no mlflow import); tested
 run_queue.py          the local record of every run (TinyDB, `.run.result.backup.json`, atomic writes): events marked sent; written BEFORE anything is sent; tested
+track_records.py      what each stage records (params/tags/metrics for train, merge, gguf, eval; the tracker run id `<profile>-<run id>`), pure, no mlflow; tested
 tracker.py            sends queued runs to the NAS oldest-first, resumable, never raises into a training; `from_environment()` -> Tracker or NullTracker; tested with a fake client
 overlap.py            is a training line also an eval line? (normalised + near-duplicate); preprocess drops them; tested
 valsplit.py           which lines are validation: sha1 of the normalised line, so pairs/variants stay together and lines keep their side as data grows; tested

@@ -41,19 +41,21 @@
   Metric points everywhere are `(name, value, timestamp_ms, step)` = MLflow's `Metric` order. **Run against a real 3.16.1 server (skinny client) the first time exposed a swapped
   timestamp/step that the unit tests had pinned on both sides; a cross-module test now covers it.** Checked end to end: a run recorded with the server off (log line, files copied into
   the queue) arrived complete (params, tags, 300 loss points at the right times, artifact, FINISHED) when the next run started; nothing was sent twice.
-- **PR 4 (next) — design notes for the session that continues.** Callers to check first with graft: `lf_tools.train_command`/`merge_command`, `run_pipeline.stage_env`/`main`,
-  `runs.start_run`/`finish_run`/`resolve_adapter`. Plan: (a) a tested data-part module (e.g. `track_records.py`) assembles each stage's records from the pure helpers
-  (`tracking.train_params`, `dataset_tags` from `data/hf/fetch_state.json` + the manifest, `prompt_fingerprint`, `git_info`, `package_versions`, `train_result_metrics`,
-  `trainer_tags`, `eval_metrics`, `gguf_info`) so the model-part scripts stay thin; (b) `train.py`: `tracker.from_environment()`, `begin` (or `resume`), params + tags, after training
-  `step_log(trainer_log.jsonl)` + result metrics + `finish`, `flush`; (c) stages run by hand must land in the SAME run: put the tracker's local id in the run's `run.json`
-  (`runs.py`) and let merge/gguf/eval `resume` it (the merged dir's `resonance_run.json` already names the run); under `run_pipeline.py` pass it via `stage_env` and mark the run
-  FAILED when a stage fails; (d) `eval.py`: `eval_metrics` + the report and predictions as artifacts, tag `eval_prompt`; `merge.py`/`gguf.py`: stage tags, GGUF size/sha;
-  (e) every call goes through `Tracker` (never raises), tracking off = `NullTracker`; (f) record the eval decoding settings (`max_new_tokens=256`, greedy, batch 1). Then PR 5:
+- **PR 4a (done, data part, tested): `track_records.py`** assembles each stage's records from the `tracking.py` helpers: `run_identity` (tracker run = `<profile>-<run id>`, no need to store
+  an id in `run.json` or pass it through `stage_env`: merge/gguf/eval derive it from the run `resonance_run.json` names, `runs.read_merge_record` + `stage_run_id`; a pre-runs adapter -> None -> no
+  tracking), `train_records` (params: recipe + data; tags: dataset revision/hashes, prompt fingerprint, git, packages), `train_result_records`, `merge_tags`, `gguf_tags`, `eval_records`.
+  `config.MLFLOW_EXPERIMENT`, `config.EVAL_MAX_NEW_TOKENS`. Params are logged by train only; eval decoding/prompt are tags (a param cannot change once logged). Known limit: two evals with different
+  `--prompt` in one run write the same `eval.*` metric keys (history of one metric, tag = the last prompt).
+- **PR 4b (next, model part, NOT VERIFIED without the GPU): the thin wiring.** Callers checked: `train.py` (`start_run`/`finish_run`), `merge.py` (`resolve_adapter`/`write_merge_record`), `gguf.py`, `eval.py`
+  (hardcodes `max_new_tokens=256` -> use `config.EVAL_MAX_NEW_TOKENS`). `train.py`: `tracker.from_environment()`, `begin(MLFLOW_EXPERIMENT, name, local_run_id)`, params + tags (`git_info`, `package_versions`,
+  `read_state(data/hf/fetch_state.json)`, `read_manifest`), after training `step_log(trainer_log.jsonl)` + `train_result_records` (read `train_results.json`/`trainer_state.json` from the run dir) + `finish`,
+  `flush`; failure -> `finish("failed")`. `merge.py`/`gguf.py`/`eval.py`: `resume(stage_run_id(read_merge_record(merged_dir)))`, tags/metrics/artifacts (report, predictions), `flush`.
+  Every call goes through `Tracker` (never raises); off = `NullTracker`. Failure marking is done in each stage script (not `run_pipeline.py`): the stage that fails marks its run failed. Then PR 5:
   `scripts/mlflow_compare.py`. Pipeline-review items #4, #6-#8 (GGUF eval, term metric, bigger eval set, COMET/pins) follow.
 - PR order: 1 server (`deploy/mlflow/` + guard tests), 2 `tracking.py` pure helpers, 3 the queue (TinyDB + sync, fake client in tests), 4 stage
   wiring (model part, NOT VERIFIED), 5 `mlflow_compare.py` + docs.
 
-**Status: plan only, nothing implemented.** Per CLAUDE.md the next session presents this (adjusted) and waits for the maintainer's OK before touching code.
+**Status: PR 1-3 and 4a merged/in review; 4b (stage wiring) next.** Per CLAUDE.md the next session presents this (adjusted) and waits for the maintainer's OK before touching code.
 Why: the first runs (`roadmap/first-training-run-2026-10-01.md`) were compared by pasting `train_results.json`, eval `.txt` reports and PowerShell
 output into chat and then into markdown. MLflow replaces that: every run keeps its params, metrics, data fingerprint and reports, comparable in the UI
 and — for LLM agents — through `mlflow.search_runs` without a browser.
