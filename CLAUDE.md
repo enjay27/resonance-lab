@@ -70,7 +70,9 @@ run_pipeline.py       --pipeline <name>: runs its stages in order, stops at the 
 scripts/
   validate.py           shared data: raw logs -- no Hangeul in `original` (ValidationError)
   preprocess.py         shared data: raw {original, translated} -> {instruction, input, output};
-                          skips untranslated / blank rows
+                          `clean_reason` drops empty/untranslated, Hangeul-in-source,
+                          JP-left-in-output, 10x-long, recruitment-spam, duplicate rows
+                          and counts each reason
   unsloth/              pipeline `unsloth` (Qwen3 1.7B)
     split_dataset.py      data: dedup by input, shuffle (seed 42), train/val -> lora_dataset/
     train.py              model: LoRA fine-tune (unsloth), merge -> model_f16/

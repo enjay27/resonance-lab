@@ -8,9 +8,12 @@
    2026-10-01: keep the Qwen3 pipeline; take only the branch's features; `llamafactory`
    becomes the default). One PR at a time, each merged before the next:
    - **A — registry + move (done):** `pipelines.py`, `--pipeline`, `scripts/unsloth/`.
-   - **B — shared preprocess:** the branch's filters (Hangeul in source, JP residual,
-     10x-length hallucination, recruitment spam, dedup, per-reason counts), tested first;
-     output format chosen per pipeline (`{instruction,input,output}` vs `{system,original,translated}`).
+   - **B — shared preprocess (done):** the branch's filters (Hangeul in source, JP residual,
+     10x-length hallucination, recruitment spam, first-occurrence dedup, per-reason report,
+     malformed JSON counted not fatal) as `clean_reason`, tested first. **Changes the
+     training data** (rows are dropped) — a feature, so re-run `eval.py` after the next
+     training. Not taken yet: the branch's `{system,original,translated}` output format
+     (its consumer is `update_dataset_info.py`, which reads a different file; decide in C).
    - **C — `llamafactory` pipeline:** `configs/training/*.yaml` (one yaml = one model
      profile, so Hy-MT2 / Gemma 4 / Qwen3.5 from the shortlist are config files), `train.py`
      (wraps `llamafactory-cli`), `export.py` (merge -> F16 GGUF -> q4_k_m),

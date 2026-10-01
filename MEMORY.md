@@ -17,8 +17,8 @@ contract: [`stream-contract.md`](.memory/active-issues/stream-contract.md).
 fields) instead of crashing `split_dataset`. Fixed on `main` only, not on the experiment branch.
 
 **Switchable pipelines (2026-10-01, `claude/pipeline-registry`):** `run_pipeline.py --pipeline unsloth`
-(only one so far; `pipelines.py`, scripts in `scripts/unsloth/`). Next: B shared preprocess, C `llamafactory`
-(becomes default), D eval metrics — [`roadmap/next.md`](.memory/roadmap/next.md) 2. NOT VERIFIED: moved scripts (no GPU).
+(only one so far; `pipelines.py`, scripts in `scripts/unsloth/`). A merged (#3); B (`claude/preprocess-filters`) shared preprocess filters, tested — changes the
+training data, re-eval after the next training. Next: C `llamafactory` (becomes default), D eval metrics — [`roadmap/next.md`](.memory/roadmap/next.md) 2. NOT VERIFIED: moved scripts (no GPU).
 
 **Model part never runs in a cloud session** (no GPU). What changed without a run:
 [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md).

@@ -6,3 +6,9 @@ Code or config changed in a session without CUDA. Delete an item once it has run
   removed an unused `shutil` import and the unused `result =` in `run_step` — no
   behaviour change, but never run since. `validate.py` raises its own `ValidationError`
   instead of `huggingface_hub`'s (unit-tested; pipeline halt unchanged).
+- **`scripts/unsloth/*` moved (2026-10-01, PR #3):** pure move + one path-depth line per script;
+  `run_pipeline.py --pipeline unsloth` never run since. Check: `python run_pipeline.py` reaches
+  every stage (the stage scripts' `config` import resolves).
+- **`preprocess.py` filters (2026-10-01, `claude/preprocess-filters`):** unit-tested; not run on a
+  real raw log. It now drops more rows than before (the branch's filters) — compare the
+  Preprocessing Report counts on the real data before training, and re-run `eval.py` after.
