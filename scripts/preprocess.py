@@ -4,7 +4,9 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import RAW_LOGS, PROCESSED_LOGS, INSTRUCTION
+from config import RAW_LOGS, PROCESSED_LOGS, INSTRUCTION, EVAL_DATASET_PATH
+from eval_metrics import load_eval_dataset
+from overlap import EvalOverlap
 from prompts import STYLES, build_prompt, style_for_template
 from text_rules import HANGEUL_PATTERN, JP_PATTERN
 
@@ -19,6 +21,8 @@ REASONS = (
     "Hangeul residual in translation (ko_ja)",
     "hallucination",
     "recruitment spam",
+    "eval overlap",
+    "eval overlap (near)",
     "duplicate",
     "json error",
 )
@@ -94,9 +98,11 @@ def _report(counts):
         print(f"  {reason:<{width}}: {counts[reason]}")
 
 
-def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, reverse=False):
+def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, reverse=False, eval_originals=()):
     """Clean raw {original, translated} rows into training rows of layout `fmt`.
 
+    Rows whose original is one of `eval_originals` (exactly or nearly: see overlap.py) are dropped, so the
+    model is never trained on what it is evaluated on; their reverse rows go with them.
     Returns the counts per outcome (`total`, `passed` and one per reason).
     """
     if fmt not in FORMATS:
@@ -110,6 +116,7 @@ def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     counts = {"total": 0, "passed": 0, **{reason: 0 for reason in REASONS}}
     seen_inputs = set()
+    eval_overlap = EvalOverlap(eval_originals)
 
     with open(input_file, 'r', encoding='utf-8') as f_in, \
             open(output_file, 'w', encoding='utf-8') as f_out:
@@ -124,6 +131,10 @@ def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, 
             translated = (data.get("translated") or "").strip()
 
             reason = clean_reason(original, translated)
+            if reason is None:
+                found = eval_overlap.check(original)
+                if found:
+                    reason = "eval overlap" if found == "exact" else "eval overlap (near)"
             if reason is None and original in seen_inputs:
                 reason = "duplicate"  # the first occurrence wins
             if reason:
@@ -174,13 +185,34 @@ def main(argv=None):
                         help="pair format only: instruction put before each line; auto = the style of --model's template "
                              "(default: %(default)s = the raw line)")
     parser.add_argument("--model", help="llamafactory profile for --prompt auto (default: $RESONANCE_LF_PROFILE, else the default)")
+    parser.add_argument("--eval-set", default=EVAL_DATASET_PATH,
+                        help="eval dataset whose lines are kept out of the training data (default: %(default)s)")
+    parser.add_argument("--keep-eval", action="store_true",
+                        help="do not drop the eval set's lines from the training data (experiments only: it inflates every score)")
     parser.add_argument("--reverse", action="store_true",
                         help="pair format only: also write every clean row as ko->ja, Korean as the input")
     args = parser.parse_args(argv)
     style = {"none": None, "auto": None}.get(args.prompt, args.prompt)
     if args.prompt == "auto":
         style = style_for_template(_profile_template(args.model))
-    transform_for_lora(RAW_LOGS, PROCESSED_LOGS, args.fmt, style, args.reverse)
+    transform_for_lora(RAW_LOGS, PROCESSED_LOGS, args.fmt, style, args.reverse, _eval_originals(args))
+
+
+def _eval_originals(args):
+    """The eval lines to keep out of training, per the command line ([] when excluding is off or there is no set)."""
+    if args.keep_eval:
+        print("--keep-eval: the eval set's lines stay in the training data.")
+        return []
+    if not os.path.exists(args.eval_set):
+        print(f"There is no eval set at {args.eval_set}: nothing is excluded from the training data.")
+        return []
+    try:
+        samples = load_eval_dataset(args.eval_set)
+    except ValueError as e:
+        print(f"[ERROR] {e}")
+        sys.exit(1)
+    print(f"Excluding eval lines ({len(samples)}) from {args.eval_set}.")
+    return [sample["original"] for sample in samples]
 
 
 if __name__ == "__main__":

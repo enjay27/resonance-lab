@@ -1,5 +1,29 @@
 # Plan: MLflow experiment tracking (maintainer, 2026-10-01: "I would use mlflow ... I'll start from a new session")
 
+## REVISED 2026-10-01 — maintainer's decisions (these override the "Design" section where they differ)
+- **Server on the maintainer's Synology NAS** (Intel Celeron J4025, x86_64, 10 GB RAM, Docker/docker-compose), reached over the LAN from the Windows
+  desktop (same gateway). `deploy/mlflow/` holds compose + `.env.example` + README. Server URL and credentials live only in the gitignored
+  `.env.mlflow` (committed `.env.mlflow.example` has blank values). Not exposed to the internet; DSM serves port 5000, so MLflow uses 5050;
+  MLflow basic-auth, single user; image tag == client version; `--allowed-hosts`; no Projects/model serving/registry/gateway; non-root, read-only
+  fs, `cap_drop: ALL`, no `docker.sock`, 1 GB limit; SQLite on a local NAS volume (not SMB/NFS); Hyper Backup / `sqlite3 .backup`.
+- **Metadata + small files.** Params, tags, metrics, plus small artifacts: eval report `.txt`, per-sample predictions (eval set only: hand-written),
+  `train.yaml`/`merge.yaml`, `trainer_log.jsonl`. `--serve-artifacts` on the NAS volume. Never training data, weights, checkpoints, GGUFs.
+- **Dataset = public HF repo**, refreshed about every 2 months. Download with `hf download <repo> --repo-type dataset --revision <sha>`;
+  `configs/hf_dataset.yaml` pins repo + revision (each refresh is a small PR). Every run records repo id, link, revision, `dataset_version`, the
+  sha256 of the files used, row counts and per-reason drops, and the eval-overlap count.
+- **Offline queue, write-locally-first.** NoSQL local store: TinyDB, file `.run.result.backup.json` (gitignored) + `.run.result.backup.files/` for
+  small attachments. Flow: (1) open a run record at the start of the pipeline / a standalone stage; (2) every stage appends params/tags/metrics to it;
+  (3) ping the server (short timeout, one retry); (4) when up, replay pending records oldest first as a queue, stop at the first failure; (5) when
+  down, leave them pending. Idempotent: each record has a `local_run_id` tag checked on the server before replaying; later stages resume the stored
+  `mlflow_run_id`. Tracking never raises (a dead NAS must not fail or hang a training run).
+- **No HF live callback** (`report_to=mlflow`): after training, parse LLaMA-Factory's own `trainer_log.jsonl` and send the curves in `log_batch`
+  chunks of <=1000, so online and offline runs share one path. Live view stays with `watch_training.py`.
+- Client package: prefer `mlflow-skinny` (check Python 3.13 / Windows / pinned torch). Cloud sessions cannot reach the NAS: `mlflow_compare.py`
+  runs on the desktop.
+- Run-identity prerequisites (unique adapter dir per run, sidecar `.meta.json`, per-run log) come first: `pipeline-review-2026-10-01.md` #2, #3, #21.
+- PR order: 1 server (`deploy/mlflow/` + guard tests), 2 `tracking.py` pure helpers, 3 the queue (TinyDB + sync, fake client in tests), 4 stage
+  wiring (model part, NOT VERIFIED), 5 `mlflow_compare.py` + docs.
+
 **Status: plan only, nothing implemented.** Per CLAUDE.md the next session presents this (adjusted) and waits for the maintainer's OK before touching code.
 Why: the first runs (`roadmap/first-training-run-2026-10-01.md`) were compared by pasting `train_results.json`, eval `.txt` reports and PowerShell
 output into chat and then into markdown. MLflow replaces that: every run keeps its params, metrics, data fingerprint and reports, comparable in the UI

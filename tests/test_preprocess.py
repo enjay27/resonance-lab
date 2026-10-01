@@ -111,6 +111,8 @@ def test_filters_keep_clean_rows_in_order_and_report_each_reason(write_jsonl, tm
         "Hangeul residual in translation (ko_ja)": 0,
         "hallucination": 1,
         "recruitment spam": 0,
+        "eval overlap": 0,
+        "eval overlap (near)": 0,
         "duplicate": 1,
         "json error": 1,
     }
@@ -293,3 +295,105 @@ def test_the_translategemma_profile_trains_with_room_for_the_instruction():
         path = f"{config.BASE_DIR}/configs/llamafactory/{name}/train.yaml"
         with open(path, encoding="utf-8") as f:
             assert yaml.safe_load(f)["cutoff_len"] >= 256, name
+
+
+# --- the eval set stays out of the training data --------------------------------------------------
+
+
+EVAL_LINE = "今日のレイドは21時から始めます、参加できる人は教えてください"
+
+
+def test_rows_whose_original_is_in_the_eval_set_are_dropped_and_counted(write_jsonl, tmp_path, capsys):
+    src = write_jsonl("raw.jsonl", [
+        {"original": "ウルト溜まった", "translated": "궁 찼다!"},  # the eval line
+        {"original": "ウルト溜まった！", "translated": "궁 찼다"},  # same line after normalising
+        {"original": EVAL_LINE + "ね", "translated": "오늘 레이드는 21시부터예요"},  # near-duplicate
+        {"original": "スカイ", "translated": "스카이"},
+    ])
+    out = tmp_path / "out.jsonl"
+
+    counts = preprocess.transform_for_lora(src, str(out), eval_originals=["ウルト溜まった", EVAL_LINE])
+
+    assert [r["input"] for r in read_jsonl(out)] == ["スカイ"]
+    assert counts["eval overlap"] == 2 and counts["eval overlap (near)"] == 1
+    assert counts["passed"] == 1
+    assert re.search(r"eval overlap\s*: 2", capsys.readouterr().out)
+
+
+def test_the_reverse_row_of_an_eval_line_is_not_written_either(write_jsonl, tmp_path):
+    src = write_jsonl("raw.jsonl", [
+        {"original": "ウルト溜まった", "translated": "궁 찼다!"},
+        {"original": "スカイ", "translated": "스카이"},
+    ])
+    out = tmp_path / "out.jsonl"
+
+    preprocess.transform_for_lora(src, str(out), fmt="pair", reverse=True, eval_originals=["ウルト溜まった"])
+
+    assert {r["original"] for r in read_jsonl(out)} == {"スカイ", "스카이"}  # both directions of スカイ only, none of the eval line
+
+
+def test_without_an_eval_set_nothing_is_excluded(write_jsonl, tmp_path):
+    src = write_jsonl("raw.jsonl", [{"original": "ウルト溜まった", "translated": "궁 찼다!"}])
+    out = tmp_path / "out.jsonl"
+
+    counts = preprocess.transform_for_lora(src, str(out))
+
+    assert counts["passed"] == 1 and counts["eval overlap"] == 0
+
+
+def _eval_file(tmp_path, rows):
+    path = tmp_path / "eval.jsonl"
+    path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    return str(path)
+
+
+def test_main_excludes_the_eval_set_by_default_when_the_file_exists(write_jsonl, tmp_path, monkeypatch, capsys):
+    src = write_jsonl("raw.jsonl", [
+        {"original": "ウルト溜まった", "translated": "궁 찼다!"},
+        {"original": "スカイ", "translated": "스카이"},
+    ])
+    out = tmp_path / "out.jsonl"
+    monkeypatch.setattr(preprocess, "RAW_LOGS", src)
+    monkeypatch.setattr(preprocess, "PROCESSED_LOGS", str(out))
+    monkeypatch.setattr(preprocess, "EVAL_DATASET_PATH", _eval_file(tmp_path, [{"original": "ウルト溜まった", "translated": "궁 찼다!"}]))
+
+    preprocess.main(["--format", "pair"])
+
+    assert [r["original"] for r in read_jsonl(out)] == ["スカイ"]
+    assert "Excluding eval lines" in capsys.readouterr().out
+
+
+def test_main_keep_eval_turns_the_exclusion_off(write_jsonl, tmp_path, monkeypatch):
+    src = write_jsonl("raw.jsonl", [{"original": "ウルト溜まった", "translated": "궁 찼다!"}])
+    out = tmp_path / "out.jsonl"
+    monkeypatch.setattr(preprocess, "RAW_LOGS", src)
+    monkeypatch.setattr(preprocess, "PROCESSED_LOGS", str(out))
+    monkeypatch.setattr(preprocess, "EVAL_DATASET_PATH", _eval_file(tmp_path, [{"original": "ウルト溜まった", "translated": "x"}]))
+
+    preprocess.main(["--format", "pair", "--keep-eval"])
+
+    assert len(read_jsonl(out)) == 1
+
+
+def test_main_says_so_when_there_is_no_eval_set(write_jsonl, tmp_path, monkeypatch, capsys):
+    src = write_jsonl("raw.jsonl", [{"original": "スカイ", "translated": "스카이"}])
+    monkeypatch.setattr(preprocess, "RAW_LOGS", src)
+    monkeypatch.setattr(preprocess, "PROCESSED_LOGS", str(tmp_path / "out.jsonl"))
+    monkeypatch.setattr(preprocess, "EVAL_DATASET_PATH", str(tmp_path / "missing.jsonl"))
+
+    preprocess.main(["--format", "pair"])
+
+    assert "no eval set" in capsys.readouterr().out
+
+
+def test_main_stops_on_an_unreadable_eval_set(write_jsonl, tmp_path, monkeypatch):
+    src = write_jsonl("raw.jsonl", [{"original": "スカイ", "translated": "스카이"}])
+    bad = tmp_path / "eval.jsonl"
+    bad.write_text("{not json\n", encoding="utf-8")
+    monkeypatch.setattr(preprocess, "RAW_LOGS", src)
+    monkeypatch.setattr(preprocess, "PROCESSED_LOGS", str(tmp_path / "out.jsonl"))
+    monkeypatch.setattr(preprocess, "EVAL_DATASET_PATH", str(bad))
+
+    with pytest.raises(SystemExit) as exc:
+        preprocess.main(["--format", "pair"])
+    assert exc.value.code == 1
