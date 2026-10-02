@@ -1,7 +1,6 @@
 # A Jupyter notebook for the whole lifecycle of a parameter test — idea, 2026-10-02 (maintainer)
 
-**Status: NOT started. Higher priority than the per-sample MLflow evaluation idea (`mlflow-genai-eval.md`). The maintainer starts it from a fresh session: present the design below, get the answers to the open
-questions, then build (tests first).** Why: a parameter test is eight manual steps in PowerShell and a table to read; the sweeps showed it is the thing repeated most.
+**Status: BUILT 2026-10-02 (PR from `claude/great-babbage-i0rage`): `notebooks/parameter_test.ipynb` + `parameter_test.py` (tested). Not yet run on the GPU machine: see `active-issues/unverified-on-gpu.md`.** Why: a parameter test is eight manual steps in PowerShell and a table to read; the sweeps showed it is the thing repeated most.
 
 ## The lifecycle one notebook run should cover ("one parameter test")
 1. **Set the parameters** in one cell: model profile (default `hy-mt2-1.8b`), `fast`, `lr`, `epochs`, eval prompt(s) (`training`, `chat-template`).
@@ -25,7 +24,15 @@ which need steps 2 again. A generic allow-listed `--set key=value` would be the 
   a venv built by an older Python than the base install broke `python -c` earlier with `linecache._register_code ... 'str' has no attribute 'co_consts'` — fixed with `python -m venv --upgrade .venv` (base Python path, venv deactivated).
 - Failure handling follows the stage rule: a failing stage stops the lifecycle with its tail log; nothing is retried silently.
 
-## Open questions for the maintainer (answer before building)
+## Answers of the maintainer (2026-10-02) and what was built
+1. PyCharm notebook support (live output = line-by-line streaming into the cell; plots = inline matplotlib). 2. `.ipynb`, outputs stripped, guarded by `tests/test_notebooks.py`; executed copies `*.executed.ipynb` are gitignored.
+3. One notebook. 4. The sweep runs only the `training` prompt unless a parameter set (or `PROMPTS`) lists `chat-template` too.
+Built: `parameter_test.py` (`ParamSet`, `lifecycle`, `run_command` with process-tree stop on interrupt, `read_curves`/`run_curves`, `run_lifecycle`/`run_sweep`/`best_result`, `decision_text`, `results_markdown`, `kernel_warning`);
+`notebooks/parameter_test.ipynb` (parameters, data, train, merge, eval, curves, MLflow compare, sweep, decide); `requirements-notebook.txt` (ipykernel, matplotlib).
+Left out / next: an interrupted cell on Windows is a hard `taskkill` (the MLflow run is probably left RUNNING, not KILLED; unverified); the compare cell shows MLflow's chrF/term table but the sweep's local table has eval loss only;
+only `lr`/`epochs` are sweepable (the generic `--set key=value` override is the next PR).
+
+## Open questions that were asked (kept for the record)
 1. Where does it run: PyCharm's notebook support, or `jupyter lab` in a terminal? (affects the live-output cell and the plotting choice)
 2. Stored how: `.ipynb` with stripped outputs (guard test), or jupytext percent-format `.py` (clean diffs, opened as a notebook)?
 3. One notebook for the whole lifecycle, or a small set (`01_data`, `02_parameter_test`, `03_compare`)?
