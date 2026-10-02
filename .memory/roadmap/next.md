@@ -5,14 +5,11 @@ TranslateGemma profiles stay in the repo, not developed. Work now, in this order
 1. **`--fast` flag on every llamafactory script + `run_pipeline.py`, default profile -> `hy-mt2-1.8b` (done).**
 2. **`scripts/mlflow_compare.py` (done)**: one table of the runs (profile, lr, epochs, best eval loss, eval scores) for the sweeps; `--sort eval-loss|chrf|term`, `--profile`, `--markdown`, `--all`.
 3. **Sweeps on `hy-mt2-1.8b-fast` (~4 min each)**: lr (the base run at 2e-4 overfit: train 0.15 vs eval 0.69, best at epoch ~1.9), epochs, packing; then confirm the best on the full profile (~25 min) and run both eval prompts.
-4. Then the run-queue journal (below), the 7B (QLoRA: bf16 does not fit 16 GB), the prompt copy to resonance-stream once Hy beats the shipped model.
+4. Then (the run-queue journal is done) a command-line override of lr/epochs for sweeps, the 7B (QLoRA: bf16 does not fit 16 GB), the prompt copy to resonance-stream once Hy beats the shipped model.
 
-## Queued by the maintainer (2026-10-02): run queue as an append-only journal — **the next task after the lr 1e-4 profile decision**
-Idea: `run_queue.py` stores `.run.result.backup.jsonl`, one line per record, read in batches; a sent line is skipped, and sent lines are dropped at the next start. Agreed refinements
-(assessment in the session): mark sent by **appending an ack line** (editing a line in place needs a whole-file rewrite, which is what TinyDB does now and what loses an update when two
-processes write); line types `run` (local id, experiment, name, start), `event`, `remote` (server id), `sent`; **keep the run header + `remote_id`** of the newest N runs (merge/GGUF/eval
-resume a run days later by it, and `remote_id` stops a double create) and drop only sent event lines and their copied files; ignore a torn last line; read the old `.run.result.backup.json`
-once to migrate. Only `run_queue.py` + tests change (data part); the tracker/stage API stays. Not urgent: the current queue works (a 401 run stayed queued and was sent later, 2026-10-02).
+## Done 2026-10-02 (maintainer's idea): the run queue is an append-only journal, `run_queue.py` / `.run.result.backup.jsonl`
+One line per write; a sent event is acknowledged by a `sent` line and dropped (with its copied file) at the next start; the run header + server id stay for resuming (and for `prune`); a torn last line is ignored; two
+processes appending lose nothing; the old TinyDB file is migrated once (renamed `.migrated`); TinyDB is no longer a dependency. Details: `mlflow-plan.md`.
 
 ## Worked in this order (2026-10-01, maintainer approved): [`pipeline-review-2026-10-01.md`](pipeline-review-2026-10-01.md)
 Data safety (eval-overlap exclusion **done**; sidecar manifest, pair/time split, validate vs preprocess, Fetch Data) -> run identity (unique adapter

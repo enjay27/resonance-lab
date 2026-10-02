@@ -15,7 +15,7 @@ Hy-1.8B at lr 2e-4 overfits (train 0.15 vs eval 0.69, best epoch ~1.9); older Hy
 
 **Pipeline state:** switchable pipelines/profiles; eval-overlap exclusion, manifest + validation split, validate/drop-rate guards (limits are guesses), Fetch Data (`--pin`/`--check`; HF dataset pinned `b37c268f`, the
 unified file for ~2 months: local `include: "bp-training-dataset-*.jsonl"`, `fetch_data.py --force` once), run identity, MLflow end to end (NAS server, offline queue, `track_records.py`/`stage_tracking.py`; UI shows runs, curves,
-artifacts; NAS `MINIO_ENDPOINT_URL` must be the NAS's real address; Ctrl+C -> KILLED; a failed artifact cannot block the queue). `-fast` profiles evaluate every 10 steps. Queued: run-queue journal.
+artifacts; NAS `MINIO_ENDPOINT_URL` must be the NAS's real address; Ctrl+C -> KILLED; a failed artifact cannot block the queue; the offline queue is an append-only journal `.run.result.backup.jsonl`, TinyDB dropped). `-fast` profiles evaluate every 10 steps.
 Rule: **graft first** (`graft skeleton <file>` before reading a file, see CLAUDE.md). Index: [`roadmap/next.md`](.memory/roadmap/next.md).
 
 **Model part never runs in a cloud session** (no GPU): every model stage is NOT VERIFIED —

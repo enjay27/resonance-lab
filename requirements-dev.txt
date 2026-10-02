@@ -6,4 +6,3 @@ rich==15.0.0
 sacrebleu==2.6.0
 
 # The local queue of runs not yet sent to the MLflow server (run_queue.py): a schemaless JSON document store, pure Python (3.10-3.14).
-tinydb==4.9.0
