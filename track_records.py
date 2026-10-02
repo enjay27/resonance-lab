@@ -40,10 +40,17 @@ def stage_run_id(record):
     return run_identity(record["profile"], record["run"])[0]
 
 
-def train_records(profile_name, base_model, template, train_cfg, fetch_state, manifest, run_id, git=None, packages=None):
-    """(params, tags) for the start of a training."""
+def override_tag(overrides):
+    """The command-line overrides of a training as one tag value, `learning_rate=5e-05,num_train_epochs=2`."""
+    return ",".join(f"{key}={value:g}" for key, value in overrides.items())
+
+
+def train_records(profile_name, base_model, template, train_cfg, fetch_state, manifest, run_id, git=None, packages=None, overrides=None):
+    """(params, tags) for the start of a training. `train_cfg` is the yaml with the overrides already applied."""
     params = tracking.train_params(profile_name, base_model, template, train_cfg)
     tags = {"stage": "train", "run.id": run_id, **tracking.dataset_tags(fetch_state, manifest)}
+    if overrides:
+        tags["train.overrides"] = override_tag(overrides)
     if manifest:
         params.update(tracking.data_params(manifest))
         tags.update(tracking.prompt_fingerprint(manifest.get("style"), manifest.get("reverse")))

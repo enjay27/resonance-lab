@@ -484,6 +484,60 @@ def test_the_base_profile_keeps_its_own_eval_cadence(base, fast):
     assert b["eval_steps"] == b["save_steps"] == 100  # ~1600 steps: eval every 100 (the fast profiles' scaling is their own)
 
 
+# --- command-line overrides of the learning rate and the epochs (sweeps without editing a profile) -------------------
+
+
+def test_no_override_is_no_dict():
+    assert lf_tools.training_overrides(None, None) == {}
+
+
+def test_the_learning_rate_and_the_epochs_become_the_yaml_keys_they_replace():
+    assert lf_tools.training_overrides(1e-4, None) == {"learning_rate": 1e-4}
+    assert lf_tools.training_overrides(None, 2) == {"num_train_epochs": 2.0}
+    assert lf_tools.training_overrides(5e-5, 1.5) == {"learning_rate": 5e-5, "num_train_epochs": 1.5}
+
+
+@pytest.mark.parametrize("lr,epochs", [(0, None), (-1e-4, None), (float("nan"), None), (float("inf"), None), (None, 0), (None, -1), (None, float("nan"))])
+def test_a_learning_rate_or_epochs_that_makes_no_sense_is_refused(lr, epochs):
+    with pytest.raises(ValueError, match="positive"):
+        lf_tools.training_overrides(lr, epochs)
+
+
+def test_override_arguments_are_written_so_the_trainers_config_parser_reads_them_as_numbers():
+    """LLaMA-Factory reads `key=value` after the yaml with OmegaConf (checked: it reads these as floats). Write every number
+    with a dot, which plain YAML also reads as a float: learning rate 1.000000e-05, epochs 2.0."""
+    assert lf_tools.override_arguments({"learning_rate": 1e-4}) == ["learning_rate=1.000000e-04"]
+    assert lf_tools.override_arguments({"learning_rate": 5e-5, "num_train_epochs": 2.0}) == ["learning_rate=5.000000e-05", "num_train_epochs=2.0"]
+    assert lf_tools.override_arguments({"num_train_epochs": 1.5}) == ["num_train_epochs=1.5"]
+    assert lf_tools.override_arguments({}) == []
+
+
+def test_the_train_command_carries_the_overrides_after_the_output_dir():
+    run_dir = os.path.join(config.BASE_DIR, "outputs", "hy_lora", "20261002-190000")
+
+    cmd = lf_tools.train_command("configs/x/train.yaml", run_dir, {"learning_rate": 1e-4, "num_train_epochs": 2.0})
+
+    assert cmd == ["llamafactory-cli", "train", "configs/x/train.yaml", "output_dir=outputs/hy_lora/20261002-190000",
+                   "learning_rate=1.000000e-04", "num_train_epochs=2.0"]
+    assert lf_tools.train_command("t.yaml", None, {"learning_rate": 1e-4}) == ["llamafactory-cli", "train", "t.yaml", "learning_rate=1.000000e-04"]
+    assert lf_tools.train_command("t.yaml") == ["llamafactory-cli", "train", "t.yaml"]  # no override: as before
+
+
+def test_lr_and_epochs_are_command_line_options_of_the_training_script():
+    parser = argparse.ArgumentParser()
+    lf_tools.add_override_arguments(parser)
+
+    args = parser.parse_args(["--lr", "1e-4", "--epochs", "2"])
+
+    assert (args.lr, args.epochs) == (1e-4, 2.0) and parser.parse_args([]).lr is None and parser.parse_args([]).epochs is None
+
+
+def test_the_override_options_pass_through_the_profile_parser_untouched():
+    profile, rest = lf_tools.profile_from_args(["--fast", "--lr", "1e-4", "--epochs", "2"], "test")
+
+    assert profile.name == config.LF_PROFILE_DEFAULT + "-fast" and rest == ["--lr", "1e-4", "--epochs", "2"]
+
+
 # --- a variant of a profile: the same recipe with one thing changed ---------------------------------
 
 # (base, variant, what the train.yaml may differ in besides the output folder)

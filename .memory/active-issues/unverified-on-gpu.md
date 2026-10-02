@@ -2,6 +2,10 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **`train.py --lr / --epochs` (2026-10-02):** the override is passed to `llamafactory-cli train` as `learning_rate=1.000000e-04 num_train_epochs=2.0` after `output_dir=...`, the same mechanism as `output_dir=`. Unit-tested;
+  the format was checked with a real OmegaConf (what LLaMA-Factory reads them with: floats), never with LLaMA-Factory itself. Check on a `-fast` run: `python scripts\llamafactory\train.py --fast --lr 1e-4 --epochs 2` prints
+  the overrides, the LLaMA-Factory log/`train.yaml` args show learning_rate 0.0001 and 2 epochs (about 58 steps), and the MLflow run has param `learning_rate` 0.0001, `num_train_epochs` 2.0 and the tag `train.overrides`.
+
 - **Run queue journal (2026-10-02):** `run_queue.py` now writes `.run.result.backup.jsonl` instead of TinyDB's `.run.result.backup.json`. Unit-tested (appends, torn line, two writers, compaction, migration of the old
   format) and run end to end with the real MLflow client against a real 3.16.1 server (record, sync, next-start compaction, a later stage resuming the run). Not run on Windows / Python 3.13: the first start after
   the update migrates your old `.run.result.backup.json` (renamed `.migrated`; a run still unsent there is sent at the next sync) -- check `[tracking]` shows no warning, and that `.run.result.backup.jsonl` exists.

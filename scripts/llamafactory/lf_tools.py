@@ -7,6 +7,7 @@ repo root because the yaml files use paths relative to it.
 
 import argparse
 import json
+import math
 import os
 import subprocess
 import sys
@@ -238,9 +239,35 @@ def repo_relative(path):
     return os.path.relpath(path, BASE_DIR).replace(os.sep, "/")
 
 
-def train_command(train_yaml, output_dir=None):
-    """`llamafactory-cli train`; `output_dir` (this run's directory, see runs.py) overrides the yaml's."""
-    return ["llamafactory-cli", "train", train_yaml] + ([f"output_dir={repo_relative(output_dir)}"] if output_dir else [])
+def training_overrides(lr=None, epochs=None):
+    """The yaml keys `--lr` / `--epochs` replace for one training (sweeps without editing a profile): {} when neither is
+    given. Raises ValueError for a value that is not a positive finite number."""
+    overrides = {}
+    for key, value in (("learning_rate", lr), ("num_train_epochs", epochs)):
+        if value is None:
+            continue
+        if not (math.isfinite(value) and value > 0):
+            raise ValueError(f"{key} must be a positive number, not {value!r}")
+        overrides[key] = float(value)
+    return overrides
+
+
+def override_arguments(overrides):
+    """`key=value` arguments for llamafactory-cli, read by LLaMA-Factory with OmegaConf. Every number is written with a dot
+    (learning rate 1.000000e-05, epochs 2.0), a float to OmegaConf and to plain YAML alike (YAML 1.1 takes `1e-05` as text)."""
+    return [f"{key}={value:.6e}" if key == "learning_rate" else f"{key}={float(value)!r}" for key, value in overrides.items()]
+
+
+def add_override_arguments(parser):
+    parser.add_argument("--lr", type=float, help="learning rate for this training, instead of the profile's (e.g. 1e-4); recorded in MLflow")
+    parser.add_argument("--epochs", type=float, help="number of epochs for this training, instead of the profile's (e.g. 2); recorded in MLflow")
+
+
+def train_command(train_yaml, output_dir=None, overrides=None):
+    """`llamafactory-cli train`; `output_dir` (this run's directory, see runs.py) overrides the yaml's, and so do
+    `overrides` (`training_overrides`)."""
+    return (["llamafactory-cli", "train", train_yaml] + ([f"output_dir={repo_relative(output_dir)}"] if output_dir else [])
+            + override_arguments(overrides or {}))
 
 
 def merge_command(merge_yaml, adapter_dir=None):
