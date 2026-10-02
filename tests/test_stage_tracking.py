@@ -67,9 +67,10 @@ def test_a_training_starts_its_run_before_it_records_anything():
 
 
 def _training_files(tmp_path):
-    _write(tmp_path / "trainer_log.jsonl", '{"current_steps": 1, "loss": 2.0}\n')
+    _write(tmp_path / "trainer_log.jsonl", '{"current_steps": 1, "loss": 2.0, "elapsed_time": "0:00:01"}\n')
     _write(tmp_path / "train_results.json", {"train_runtime": 100.0})
-    _write(tmp_path / "trainer_state.json", {"global_step": 9, "best_model_checkpoint": "o/checkpoint-8", "log_history": []})
+    _write(tmp_path / "trainer_state.json", {"global_step": 9, "best_model_checkpoint": "o/checkpoint-8",
+                                             "log_history": [{"step": 1, "loss": 2.0, "grad_norm": 7.5}]})
     _write(tmp_path / "train_stdout.log", "[INFO] trainable params: 13,434,880 || all params: 3,893,000,000 || trainable%: 0.3451\nstep 1\n")
     yaml_file, manifest = tmp_path / "train.yaml", tmp_path / "lora_train_data.meta.json"
     _write(yaml_file, "learning_rate: 1.0e-5\n")
@@ -83,10 +84,12 @@ def test_a_finished_training_sends_its_curves_results_and_recipe_then_closes_the
 
     stage_tracking.finish_training(t, str(tmp_path), "FINISHED", train_yaml=train_yaml, manifest_file=manifest)
 
-    assert t.named("step_log")[0][1] == (str(tmp_path / "trainer_log.jsonl"),)
+    curves = tmp_path / "curves.jsonl"  # the trainer's log with the gradient norm of its state file joined in
+    assert t.named("step_log")[0][1] == (str(curves),)
+    assert json.loads(curves.read_text(encoding="utf-8").splitlines()[0])["grad_norm"] == 7.5
     assert t.named("metrics")[0][1][0]["train.runtime_s"] == 100.0
     tags = {k: v for call in t.named("tags") for k, v in call[1][0].items()}
-    assert tags["train.best_checkpoint"] == "checkpoint-8"
+    assert tags["train.best_checkpoint"] == "checkpoint-8" and tags["train.global_step"] == "9"
     assert tags["train.trainable_params"] == "13434880" and tags["train.all_params"] == "3893000000"
     sent = [os.path.basename(c[1][0]) for c in t.named("artifact")]
     assert sent == ["train.yaml", "lora_train_data.meta.json", "trainer_state.json"]  # the recipe and data record, not the noisy log

@@ -416,13 +416,20 @@ class FakeMlflow:
             self.calls.append(("search_experiments", max_results))
             return []
 
+        existing = None  # an experiment the server already has: (id, tags)
+
         def get_experiment_by_name(self, name):
             self.calls.append(("get_experiment_by_name", name))
-            return None
+            if self.existing is None:
+                return None
+            return type("E", (), {"experiment_id": self.existing[0], "tags": dict(self.existing[1])})
 
-        def create_experiment(self, name):
-            self.calls.append(("create_experiment", name))
+        def create_experiment(self, name, tags=None):
+            self.calls.append(("create_experiment", name, dict(tags or {})))
             return "7"
+
+        def set_experiment_tag(self, experiment_id, key, value):
+            self.calls.append(("set_experiment_tag", experiment_id, key, value))
 
         def create_run(self, experiment_id, start_time=None, tags=None, run_name=None):
             self.calls.append(("create_run", experiment_id, start_time, dict(tags)))
@@ -463,10 +470,38 @@ def test_the_adapter_creates_the_experiment_once_and_the_run_with_its_local_id_a
     remote = a.create_run("resonance-lab", "hy-1", 1_700_000_000_000, "local-1")
 
     assert remote == "run-1"
-    assert ("create_experiment", "resonance-lab") in client.calls
+    assert ("create_experiment", "resonance-lab", {"mlflow.experimentKind": "finetuning"}) in client.calls
     assert ("create_run", "7", 1_700_000_000_000, {"mlflow.runName": "hy-1", "local_run_id": "local-1"}) in client.calls
     a.create_run("resonance-lab", "hy-2", 1, "local-2")
-    assert client.calls.count(("create_experiment", "resonance-lab")) == 1
+    assert [c[0] for c in client.calls].count("create_experiment") == 1
+
+
+def test_a_new_experiment_is_marked_as_fine_tuning_so_the_ui_shows_training_runs_not_evaluation_runs(adapter):
+    a, client = adapter
+
+    a.create_run("resonance-lab", "hy-1", 1, "local-1")
+
+    assert ("create_experiment", "resonance-lab", {"mlflow.experimentKind": "finetuning"}) in client.calls
+
+
+def test_an_existing_experiment_without_the_kind_gets_it_once(adapter):
+    a, client = adapter
+    client.existing = ("3", {})
+
+    a.create_run("resonance-lab", "hy-1", 1, "local-1")
+    a.create_run("resonance-lab", "hy-2", 1, "local-2")
+
+    assert client.calls.count(("set_experiment_tag", "3", "mlflow.experimentKind", "finetuning")) == 1
+    assert not [c for c in client.calls if c[0] == "create_experiment"]
+
+
+def test_an_experiment_whose_kind_was_chosen_in_the_ui_is_left_alone(adapter):
+    a, client = adapter
+    client.existing = ("3", {"mlflow.experimentKind": "custom_model_development"})
+
+    a.create_run("resonance-lab", "hy-1", 1, "local-1")
+
+    assert not [c for c in client.calls if c[0] == "set_experiment_tag"]
 
 
 def test_the_adapter_finds_a_run_by_its_local_id_tag(adapter):

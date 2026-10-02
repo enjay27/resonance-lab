@@ -195,15 +195,19 @@ def test_train_result_metrics_read_the_trainers_two_files():
     metrics = tracking.train_result_metrics(results, state)
 
     assert metrics["train.runtime_s"] == 1508.2 and metrics["train.samples_per_s"] == 8.5 and metrics["train.steps_per_s"] == 1.064
-    assert metrics["train.loss"] == 0.505 and metrics["train.epochs"] == 3.0 and metrics["train.total_flos"] == 1.5e16 and metrics["train.global_step"] == 1605
+    assert metrics["train.loss"] == 0.505
     assert metrics["eval.best_loss"] == 0.6656 and metrics["eval.best_loss_step"] == 1000
-    assert tracking.trainer_tags(state) == {"train.best_checkpoint": "checkpoint-1000"}
+    # the same number for every run of a profile is no chart: it is a tag
+    assert not {"train.epochs", "train.total_flos", "train.global_step"} & set(metrics)
+    assert tracking.trainer_tags(state, results) == {"train.best_checkpoint": "checkpoint-1000", "train.epochs": "3",
+                                                     "train.global_step": "1605", "train.total_flos": "15000000000000000"}
 
 
 def test_train_result_metrics_cope_with_missing_files_and_no_eval_rows():
     assert tracking.train_result_metrics(None, None) == {}
     assert "eval.best_loss" not in tracking.train_result_metrics({"train_loss": 1.0}, {"log_history": [{"loss": 1.0, "step": 1}]})
     assert tracking.trainer_tags(None) == {} and tracking.trainer_tags({"best_model_checkpoint": None}) == {}
+    assert tracking.trainer_tags(None, {"epoch": 2.5}) == {"train.epochs": "2.5"}
 
 
 def _log(*rows):
@@ -293,3 +297,33 @@ def test_the_trainable_parameter_counts_are_read_from_the_trainers_log():
 
 def test_a_log_without_the_line_gives_no_tags():
     assert tracking.model_size_tags("") == {} and tracking.model_size_tags("Traceback ...") == {}
+
+
+# --- the curves: the trainer's log plus the gradient norm only its state file has ----------------------------------------
+
+
+def test_the_gradient_norm_from_the_trainer_state_joins_the_log_rows_by_step():
+    log = _log({"current_steps": 1, "loss": 5.3, "lr": 3e-07, "elapsed_time": "0:00:01"},
+               {"current_steps": 2, "loss": 5.1, "lr": 6e-07, "elapsed_time": "0:00:02"})
+    state = {"log_history": [{"step": 1, "loss": 5.3, "grad_norm": 18.06}, {"step": 2, "loss": 5.1, "grad_norm": 24.1}]}
+
+    rows = [json.loads(line) for line in tracking.curve_lines(log, state)]
+
+    assert [(r["current_steps"], r["grad_norm"], r["elapsed_time"]) for r in rows] == [(1, 18.06, "0:00:01"), (2, 24.1, "0:00:02")]
+    points = tracking.step_metrics(tracking.curve_lines(log, state), start_ms=0)
+    assert ("grad_norm", 18.06, 1000, 1) in points  # the existing point builder already knows the key
+
+
+def test_curves_keep_rows_without_a_matching_state_row_and_skip_junk():
+    log = _log({"current_steps": 1, "loss": 5.3, "elapsed_time": "0:00:01"}, {"current_steps": 7, "eval_loss": 0.9, "elapsed_time": "0:00:07"})
+    state = {"log_history": [{"step": 1, "grad_norm": 2.0}, {"step": 3, "grad_norm": 9.0}, {"eval_loss": 0.9}, "junk", {"step": 1, "grad_norm": float("nan")}]}
+
+    rows = [json.loads(line) for line in tracking.curve_lines(log, state)]
+
+    assert [r["current_steps"] for r in rows] == [1, 7] and rows[0]["grad_norm"] == 2.0 and "grad_norm" not in rows[1]
+
+
+def test_without_a_state_file_the_curves_are_the_log_itself():
+    log = _log({"current_steps": 1, "loss": 5.3, "elapsed_time": "0:00:01"})
+
+    assert [json.loads(line) for line in tracking.curve_lines(log, None)] == [json.loads(log[0])]

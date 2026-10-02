@@ -16,6 +16,7 @@ from manifest import manifest_path
 TRAINER_LOG = "trainer_log.jsonl"
 TRAIN_RESULTS = "train_results.json"
 TRAINER_STATE = "trainer_state.json"
+CURVES = "curves.jsonl"  # trainer_log.jsonl with the gradient norm of trainer_state.json joined in; what the tracker sends as curves
 
 
 class _Off:
@@ -74,6 +75,18 @@ def _first_text(path, limit=1_000_000):
         return ""
 
 
+def _curves_file(log, curves, state):
+    """Write the curves file (the log + `grad_norm`) and return its path; the plain log when that cannot be done."""
+    try:
+        with open(log, encoding="utf-8") as f:
+            lines = tracking.curve_lines(f.read().splitlines(), state)
+        with open(curves, "w", encoding="utf-8") as f:
+            f.write("".join(line + "\n" for line in lines))
+        return curves
+    except OSError:
+        return log
+
+
 def finish_training(tracker, run_dir, status, train_yaml=None, manifest_file=manifest_path(PROCESSED_LOGS)):
     """Send the curves, the result metrics and the model size of a training, close its run (`FINISHED` / `FAILED` /
     `KILLED`), then upload the files that say how it was made and flush.
@@ -83,10 +96,11 @@ def finish_training(tracker, run_dir, status, train_yaml=None, manifest_file=man
     where it holds the traceback.
     """
     log = os.path.join(run_dir, TRAINER_LOG)
+    results = track_records.read_json(os.path.join(run_dir, TRAIN_RESULTS))
+    state = track_records.read_json(os.path.join(run_dir, TRAINER_STATE))
     if os.path.isfile(log):
-        tracker.step_log(log)
-    metrics, tags = track_records.train_result_records(track_records.read_json(os.path.join(run_dir, TRAIN_RESULTS)),
-                                                      track_records.read_json(os.path.join(run_dir, TRAINER_STATE)))
+        tracker.step_log(_curves_file(log, os.path.join(run_dir, CURVES), state))
+    metrics, tags = track_records.train_result_records(results, state)
     stdout = os.path.join(run_dir, TRAIN_LOG_NAME)
     tags = {**tags, **tracking.model_size_tags(_first_text(stdout))}
     if metrics:
