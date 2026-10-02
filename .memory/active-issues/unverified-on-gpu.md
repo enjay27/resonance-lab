@@ -2,6 +2,9 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **`-fast` eval cadence (2026-10-02):** the three `-fast` profiles now have `eval_steps: 10`, `save_steps: 10` (were 100 = never evaluated in an ~87-step run). Unit-tested (YAML only). Check on the next `-fast` training:
+  `eval_loss` rows in `trainer_log.jsonl` / the MLflow curve, the best checkpoint chosen (`train.best_checkpoint` tag), and that the extra evals (199 validation rows) cost seconds, not minutes.
+
 - **Curves, constants, experiment kind (2026-10-02):** `finish_training` writes `<run dir>/curves.jsonl` (the trainer log + `grad_norm` joined from `trainer_state.json`) and sends it as the curves;
   `train.epochs` / `train.global_step` / `train.total_flos` are tags now (they were bar charts); the adapter sets the experiment tag `mlflow.experimentKind=finetuning` on a new experiment and once on an existing one
   without it (a kind chosen in the UI is kept). Unit-tested; the tag logic ran against a real MLflow 3.16.1 server. NOT confirmed: that the web UI then shows the training-runs view with line charts
