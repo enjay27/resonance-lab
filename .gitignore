@@ -47,9 +47,12 @@ deploy/mlflow/.env
 deploy/postgres/.env
 .env.mlflow
 .run.result.backup.json
-.run.result.backup.files/
-.run.result.backup.json.tmp
+.run.result.backup.json.migrated
 .run.result.backup.json.corrupt-*
+.run.result.backup.jsonl
+.run.result.backup.jsonl.tmp
+.run.result.backup.jsonl.corrupt-*
+.run.result.backup.files/
 
 # --- [GITHUB TEMPLATE] Byte-compiled / optimized / DLL files ---
 __pycache__/

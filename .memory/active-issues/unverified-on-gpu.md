@@ -2,6 +2,11 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **Run queue journal (2026-10-02):** `run_queue.py` now writes `.run.result.backup.jsonl` instead of TinyDB's `.run.result.backup.json`. Unit-tested (appends, torn line, two writers, compaction, migration of the old
+  format) and run end to end with the real MLflow client against a real 3.16.1 server (record, sync, next-start compaction, a later stage resuming the run). Not run on Windows / Python 3.13: the first start after
+  the update migrates your old `.run.result.backup.json` (renamed `.migrated`; a run still unsent there is sent at the next sync) -- check `[tracking]` shows no warning, and that `.run.result.backup.jsonl` exists.
+  `pip uninstall tinydb` is optional (no longer a requirement). Compaction replaces the file: on Windows it is skipped (retried next start) if another process has the journal open.
+
 - **`scripts/mlflow_compare.py` (2026-10-02):** data part (needs `.env.mlflow` and `mlflow-skinny`, no GPU). Unit-tested with a stand-in client and run against a real MLflow 3.16.1 server with runs recorded through
   the tracker (sorted by eval loss / chrF, killed run hidden, markdown). Not run against the NAS or your real runs: `python scripts\mlflow_compare.py` should list `hy-mt2-1.8b-fast-...` with their eval loss;
   the eval columns stay `-` until a run's eval stage ran (two evals with different `--prompt` in one run share the same metric keys: the table shows the last prompt).

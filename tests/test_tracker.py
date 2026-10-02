@@ -528,13 +528,13 @@ def test_the_adapter_turns_plain_data_into_mlflow_entities(adapter):
     assert ("set_terminated", "run-1", "FINISHED", 5000) in client.calls
 
 
-def test_tinydb_is_pinned_where_the_queue_runs():
+def test_the_queue_needs_no_database_package():
     import os
     from config import BASE_DIR
 
     for name in ("requirements-dev.txt", "requirements-llamafactory.txt"):
         with open(os.path.join(BASE_DIR, name), encoding="utf-8") as f:
-            assert "tinydb==4.9.0" in f.read().split(), name
+            assert "tinydb" not in f.read().lower(), name  # the journal is plain JSON lines (run_queue.py)
 
 
 def test_trainer_log_points_reach_mlflow_with_the_timestamp_and_the_step_in_the_right_places(tmp_path):

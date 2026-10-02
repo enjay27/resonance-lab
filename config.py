@@ -70,5 +70,6 @@ MLFLOW_EXPERIMENT = "resonance-lab"  # every training (profile run) is one MLflo
 EVAL_MAX_NEW_TOKENS = 256  # greedy decoding, batch 1; recorded with every eval run (track_records.eval_records)
 
 # The local queue of runs not yet sent to the MLflow server (run_queue.py): gitignored, written before anything is sent.
-RUN_QUEUE_PATH = os.path.join(BASE_DIR, ".run.result.backup.json")
+RUN_QUEUE_PATH = os.path.join(BASE_DIR, ".run.result.backup.jsonl")  # the journal (run_queue.py)
+RUN_QUEUE_LEGACY = os.path.join(BASE_DIR, ".run.result.backup.json")  # the old TinyDB file: read once, renamed .migrated
 RUN_QUEUE_FILES = os.path.join(BASE_DIR, ".run.result.backup.files")  # the small files (reports, trainer log) of queued runs

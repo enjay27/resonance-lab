@@ -73,7 +73,7 @@ text_rules.py         JP / Hangeul patterns shared by preprocess and the eval me
 hf_data.py            the HF dataset: config, `hf download` command, merge of the per-channel files, fetch state; tested (no network)
 runs.py               one training = one run dir `<output_dir>/<run id>/` + run.json status; merge takes the latest complete run; tested
 tracking.py           what a run records in MLflow, pure: .env.mlflow settings, params/tags/metrics from yaml, manifest, fetch state, eval report, trainer files (no mlflow import); tested
-run_queue.py          the local record of every run (TinyDB, `.run.result.backup.json`, atomic writes): events marked sent; written BEFORE anything is sent; tested
+run_queue.py          the local record of every run: an append-only JSON-lines journal `.run.result.backup.jsonl` (one line per write; sent events acknowledged by a `sent` line and dropped at the next start, the run header + server id kept; the old TinyDB file is migrated once); written BEFORE anything is sent; tested
 track_records.py      what each stage records (params/tags/metrics for train, merge, gguf, eval; the tracker run id `<profile>-<run id>`), pure, no mlflow; tested
 stage_tracking.py     the stages' use of the tracker (open_tracker never raises; start/finish_training, resume_stage, record_stage, fail_stage); tested
 compare_runs.py       the experiment's runs as one table (profile, lr, epochs, best eval loss, eval scores, data revision), sorted/filtered; pure; tested
