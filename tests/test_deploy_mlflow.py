@@ -104,9 +104,20 @@ def test_basic_auth_is_on_and_the_host_header_is_checked(service):
 
     assert command[command.index("--app-name") + 1] == "basic-auth"
     assert "--allowed-hosts" in command and "${MLFLOW_ALLOWED_HOSTS:?" in command[command.index("--allowed-hosts") + 1]
-    assert command[command.index("--cors-allowed-origins") + 1] == ""  # no browser origin may call the API
     assert "--disable-security-middleware" not in command
     assert "--dev" not in command
+
+
+def test_only_the_web_ui_own_address_is_an_allowed_browser_origin(service):
+    """An empty list blocks the UI's own requests (the browser sends `Origin: http://<NAS>:5050` even to the page's own
+    server): the runs list and every chart stayed empty and the log said "Blocked cross-origin request". The UI's own
+    address is allowed, nothing else: no wildcard, no other site."""
+    command = _command(service)
+    origins = command[command.index("--cors-allowed-origins") + 1].split(",")
+
+    assert "http://${MLFLOW_BIND}:${MLFLOW_PORT:-5050}" in origins
+    assert all(origin.startswith("http://${MLFLOW_BIND}:") or origin in ("http://localhost:5050", "http://127.0.0.1:5050") for origin in origins)
+    assert "*" not in "".join(origins)
 
 
 def test_the_server_only_serves_tracking_and_proxies_small_artifacts(service):

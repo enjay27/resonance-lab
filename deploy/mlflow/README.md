@@ -40,12 +40,13 @@ curl -s -o /dev/null -w "%{http_code}\n" http://<NAS IP>:5050/api/2.0/mlflow/exp
 curl -s -o /dev/null -w "%{http_code}\n" -u admin:<password> "http://<NAS IP>:5050/api/2.0/mlflow/experiments/search?max_results=1"   # 200
 ```
 Then, in the resonance-lab repo, copy `.env.mlflow.example` to `.env.mlflow` and fill in the URL and password
-(gitignored: the URL and the password never go into git). Open `http://<NAS IP>:5050` in a browser to see the runs.
+(gitignored: the URL and the password never go into git). Open `http://<NAS IP>:5050` in a browser to see the runs: exactly the address and port of `MLFLOW_BIND`/`MLFLOW_PORT`, because that is the one
+browser origin the server allows (a host name in `MLFLOW_ALLOWED_HOSTS` passes the host check, but the UI's requests from it get 403 and the runs list and charts stay empty).
 
 ## What the settings do
 | Requirement | Setting |
 |---|---|
-| only you | basic-auth with one `admin` user, `default_permission = NO_PERMISSIONS` (MLflow's own default is READ), no self sign-up (every API call and `/signup` answer 401), `--allowed-hosts` (a request naming another host gets 403), no CORS origin, bound to the NAS LAN address, firewall to one IP |
+| only you | basic-auth with one `admin` user, `default_permission = NO_PERMISSIONS` (MLflow's own default is READ), no self sign-up (every API call and `/signup` answer 401), `--allowed-hosts` (a request naming another host gets 403), CORS only for the web UI's own address (`http://MLFLOW_BIND:MLFLOW_PORT`; any other site's request gets 403), bound to the NAS LAN address, firewall to one IP |
 | runs no Python | `mlflow server` only (no Projects, model serving or registry in use). MLflow 3.x starts job workers **by default**: `MLFLOW_SERVER_ENABLE_JOB_EXECUTION=false` and `MLFLOW_SERVER_JOB_ENABLE_PERIODIC_TASKS=false` switch them off; the assistant and its docker sandbox are off; no `docker.sock`; read-only root file system, no capabilities, non-root, 1 GB, 200 processes |
 | metadata + small files | runs and users in Postgres (`deploy/postgres/`, databases `mlflow` and `mlflow_auth`), artifacts in MinIO through `--serve-artifacts` (the desktop never talks to Postgres or MinIO, so it needs none of their credentials). resonance-lab logs only reports, predictions and configs, never data, weights or GGUFs |
 | private | telemetry is off (`MLFLOW_DISABLE_TELEMETRY`, `DO_NOT_TRACK`); the client example sets it too |

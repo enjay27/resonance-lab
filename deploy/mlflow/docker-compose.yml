@@ -36,8 +36,8 @@ services:
       - basic-auth # one admin user; users cannot sign themselves up
       - --allowed-hosts # a request must name one of these hosts (the NAS address and port you use)
       - "${MLFLOW_ALLOWED_HOSTS:?set MLFLOW_ALLOWED_HOSTS in .env},localhost:5050,127.0.0.1:5050"
-      - --cors-allowed-origins # no browser origin may call the API
-      - ""
+      - --cors-allowed-origins # only the web UI's own address (the browser sends it as the Origin of the UI's requests); no other site
+      - "http://${MLFLOW_BIND}:${MLFLOW_PORT:-5050}"
 
     environment:
       # basic-auth's own database (users and permissions), the second database of deploy/postgres/. entrypoint.py renders
