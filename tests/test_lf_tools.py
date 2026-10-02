@@ -419,6 +419,24 @@ def test_fast_profile_keeps_the_effective_batch_and_has_its_own_dirs(base, fast)
     assert read_yaml(pf.merge_yaml)["adapter_name_or_path"] == f["output_dir"]
 
 
+@pytest.mark.parametrize("base,fast", FAST_PAIRS)
+def test_fast_profile_evaluates_often_enough_to_have_a_validation_curve(base, fast):
+    """A fast run is ~90 steps (packed, effective batch 32, 3 epochs). With eval_steps 100 it never evaluated: no
+    eval-loss curve in MLflow and no best checkpoint for load_best_model_at_end. Evaluate and save every few steps."""
+    f = read_yaml(lf_tools.load_profile(fast).train_yaml)
+
+    assert f["eval_strategy"] == f["save_strategy"] == "steps" and f["load_best_model_at_end"] is True
+    assert f["eval_steps"] <= 20
+    assert f["save_steps"] % f["eval_steps"] == 0  # the trainer refuses a best-model save that is not on an eval step
+
+
+@pytest.mark.parametrize("base,fast", FAST_PAIRS)
+def test_the_base_profile_keeps_its_own_eval_cadence(base, fast):
+    b = read_yaml(lf_tools.load_profile(base).train_yaml)
+
+    assert b["eval_steps"] == b["save_steps"] == 100  # ~1600 steps: eval every 100 (the fast profiles' scaling is their own)
+
+
 # --- reading training pairs for inspection ---------------------------------------------------------
 
 

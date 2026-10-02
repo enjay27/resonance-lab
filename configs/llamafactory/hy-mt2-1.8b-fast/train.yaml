@@ -40,9 +40,9 @@ bf16: true
 
 ### Eval & Save
 eval_strategy: steps
-eval_steps: 100
+eval_steps: 10  # ~90 steps in a fast run: 100 never evaluated (no eval-loss curve, no best checkpoint)
 save_strategy: steps
-save_steps: 100
+save_steps: 10  # a multiple of eval_steps (load_best_model_at_end)
 save_total_limit: 3
 load_best_model_at_end: true
 
