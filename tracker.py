@@ -214,8 +214,14 @@ class MlflowAdapter:
             found = self._client.get_experiment_by_name(name)
             if found is not None:
                 self._experiments[name] = found.experiment_id
+                if tracking.EXPERIMENT_KIND_TAG not in (getattr(found, "tags", None) or {}):
+                    try:  # a nicety (training runs view): never a reason to stop sending
+                        self._client.set_experiment_tag(found.experiment_id, tracking.EXPERIMENT_KIND_TAG, tracking.EXPERIMENT_KIND)
+                    except Exception:  # noqa: BLE001
+                        pass
             elif create:
-                self._experiments[name] = self._client.create_experiment(name)
+                self._experiments[name] = self._client.create_experiment(
+                    name, tags={tracking.EXPERIMENT_KIND_TAG: tracking.EXPERIMENT_KIND})
         return self._experiments.get(name)
 
     def find_run(self, experiment, local_id):

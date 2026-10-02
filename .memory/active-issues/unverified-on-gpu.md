@@ -2,6 +2,11 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **Curves, constants, experiment kind (2026-10-02):** `finish_training` writes `<run dir>/curves.jsonl` (the trainer log + `grad_norm` joined from `trainer_state.json`) and sends it as the curves;
+  `train.epochs` / `train.global_step` / `train.total_flos` are tags now (they were bar charts); the adapter sets the experiment tag `mlflow.experimentKind=finetuning` on a new experiment and once on an existing one
+  without it (a kind chosen in the UI is kept). Unit-tested; the tag logic ran against a real MLflow 3.16.1 server. NOT confirmed: that the web UI then shows the training-runs view with line charts
+  (read from the UI's code, not seen) and that `grad_norm` appears in a real run: check on the next training.
+
 - **Tracker rough edges (2026-10-02):** Ctrl+C during `train.py` now closes the run `KILLED` (and `run.json` `failed`); a failed artifact upload no longer stops the run's closing status or the runs after it
   (3 tries, then given up and logged); the run is closed before its artifacts go up; artifacts are `train.yaml`, the manifest and `trainer_state.json` (+ `train_stdout.log` only for a FAILED/KILLED run); tags
   `train.trainable_params` / `train.all_params` come from the trainer's log line. Unit-tested, and the close-then-upload order was run against a real MLflow 3.16.1 server (KILLED + artifact). Never run on the

@@ -54,7 +54,7 @@ def train_records(profile_name, base_model, template, train_cfg, fetch_state, ma
 
 def train_result_records(results, state):
     """(metrics, tags) from the trainer's train_results.json and trainer_state.json (either may be None)."""
-    return tracking.train_result_metrics(results, state), tracking.trainer_tags(state)
+    return tracking.train_result_metrics(results, state), tracking.trainer_tags(state, results)
 
 
 def merge_tags(adapter_dir):

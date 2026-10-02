@@ -105,8 +105,8 @@ def test_the_finished_training_gives_its_metrics_and_the_best_checkpoint():
 
     metrics, tags = track_records.train_result_records(results, state)
 
-    assert metrics["train.runtime_s"] == 1500.5 and metrics["eval.best_loss"] == 0.7 and metrics["train.global_step"] == 90.0
-    assert tags == {"train.best_checkpoint": "checkpoint-80"}
+    assert metrics["train.runtime_s"] == 1500.5 and metrics["eval.best_loss"] == 0.7 and "train.global_step" not in metrics
+    assert tags == {"train.best_checkpoint": "checkpoint-80", "train.global_step": "90"}
 
 
 def test_a_training_that_left_no_result_files_records_nothing_and_does_not_fail():

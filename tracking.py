@@ -221,8 +221,7 @@ def eval_metrics(report, comet=None):
 
 
 _RESULT_KEYS = {"train_runtime": "train.runtime_s", "train_samples_per_second": "train.samples_per_s",
-                "train_steps_per_second": "train.steps_per_s", "train_loss": "train.loss", "epoch": "train.epochs",
-                "total_flos": "train.total_flos"}
+                "train_steps_per_second": "train.steps_per_s", "train_loss": "train.loss"}
 
 
 def train_result_metrics(results, state):
@@ -232,8 +231,6 @@ def train_result_metrics(results, state):
         if results and _number(results.get(key)):
             metrics[name] = float(results[key])
     if state:
-        if _number(state.get("global_step")):
-            metrics["train.global_step"] = float(state["global_step"])
         evals = [row for row in state.get("log_history", []) if _number(row.get("eval_loss"))]
         if evals:
             best = min(evals, key=lambda row: row["eval_loss"])
@@ -243,11 +240,29 @@ def train_result_metrics(results, state):
     return metrics
 
 
-def trainer_tags(state):
-    """The checkpoint load_best_model_at_end chose (the folder name)."""
-    best = (state or {}).get("best_model_checkpoint")
-    return {"train.best_checkpoint": re.split(r"[\\/]", best)[-1]} if best else {}
+def _plain(value):
+    """A number as tag text: 3.0 -> '3', 1.5e16 -> '15000000000000000', 2.5 -> '2.5'."""
+    return str(int(value)) if float(value).is_integer() else str(value)
 
+
+def trainer_tags(state, results=None):
+    """What identifies a finished training but is no chart: the checkpoint load_best_model_at_end chose (the folder name),
+    and the epochs / steps / FLOs, which are the same number in every run of a profile (as metrics they were bar charts)."""
+    tags = {}
+    best = (state or {}).get("best_model_checkpoint")
+    if best:
+        tags["train.best_checkpoint"] = re.split(r"[\\/]", best)[-1]
+    if results and _number(results.get("epoch")):
+        tags["train.epochs"] = _plain(results["epoch"])
+    if state and _number(state.get("global_step")):
+        tags["train.global_step"] = _plain(state["global_step"])
+    if results and _number(results.get("total_flos")):
+        tags["train.total_flos"] = _plain(results["total_flos"])
+    return tags
+
+
+EXPERIMENT_KIND_TAG = "mlflow.experimentKind"
+EXPERIMENT_KIND = "finetuning"  # without it MLflow 3's UI guesses "GenAI evaluation" and shows last-value bars, not curves
 
 _PARAM_COUNTS = re.compile(r"trainable params: ([\d,]+) \|\| all params: ([\d,]+)")
 
@@ -292,6 +307,27 @@ def step_metrics(lines, start_ms):
             if _number(row.get(key)):
                 points.append((name, float(row[key]), timestamp, row["current_steps"]))
     return points
+
+
+def curve_lines(log_lines, state):
+    """The rows of `trainer_log.jsonl` as JSON lines, each with the `grad_norm` that only `trainer_state.json` has (its
+    `log_history`), joined by step. Rows that are not JSON objects with a step are dropped; no state -> the log as it is."""
+    grads = {}
+    for row in (state or {}).get("log_history", []):
+        if isinstance(row, dict) and isinstance(row.get("step"), int) and _number(row.get("grad_norm")):
+            grads[row["step"]] = float(row["grad_norm"])
+    out = []
+    for line in log_lines:
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(row, dict) or not isinstance(row.get("current_steps"), int):
+            continue
+        if row["current_steps"] in grads and "grad_norm" not in row:
+            row["grad_norm"] = grads[row["current_steps"]]
+        out.append(json.dumps(row, ensure_ascii=False))
+    return out
 
 
 def chunks(items, size):
