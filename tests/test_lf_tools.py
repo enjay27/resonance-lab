@@ -437,6 +437,41 @@ def test_the_base_profile_keeps_its_own_eval_cadence(base, fast):
     assert b["eval_steps"] == b["save_steps"] == 100  # ~1600 steps: eval every 100 (the fast profiles' scaling is their own)
 
 
+# --- a variant of a profile: the same recipe with one thing changed ---------------------------------
+
+# (base, variant, what the train.yaml may differ in besides the output folder)
+VARIANTS = [("translategemma-4b", "translategemma-4b-lr1e-4", {"learning_rate"})]
+
+
+@pytest.mark.parametrize("base,variant,changes", VARIANTS)
+def test_a_variant_profile_changes_only_what_it_is_for(base, variant, changes):
+    b, v = (lf_tools.load_profile(n) for n in (base, variant))
+    bt, vt = read_yaml(b.train_yaml), read_yaml(v.train_yaml)
+
+    assert {k for k in bt.keys() | vt.keys() if bt.get(k) != vt.get(k)} == changes | {"output_dir"}
+    assert v.base_model == b.base_model and v.template == b.template and v.dataset == b.dataset
+    bm, vm = read_yaml(b.merge_yaml), read_yaml(v.merge_yaml)
+    assert {k for k in bm.keys() | vm.keys() if bm.get(k) != vm.get(k)} == {"adapter_name_or_path", "export_dir"}
+    assert vm["adapter_name_or_path"] == vt["output_dir"]
+    assert v.adapter_dir != b.adapter_dir and v.merged_dir != b.merged_dir  # a run of one never overwrites the other
+
+
+def test_the_lr1e4_variant_has_the_learning_rate_it_is_named_for():
+    assert read_yaml(lf_tools.load_profile("translategemma-4b-lr1e-4").train_yaml)["learning_rate"] == 1.0e-4
+
+
+@pytest.mark.parametrize("name", lf_tools.available_profiles())
+def test_every_profiles_model_folders_are_gitignored(name):
+    """The *.safetensors are ignored, but a merged model's folder also holds tokenizer.json (tens of MB) and configs:
+    the whole folder of every profile (merged model, adapters) must be ignored, never one `git add -A` from a commit."""
+    import subprocess
+
+    p = lf_tools.load_profile(name)
+    for folder in (p.adapter_dir, p.merged_dir):
+        path = os.path.join(os.path.relpath(folder, config.BASE_DIR), "tokenizer.json")
+        assert subprocess.run(["git", "check-ignore", "-q", path], cwd=config.BASE_DIR).returncode == 0, path
+
+
 # --- reading training pairs for inspection ---------------------------------------------------------
 
 

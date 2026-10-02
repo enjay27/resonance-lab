@@ -2,6 +2,10 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **Profile `translategemma-4b-lr1e-4` (2026-10-02):** YAML only, unit-tested (differs from `translategemma-4b` only in `learning_rate` 1e-4 and its own `outputs/translategemma-lr1e-4_lora` / `model_gemma-lr1e-4_merged`
+  folders). Never trained. Why: the lr 1e-5 run was underfit (eval loss 0.888 still falling at the last step, gap +0.04; the Hy profiles use 2e-4). Compare in MLflow: eval-loss curve, best checkpoint, then both eval
+  prompts (`eval.py --model translategemma-4b-lr1e-4 [--prompt training]`) against chrF 45.2 / term accuracy 1/21 of the lr 1e-5 run. A higher lr can overfit: watch the train/eval gap.
+
 - **`-fast` eval cadence (2026-10-02):** the three `-fast` profiles now have `eval_steps: 10`, `save_steps: 10` (were 100 = never evaluated in an ~87-step run). Unit-tested (YAML only). Check on the next `-fast` training:
   `eval_loss` rows in `trainer_log.jsonl` / the MLflow curve, the best checkpoint chosen (`train.best_checkpoint` tag), and that the extra evals (199 validation rows) cost seconds, not minutes.
 
