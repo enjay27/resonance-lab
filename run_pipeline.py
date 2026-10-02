@@ -33,10 +33,15 @@ def check_system():
             print("GPU: NOT FOUND (Check CUDA drivers)")
     print("-" * 25 + "\n")
 
-def stage_env(model, base=None):
-    """The environment the stage scripts run in: --model, when given, overrides RESONANCE_LF_PROFILE."""
+def stage_env(model, base=None, fast=False):
+    """The environment the stage scripts run in: --model, when given, overrides RESONANCE_LF_PROFILE; --fast makes it that
+    model's fast profile (the model being --model, else the variable, else the default)."""
     env = dict(os.environ if base is None else base)
-    if model:
+    if fast:
+        sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "llamafactory"))
+        from lf_tools import model_name
+        env["RESONANCE_LF_PROFILE"] = model_name(model, env, fast=True)
+    elif model:
         env["RESONANCE_LF_PROFILE"] = model
     return env
 
@@ -64,15 +69,18 @@ def main():
                         help="training backend (default: %(default)s)")
     parser.add_argument("--model", help="llamafactory model profile (default: $RESONANCE_LF_PROFILE, else "
                         "the default profile); the parameter wins over the environment")
+    parser.add_argument("--fast", action="store_true", help="llamafactory: run on the model's fast profile (<model>-fast)")
     which = parser.add_mutually_exclusive_group()
     which.add_argument("--from", dest="from_stage", metavar="STAGE",
                        help="start at this stage (name or unique prefix, e.g. 'merge') and run the rest")
     which.add_argument("--only", metavar="STAGE", help="run just this stage")
     args = parser.parse_args()
+    if args.fast and args.pipeline != "llamafactory":
+        parser.error("--fast needs the llamafactory pipeline (the others have no model profiles)")
 
     check_system()
     print(f"Pipeline: {args.pipeline}\n")
-    env = stage_env(args.model)
+    env = stage_env(args.model, fast=args.fast)
     total_start = time.perf_counter()
 
     try:

@@ -24,7 +24,7 @@ def main(argv=None):
 
     from transformers import AutoTokenizer
 
-    profile = load_profile(model_name(args.model))
+    profile = load_profile(model_name(args.model, fast=args.fast))
     model = args.tokenizer or profile.base_model
     tokenizer = AutoTokenizer.from_pretrained(model, trust_remote_code=True)
     print(f"profile {profile.name} | template {profile.template} | tokenizer {model}")

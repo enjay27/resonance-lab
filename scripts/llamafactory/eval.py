@@ -31,7 +31,7 @@ def main(argv=None):
     add_model_argument(parser)
     args = parser.parse_args(argv)
 
-    profile = load_profile(model_name(args.model))
+    profile = load_profile(model_name(args.model, fast=args.fast))
     try:
         samples = load_eval_dataset(EVAL_DATASET_PATH)
     except (FileNotFoundError, ValueError) as e:

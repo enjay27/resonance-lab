@@ -2,6 +2,7 @@ import sys
 
 import pytest
 
+import config
 import run_pipeline
 
 
@@ -67,6 +68,34 @@ def test_stage_env_puts_the_model_parameter_over_the_environment():
 
     assert run_pipeline.stage_env("hy-mt2-1.8b", base) == {"RESONANCE_LF_PROFILE": "hy-mt2-1.8b", "PATH": "x"}
     assert run_pipeline.stage_env(None, base) == base  # no parameter: the environment stands
+
+
+def test_stage_env_fast_puts_the_fast_profile_of_the_model_in_the_environment():
+    assert run_pipeline.stage_env("hy-mt2-1.8b", {"PATH": "x"}, fast=True) == {"RESONANCE_LF_PROFILE": "hy-mt2-1.8b-fast", "PATH": "x"}
+    assert run_pipeline.stage_env(None, {"RESONANCE_LF_PROFILE": "hy-mt2-7b"}, fast=True)["RESONANCE_LF_PROFILE"] == "hy-mt2-7b-fast"
+    default = run_pipeline.stage_env(None, {}, fast=True)["RESONANCE_LF_PROFILE"]
+    assert default.endswith("-fast") and default == config.LF_PROFILE_DEFAULT + "-fast"
+    assert run_pipeline.stage_env("hy-mt2-1.8b-fast", {}, fast=True)["RESONANCE_LF_PROFILE"] == "hy-mt2-1.8b-fast"
+
+
+def test_main_fast_runs_every_stage_on_the_fast_profile(monkeypatch):
+    _fake_pipeline(monkeypatch, ["--model", "hy-mt2-1.8b", "--fast"])
+    envs = []
+    monkeypatch.setattr(run_pipeline, "run_step", lambda name, path, args=(), env=None: envs.append(env) or True)
+
+    run_pipeline.main()
+
+    assert {e["RESONANCE_LF_PROFILE"] for e in envs} == {"hy-mt2-1.8b-fast"} and len(envs) == 3
+
+
+def test_fast_needs_the_llamafactory_pipeline(monkeypatch, capsys):
+    _fake_pipeline(monkeypatch, ["--pipeline", "unsloth", "--fast"])
+
+    with pytest.raises(SystemExit) as exc:
+        run_pipeline.main()
+
+    err = capsys.readouterr().err
+    assert exc.value.code == 2 and "--fast" in err and "llamafactory" in err and "unrecognized" not in err
 
 
 def test_main_runs_every_stage_with_the_model_parameter_in_the_environment(monkeypatch):
