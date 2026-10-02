@@ -13,7 +13,7 @@ different `trl`/`transformers`).
 
 | pipeline | trains | requirements | stages |
 |---|---|---|---|
-| `llamafactory` | any model with a profile in `configs/llamafactory/<profile>/` (now `translategemma-4b`; pick with `--model <profile>` on any script or on `run_pipeline.py`; `RESONANCE_LF_PROFILE` is the fallback for remote jobs, the parameter wins) | `requirements-llamafactory.txt` | Fetch Data, Validate, Preprocessing, Update Dataset, Fine-Tuning, Merge LoRA, Export GGUF (`model_gguf/bp-<profile>-q4_k_m.gguf`) |
+| `llamafactory` | any model with a profile in `configs/llamafactory/<profile>/` (now `translategemma-4b`, `translategemma-4b-lr1e-4`, the `hy-mt2-*` ones and the `-fast` variants; pick with `--model <profile>` on any script or on `run_pipeline.py`; `RESONANCE_LF_PROFILE` is the fallback for remote jobs, the parameter wins) | `requirements-llamafactory.txt` | Fetch Data, Validate, Preprocessing, Update Dataset, Fine-Tuning, Merge LoRA, Export GGUF (`model_gguf/bp-<profile>-q4_k_m.gguf`) |
 | `unsloth` | Qwen3 1.7B | `requirements-unsloth.txt` | Validate, Preprocessing, Dataset Split, Fine-Tuning, Metadata Fix, Evaluation (+ the shared report), then the manual GGUF steps below |
 
 A new model for the `llamafactory` pipeline is a new folder `configs/llamafactory/<profile>/` with `train.yaml` and

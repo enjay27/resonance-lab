@@ -29,6 +29,8 @@ lora_dataset/
 model_f16/
 model_f16_clean/
 model_gemma_merged/
+# every profile's merged model (merge.yaml export_dir): tokenizer.json and configs are not covered by *.safetensors
+model_*_merged/
 model_gguf/
 BlueProtocol_JP_KO_Translator/
 BlueProtocol_JP_KO_Translator-merged-16bit/
