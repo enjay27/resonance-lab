@@ -5,7 +5,7 @@
 ## Now — 2026-10-02
 
 **Fixed model: Hy-MT2-1.8B** (maintainer, 2026-10-02; the 7B later; TranslateGemma profiles stay but are not developed). `hy-mt2-1.8b` is the default profile; `--fast` on any llamafactory script or
-`run_pipeline.py` = that model's `-fast` profile (~4 min, eval every 10 steps). Plan and order: [`roadmap/next.md`](.memory/roadmap/next.md) (compare script, lr/epoch sweeps on `-fast`, then confirm on the full profile).
+`run_pipeline.py` = that model's `-fast` profile (~4 min, eval every 10 steps). Plan and order: [`roadmap/next.md`](.memory/roadmap/next.md): `python scripts\mlflow_compare.py --sort eval-loss` compares the runs; next lr/epoch sweeps on `-fast`, then confirm on the full profile.
 
 **Prompt: this repo owns it; resonance-stream follows** ([`stream-contract.md`](.memory/active-issues/stream-contract.md)). The shipped app model is TG-4B (instruction + line, both directions; the app also sends a `[P0]` rule and a
 literal `<bos>` it never trained on). Hy's prompt is in `prompts.py`; copy it to resonance-stream only once Hy beats the shipped model on the eval ([`shortlist`](.memory/roadmap/translator-shortlist-2026-10-01.md)).

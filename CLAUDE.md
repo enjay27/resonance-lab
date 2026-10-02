@@ -20,7 +20,7 @@ most important thing on this page.
 
 | tree | part | runs on | gate |
 |---|---|---|---|
-| `scripts/fetch_data.py` `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `eval_metrics.py` `text_rules.py` `hf_data.py` `runs.py` `tracking.py` `run_queue.py` `tracker.py` `track_records.py` `stage_tracking.py` `overlap.py` `valsplit.py` `manifest.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` `deploy/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
+| `scripts/fetch_data.py` `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `scripts/mlflow_compare.py` `compare_runs.py` `eval_metrics.py` `text_rules.py` `hf_data.py` `runs.py` `tracking.py` `run_queue.py` `tracker.py` `track_records.py` `stage_tracking.py` `overlap.py` `valsplit.py` `manifest.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` `deploy/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
 | `scripts/unsloth/train.py` `scripts/unsloth/eval.py` `scripts/unsloth/fix_metadata.py` `scripts/llamafactory/train.py` `merge.py` `gguf.py` `eval.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements-<pipeline>.txt`) | none automated — a manual run, reported |
 
 `just check` needs only `requirements-dev.txt` (`pip install -r requirements-dev.txt`;
@@ -76,6 +76,7 @@ tracking.py           what a run records in MLflow, pure: .env.mlflow settings, 
 run_queue.py          the local record of every run (TinyDB, `.run.result.backup.json`, atomic writes): events marked sent; written BEFORE anything is sent; tested
 track_records.py      what each stage records (params/tags/metrics for train, merge, gguf, eval; the tracker run id `<profile>-<run id>`), pure, no mlflow; tested
 stage_tracking.py     the stages' use of the tracker (open_tracker never raises; start/finish_training, resume_stage, record_stage, fail_stage); tested
+compare_runs.py       the experiment's runs as one table (profile, lr, epochs, best eval loss, eval scores, data revision), sorted/filtered; pure; tested
 tracker.py            sends queued runs to the NAS oldest-first, resumable, never raises into a training; `from_environment()` -> Tracker or NullTracker; tested with a fake client
 overlap.py            is a training line also an eval line? (normalised + near-duplicate); preprocess drops them; tested
 valsplit.py           which lines are validation: sha1 of the normalised line, so pairs/variants stay together and lines keep their side as data grows; tested
@@ -86,6 +87,7 @@ run_pipeline.py       --pipeline <name>: runs its stages in order, stops at the 
 scripts/
   fetch_data.py         shared data: `hf download` the app's dataset_<CHANNEL>.jsonl at the revision pinned in configs/hf_dataset.yaml, merge -> raw log;
                           only when missing/changed; skipped without a repo or with RESONANCE_RAW_LOGS; `--pin` writes the latest commit; `--force`
+  mlflow_compare.py     data: `python scripts/mlflow_compare.py [--profile hy] [--sort eval-loss|chrf|term] [--markdown] [--all]` prints compare_runs' table from the NAS's MLflow
   validate.py           shared data: raw-log sanity gate (empty/missing file, >1% damaged lines, >10% Hangeul in `original` -> ValidationError; limits in config.py)
   preprocess.py         shared data: raw {original, translated} -> {instruction, input, output};
                           `clean_reason` drops empty/untranslated, Hangeul-in-source,
