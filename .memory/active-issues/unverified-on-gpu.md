@@ -2,6 +2,10 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **`--fast` and the new default profile (2026-10-02):** `--fast` on train/merge/gguf/eval/update_dataset_info/watch_training/inspect_* and `run_pipeline.py` resolves `<model>-fast`; the default profile is
+  `hy-mt2-1.8b` now. Unit-tested (name resolution, parsers, `stage_env`), the scripts import. Not run on the GPU machine: `python run_pipeline.py --fast` (default model, ~4 min) and
+  `python scripts\llamafactory\train.py --model hy-mt2-1.8b --fast` should both train `hy-mt2-1.8b-fast`; check `eval.py --fast` and `watch_training.py --fast` follow the same run.
+
 - **Profile `translategemma-4b-lr1e-4` (2026-10-02):** YAML only, unit-tested (differs from `translategemma-4b` only in `learning_rate` 1e-4 and its own `outputs/translategemma-lr1e-4_lora` / `model_gemma-lr1e-4_merged`
   folders). Never trained. Why: the lr 1e-5 run was underfit (eval loss 0.888 still falling at the last step, gap +0.04; the Hy profiles use 2e-4). Compare in MLflow: eval-loss curve, best checkpoint, then both eval
   prompts (`eval.py --model translategemma-4b-lr1e-4 [--prompt training]`) against chrF 45.2 / term accuracy 1/21 of the lr 1e-5 run. A higher lr can overfit: watch the train/eval gap.

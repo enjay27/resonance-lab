@@ -1,3 +1,4 @@
+<!-- DECISION 2026-10-02 (maintainer): the model is fixed to Hy-MT2 (1.8B default tier first, 7B later); focus on one family. TranslateGemma/Gemma 4 are not pursued. -->
 <!-- Research by the maintainer, 2026-10-01 (uploaded in session). Kept verbatim as the plan of record for the model change. -->
 
 Resonance Stream · translator model · research

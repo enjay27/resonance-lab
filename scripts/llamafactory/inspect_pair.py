@@ -28,7 +28,7 @@ def main(argv=None):
     parser.add_argument("--file", default=PROCESSED_LOGS, help="pair file (default: the processed training file)")
     args = parser.parse_args(argv)
 
-    profile = load_profile(model_name(args.model))
+    profile = load_profile(model_name(args.model, fast=args.fast))
     try:
         pairs = first_pairs(args.file, args.rows)
     except (FileNotFoundError, ValueError) as e:

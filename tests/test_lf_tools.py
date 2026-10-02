@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import sys
@@ -318,6 +319,52 @@ def test_model_name_prefers_the_parameter_over_the_environment():
     env = {"RESONANCE_LF_PROFILE": "hy-mt2-7b"}
 
     assert lf_tools.model_name("hy-mt2-1.8b", env) == "hy-mt2-1.8b"
+
+
+# --- --fast: the fast profile of the chosen model, not another model's name ---------------------------------------
+
+
+def test_fast_picks_the_fast_profile_of_the_chosen_model():
+    assert lf_tools.model_name("hy-mt2-1.8b", {}, fast=True) == "hy-mt2-1.8b-fast"
+    assert lf_tools.model_name(None, {"RESONANCE_LF_PROFILE": "hy-mt2-7b"}, fast=True) == "hy-mt2-7b-fast"  # the remote-job variable too
+    assert lf_tools.model_name("hy-mt2-1.8b", {"RESONANCE_LF_PROFILE": "hy-mt2-7b"}, fast=True) == "hy-mt2-1.8b-fast"  # the parameter wins
+
+
+def test_fast_without_a_model_means_the_default_models_fast_profile():
+    assert lf_tools.model_name(None, {}, fast=True) == config.LF_PROFILE_DEFAULT + "-fast"
+    assert lf_tools.load_profile(lf_tools.model_name(None, {}, fast=True)).name == config.LF_PROFILE_DEFAULT + "-fast"
+
+
+def test_fast_on_a_name_that_is_already_fast_changes_nothing():
+    assert lf_tools.model_name("hy-mt2-1.8b-fast", {}, fast=True) == "hy-mt2-1.8b-fast"
+    assert lf_tools.model_name("hy-mt2-1.8b", {}, fast=False) == "hy-mt2-1.8b"  # off: the name as it is
+
+
+def test_every_script_that_takes_the_model_parameter_takes_fast_too():
+    parser = argparse.ArgumentParser()
+    lf_tools.add_model_argument(parser)
+
+    args = parser.parse_args(["--model", "hy-mt2-1.8b", "--fast"])
+
+    assert args.model == "hy-mt2-1.8b" and args.fast is True
+    assert parser.parse_args([]).fast is False
+
+
+def test_profile_from_args_resolves_fast_and_leaves_the_rest_to_the_caller():
+    profile, rest = lf_tools.profile_from_args(["--model", "hy-mt2-1.8b", "--fast", "--run", "20261002-1"], "test")
+
+    assert profile.name == "hy-mt2-1.8b-fast" and rest == ["--run", "20261002-1"]
+
+
+def test_fast_for_a_model_without_a_fast_profile_names_the_choices():
+    with pytest.raises(ValueError, match="translategemma-4b-lr1e-4-fast.*choose one of"):
+        lf_tools.profile_from_args(["--model", "translategemma-4b-lr1e-4", "--fast"], "test")
+
+
+def test_the_default_model_is_hy_mt2_1_8b_the_fixed_model():
+    """Maintainer's decision 2026-10-02: one fixed model (Hy-MT2-1.8B; the 7B later), so a command without --model trains it."""
+    assert config.LF_PROFILE_DEFAULT == "hy-mt2-1.8b"
+    assert lf_tools.load_profile(config.LF_PROFILE_DEFAULT).base_model == "tencent/Hy-MT2-1.8B"
 
 
 def test_model_name_falls_back_to_the_environment_then_the_default():

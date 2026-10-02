@@ -78,16 +78,22 @@ def load_profile(name, root=LF_CONFIG_ROOT):
     )
 
 
-def model_name(cli_value, environ=None):
+FAST_SUFFIX = "-fast"  # a model's fast profile is its folder name + this (configs/llamafactory/<model>-fast/)
+
+
+def model_name(cli_value, environ=None, fast=False):
     """The profile to use: the --model parameter, else RESONANCE_LF_PROFILE (set on remote jobs),
-    else the default. An empty value counts as unset."""
+    else the default. An empty value counts as unset. `fast` (--fast) picks that model's fast profile."""
     environ = os.environ if environ is None else environ
-    return cli_value or environ.get("RESONANCE_LF_PROFILE") or LF_PROFILE_DEFAULT
+    name = cli_value or environ.get("RESONANCE_LF_PROFILE") or LF_PROFILE_DEFAULT
+    return name + FAST_SUFFIX if fast and not name.endswith(FAST_SUFFIX) else name
 
 
 def add_model_argument(parser):
     parser.add_argument("--model", help="model profile, a folder of configs/llamafactory/ "
                         "(default: $RESONANCE_LF_PROFILE, else " + LF_PROFILE_DEFAULT + ")")
+    parser.add_argument("--fast", action="store_true", help="use that model's fast profile (<model>-fast: packing, a bigger batch, "
+                        "evaluation every few steps) instead of the full one")
 
 
 def profile_from_args(argv, description):
@@ -95,7 +101,7 @@ def profile_from_args(argv, description):
     parser = argparse.ArgumentParser(description=description)
     add_model_argument(parser)
     args, rest = parser.parse_known_args(argv)
-    return load_profile(model_name(args.model)), rest
+    return load_profile(model_name(args.model, fast=args.fast)), rest
 
 
 def dataset_info(file_name, name=LF_DATASET_NAME):

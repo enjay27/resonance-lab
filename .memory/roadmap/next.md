@@ -1,5 +1,12 @@
 # Next — candidates, in order
 
+## DECISION 2026-10-02 (maintainer): one fixed model, Hy-MT2-1.8B (the 7B later); `hy-mt2-1.8b` is the default profile
+TranslateGemma profiles stay in the repo, not developed. Work now, in this order, one PR at a time:
+1. **`--fast` flag on every llamafactory script + `run_pipeline.py`, default profile -> `hy-mt2-1.8b` (done).**
+2. **`scripts/mlflow_compare.py`**: one table of the runs (profile, lr, epochs, best eval loss, eval scores) for the sweeps.
+3. **Sweeps on `hy-mt2-1.8b-fast` (~4 min each)**: lr (the base run at 2e-4 overfit: train 0.15 vs eval 0.69, best at epoch ~1.9), epochs, packing; then confirm the best on the full profile (~25 min) and run both eval prompts.
+4. Then the run-queue journal (below), the 7B (QLoRA: bf16 does not fit 16 GB), the prompt copy to resonance-stream once Hy beats the shipped model.
+
 ## Queued by the maintainer (2026-10-02): run queue as an append-only journal — **the next task after the lr 1e-4 profile decision**
 Idea: `run_queue.py` stores `.run.result.backup.jsonl`, one line per record, read in batches; a sent line is skipped, and sent lines are dropped at the next start. Agreed refinements
 (assessment in the session): mark sent by **appending an ack line** (editing a line in place needs a whole-file rewrite, which is what TinyDB does now and what loses an update when two
