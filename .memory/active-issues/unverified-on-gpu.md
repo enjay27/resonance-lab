@@ -2,6 +2,10 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **`scripts/mlflow_compare.py` (2026-10-02):** data part (needs `.env.mlflow` and `mlflow-skinny`, no GPU). Unit-tested with a stand-in client and run against a real MLflow 3.16.1 server with runs recorded through
+  the tracker (sorted by eval loss / chrF, killed run hidden, markdown). Not run against the NAS or your real runs: `python scripts\mlflow_compare.py` should list `hy-mt2-1.8b-fast-...` with their eval loss;
+  the eval columns stay `-` until a run's eval stage ran (two evals with different `--prompt` in one run share the same metric keys: the table shows the last prompt).
+
 - **`--fast` and the new default profile (2026-10-02):** `--fast` on train/merge/gguf/eval/update_dataset_info/watch_training/inspect_* and `run_pipeline.py` resolves `<model>-fast`; the default profile is
   `hy-mt2-1.8b` now. Unit-tested (name resolution, parsers, `stage_env`), the scripts import. Not run on the GPU machine: `python run_pipeline.py --fast` (default model, ~4 min) and
   `python scripts\llamafactory\train.py --model hy-mt2-1.8b --fast` should both train `hy-mt2-1.8b-fast`; check `eval.py --fast` and `watch_training.py --fast` follow the same run.
