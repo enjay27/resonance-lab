@@ -20,7 +20,7 @@ most important thing on this page.
 
 | tree | part | runs on | gate |
 |---|---|---|---|
-| `scripts/fetch_data.py` `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `scripts/mlflow_compare.py` `compare_runs.py` `eval_metrics.py` `text_rules.py` `hf_data.py` `runs.py` `tracking.py` `run_queue.py` `tracker.py` `track_records.py` `stage_tracking.py` `overlap.py` `valsplit.py` `manifest.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` `deploy/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
+| `scripts/fetch_data.py` `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `scripts/mlflow_compare.py` `compare_runs.py` `eval_metrics.py` `text_rules.py` `hf_data.py` `runs.py` `tracking.py` `run_queue.py` `tracker.py` `track_records.py` `stage_tracking.py` `parameter_test.py` `overlap.py` `valsplit.py` `manifest.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` `deploy/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
 | `scripts/unsloth/train.py` `scripts/unsloth/eval.py` `scripts/unsloth/fix_metadata.py` `scripts/llamafactory/train.py` `merge.py` `gguf.py` `eval.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements-<pipeline>.txt`) | none automated — a manual run, reported |
 
 `just check` needs only `requirements-dev.txt` (`pip install -r requirements-dev.txt`;
@@ -82,6 +82,7 @@ tracker.py            sends queued runs to the NAS oldest-first, resumable, neve
 overlap.py            is a training line also an eval line? (normalised + near-duplicate); preprocess drops them; tested
 valsplit.py           which lines are validation: sha1 of the normalised line, so pairs/variants stay together and lines keep their side as data grows; tested
 manifest.py           lora_train_data.meta.json: how the training file was made (style, reverse, shas, counts); update_dataset_info/train check it; tested
+parameter_test.py     the logic of notebooks/parameter_test.ipynb: ParamSet, the stage commands, run_command (streams, stops the process tree on interrupt), curves from trainer_log.jsonl, sweep, decision text; tested
 pipelines.py          registry: pipeline name -> ordered stage scripts (no torch; tested)
 prompts.py            instruction text per model family and direction (translategemma, hy); used by preprocess + eval; tested
 run_pipeline.py       --pipeline <name>: runs its stages in order, stops at the first failure; --from/--only <stage> run part of it
@@ -107,6 +108,7 @@ scripts/
     gguf.py               model: convert to F16 GGUF, quantize to q4_k_m -> model_gguf/
     eval.py               model: generate on the eval set (--prompt chat-template|training), shared report
     watch_training.py     data: live training monitor (`rich`); TrainingState parses the two logs, tested
+notebooks/            parameter_test.ipynb: one parameter test / a sweep, train -> merge -> eval -> compare -> decide (PyCharm, project .venv, requirements-notebook.txt); committed with outputs CLEARED (tests/test_notebooks.py)
 configs/llamafactory/<profile>/   train.yaml + merge.yaml per model (tests check they agree)
 deploy/mlflow/        the MLflow tracking server for the maintainer's NAS (Dockerfile, compose, basic_auth.ini, .env.example, README); tests/test_deploy_mlflow.py guards it
 tests/                pytest for the data part; conftest.py has the JSONL fixtures

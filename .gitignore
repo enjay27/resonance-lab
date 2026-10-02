@@ -54,6 +54,10 @@ deploy/postgres/.env
 .run.result.backup.jsonl.corrupt-*
 .run.result.backup.files/
 
+# Executed notebooks: their outputs hold eval lines (players' chat). Commit notebooks with outputs cleared (tests/test_notebooks.py).
+notebooks/*.executed.ipynb
+.ipynb_checkpoints/
+
 # --- [GITHUB TEMPLATE] Byte-compiled / optimized / DLL files ---
 __pycache__/
 *.py[codz]
