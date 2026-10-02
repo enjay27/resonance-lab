@@ -16,6 +16,7 @@ from config import MLFLOW_ENV_FILE
 from run_queue import RunQueue
 
 KEEP_SYNCED = 20  # runs the server has completely stay in the queue file for a while, then are pruned
+ARTIFACT_TRIES = 3  # an artifact that fails this many times is given up (the file stays in the queue's files folder)
 
 
 def _short(error, limit=100):
@@ -56,7 +57,9 @@ def _send_event(queue, client, run, remote_id, event):
         raise ValueError(f"unknown event type {kind!r}")
 
 
-def _send_run(queue, client, run):
+def _send_run(queue, client, run, log=print):
+    """Send one run's unsent events in order. A failed artifact is only logged and retried at the next start (it is
+    optional: it must not keep the run from being closed, nor the runs after it from being sent); any other failure raises."""
     local = run["local_run_id"]
     remote = run["remote_id"]
     if remote is None:
@@ -64,9 +67,20 @@ def _send_run(queue, client, run):
         remote = client.find_run(run["experiment"], local) or client.create_run(run["experiment"], run["run_name"], run["start_time_ms"], local)
         queue.set_remote_id(local, remote)
     for index, event in enumerate(run["events"]):
-        if not event["sent"]:
+        if event["sent"]:
+            continue
+        try:
             _send_event(queue, client, run, remote, event)
-            queue.mark_sent(local, index)  # marked at once: a stop halfway resumes at the next event
+        except Exception as e:
+            if event["type"] != "artifact":
+                raise
+            name = os.path.basename(event["file"])
+            if queue.fail_event(local, index, ARTIFACT_TRIES) >= ARTIFACT_TRIES:
+                log(f"[tracking] artifact {name} of run {run['run_name']} failed {ARTIFACT_TRIES} times ({_short(e)}); giving up on it")
+            else:
+                log(f"[tracking] artifact {name} of run {run['run_name']} not uploaded ({_short(e)}); the run goes on, it is tried again at the next start")
+            continue
+        queue.mark_sent(local, index)  # marked at once: a stop halfway resumes at the next event
 
 
 def sync(queue, client, log=print):
@@ -86,7 +100,7 @@ def sync(queue, client, log=print):
     sent = 0
     for run in pending:
         try:
-            _send_run(queue, client, run)
+            _send_run(queue, client, run, log)
         except Exception as e:
             log(f"[tracking] sending run {run['run_name']} stopped: {_short(e)}; it and the runs after it stay queued")
             return SyncReport(True, sent, str(e))

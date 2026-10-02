@@ -280,3 +280,16 @@ def test_the_default_env_file_is_in_the_repo_root_and_ignored():
     import config
 
     assert config.MLFLOW_ENV_FILE == os.path.join(config.BASE_DIR, ".env.mlflow")
+
+
+# --- the model size, from the trainer's own log -----------------------------------------------------------------------
+
+
+def test_the_trainable_parameter_counts_are_read_from_the_trainers_log():
+    log = "[INFO|2026] noise\ntrainable params: 13,434,880 || all params: 3,893,000,000 || trainable%: 0.3451\nstep 1\n"
+
+    assert tracking.model_size_tags(log) == {"train.trainable_params": "13434880", "train.all_params": "3893000000"}
+
+
+def test_a_log_without_the_line_gives_no_tags():
+    assert tracking.model_size_tags("") == {} and tracking.model_size_tags("Traceback ...") == {}

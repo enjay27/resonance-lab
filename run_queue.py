@@ -160,6 +160,20 @@ class RunQueue:
     def mark_sent(self, local_run_id, index):
         self._update(local_run_id, lambda doc: doc["events"][index].update(sent=True))
 
+    def fail_event(self, local_run_id, index, give_up_after):
+        """Count a failed send of an optional event (an artifact). After `give_up_after` tries it is marked sent and
+        `gave_up`, so one broken upload stops being retried at every start. Returns the number of tries so far."""
+        tries = {}
+
+        def change(doc):
+            event = doc["events"][index]
+            event["attempts"] = tries["n"] = event.get("attempts", 0) + 1
+            if event["attempts"] >= give_up_after:
+                event.update(sent=True, gave_up=True)
+
+        self._update(local_run_id, change)
+        return tries["n"]
+
     def prune(self, keep=20):
         """Forget the oldest runs the server has completely (created, every event sent, closed by a status event -- later stages
         may have added events after it), keeping the newest `keep`."""

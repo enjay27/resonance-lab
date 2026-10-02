@@ -2,6 +2,12 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **Tracker rough edges (2026-10-02):** Ctrl+C during `train.py` now closes the run `KILLED` (and `run.json` `failed`); a failed artifact upload no longer stops the run's closing status or the runs after it
+  (3 tries, then given up and logged); the run is closed before its artifacts go up; artifacts are `train.yaml`, the manifest and `trainer_state.json` (+ `train_stdout.log` only for a FAILED/KILLED run); tags
+  `train.trainable_params` / `train.all_params` come from the trainer's log line. Unit-tested, and the close-then-upload order was run against a real MLflow 3.16.1 server (KILLED + artifact). Never run on the
+  GPU machine: press Ctrl+C in a `-fast` training and check the run shows KILLED, then a normal run shows FINISHED with those three artifacts and the two tags. Found on the NAS: the MLflow container's
+  `MINIO_ENDPOINT_URL` still held the example address (`192.168.0.10`), so every upload timed out; the real LAN address fixed it.
+
 - **Stage wiring to the tracker (MLflow PR 4b, 2026-10-01):** `train.py`, `merge.py`, `gguf.py` and `llamafactory/eval.py` call `stage_tracking.py` (unit-tested with a recording tracker,
   the real `Tracker` + offline queue and a fake client; never run on the GPU machine). Check with the NAS up and `.env.mlflow` filled: (1) `train.py` creates the run
   `<profile>-<run id>` in experiment `resonance-lab` (params, `dataset.*`/`prompt.*`/`git.*` tags) and, when it ends, the loss curves, `train.*` / `eval.best_loss` metrics and the log
