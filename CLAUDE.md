@@ -50,6 +50,7 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
   `google/translategemma-4b-it`, template `gemma3`), dataset `bp_translation` (validation: `bp_translation_val`, split by line in `preprocess.py`)
   (`preprocess.py --format pair --prompt auto` puts the template's instruction, from `prompts.py`, before each line; `--reverse` adds ko→ja rows — `.memory/active-issues/stream-contract.md` §1), `cutoff_len` 256, LoRA r=32.
   Profile = `configs/llamafactory/<profile>/{train,merge}.yaml`, chosen by `--model <profile>` (every llamafactory script and `run_pipeline.py`), else `RESONANCE_LF_PROFILE` (remote jobs), else the default;
+  `train.py --lr 1e-4 --epochs 2` overrides the profile's learning rate / epochs for one training (sweeps without editing a profile; recorded in MLflow as the params, tag `train.overrides`);
   `--fast` (same scripts) means that model's fast profile `<model>-fast` (packing, bigger batch, eval every 10 steps; ~4 min for the 1.8B), e.g. `run_pipeline.py --fast`.
 - **`unsloth` pipeline** (`requirements-unsloth.txt`): unsloth (pinned commit), transformers, peft,
   trl 0.24, bitsandbytes 4-bit, torch 2.10 + CUDA 12.6 (`triton-windows`). Base

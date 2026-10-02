@@ -50,12 +50,13 @@ def training_context(fetch_state_path=os.path.join(HF_DATA_DIR, "fetch_state.jso
             "git": tracking.git_info(), "packages": tracking.package_versions()}
 
 
-def start_training(tracker, profile, run, train_cfg, fetch_state, manifest, git=None, packages=None):
-    """Begin the tracker run of a training and record its recipe, data and code; returns the tracker run id."""
+def start_training(tracker, profile, run, train_cfg, fetch_state, manifest, git=None, packages=None, overrides=None):
+    """Begin the tracker run of a training and record its recipe, data and code; returns the tracker run id. `overrides`
+    (--lr / --epochs) replace the yaml's values in what is recorded, as they do in the training, and are tagged."""
     local_id, name = track_records.run_identity(profile.name, run.id)
     tracker.begin(MLFLOW_EXPERIMENT, name, local_id)
-    params, tags = track_records.train_records(profile.name, profile.base_model, profile.template, train_cfg,
-                                               fetch_state, manifest, run.id, git=git, packages=packages)
+    params, tags = track_records.train_records(profile.name, profile.base_model, profile.template, {**train_cfg, **(overrides or {})},
+                                               fetch_state, manifest, run.id, git=git, packages=packages, overrides=overrides)
     tracker.params(params)
     tracker.tags(tags)
     return local_id

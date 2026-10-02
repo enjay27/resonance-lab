@@ -4,7 +4,7 @@
 TranslateGemma profiles stay in the repo, not developed. Work now, in this order, one PR at a time:
 1. **`--fast` flag on every llamafactory script + `run_pipeline.py`, default profile -> `hy-mt2-1.8b` (done).**
 2. **`scripts/mlflow_compare.py` (done)**: one table of the runs (profile, lr, epochs, best eval loss, eval scores) for the sweeps; `--sort eval-loss|chrf|term`, `--profile`, `--markdown`, `--all`.
-3. **Sweeps on `hy-mt2-1.8b-fast` (~4 min each)**: lr (the base run at 2e-4 overfit: train 0.15 vs eval 0.69, best at epoch ~1.9), epochs, packing; then confirm the best on the full profile (~25 min) and run both eval prompts.
+3. **Sweeps on `hy-mt2-1.8b-fast` (~4 min each), now `train.py --fast --lr 1e-4 [--epochs 2]` (override of the profile, recorded in MLflow; done 2026-10-02)**: lr (the base run at 2e-4 overfit: train 0.15 vs eval 0.69, best at epoch ~1.9), epochs, packing; then confirm the best on the full profile (~25 min) and run both eval prompts.
 4. Then (the run-queue journal is done) a command-line override of lr/epochs for sweeps, the 7B (QLoRA: bf16 does not fit 16 GB), the prompt copy to resonance-stream once Hy beats the shipped model.
 
 ## Done 2026-10-02 (maintainer's idea): the run queue is an append-only journal, `run_queue.py` / `.run.result.backup.jsonl`
