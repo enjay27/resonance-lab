@@ -1,5 +1,12 @@
 # Next — candidates, in order
 
+## Queued by the maintainer (2026-10-02): run queue as an append-only journal — **the next task after the lr 1e-4 profile decision**
+Idea: `run_queue.py` stores `.run.result.backup.jsonl`, one line per record, read in batches; a sent line is skipped, and sent lines are dropped at the next start. Agreed refinements
+(assessment in the session): mark sent by **appending an ack line** (editing a line in place needs a whole-file rewrite, which is what TinyDB does now and what loses an update when two
+processes write); line types `run` (local id, experiment, name, start), `event`, `remote` (server id), `sent`; **keep the run header + `remote_id`** of the newest N runs (merge/GGUF/eval
+resume a run days later by it, and `remote_id` stops a double create) and drop only sent event lines and their copied files; ignore a torn last line; read the old `.run.result.backup.json`
+once to migrate. Only `run_queue.py` + tests change (data part); the tracker/stage API stays. Not urgent: the current queue works (a 401 run stayed queued and was sent later, 2026-10-02).
+
 ## Worked in this order (2026-10-01, maintainer approved): [`pipeline-review-2026-10-01.md`](pipeline-review-2026-10-01.md)
 Data safety (eval-overlap exclusion **done**; sidecar manifest, pair/time split, validate vs preprocess, Fetch Data) -> run identity (unique adapter
 dir, per-run log, `--from/--only`) -> MLflow PRs (revised in `mlflow-plan.md`) -> eval upgrades -> model changes. The two items below are inside it.

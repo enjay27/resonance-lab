@@ -7,6 +7,7 @@ Code or config changed in a session without CUDA. Delete an item once it has run
   `<profile>-<run id>` in experiment `resonance-lab` (params, `dataset.*`/`prompt.*`/`git.*` tags) and, when it ends, the loss curves, `train.*` / `eval.best_loss` metrics and the log
   artifact, status FINISHED; (2) `merge.py`, `gguf.py` and `eval.py --prompt training` add their tags/metrics/report to the SAME run (`stage.merge`/`stage.gguf`/`stage`, `gguf.size_bytes`, `eval.chrf`...);
   (3) with the NAS off (or `RESONANCE_MLFLOW=0`) every stage behaves as before and the next run sends the backlog; (4) the eval's `EVAL_MAX_NEW_TOKENS` is 256, as the hardcoded value was.
+  Seen on the maintainer's machine 2026-10-02: a `-fast` training queued its run while the NAS login was wrong (401, training unaffected) and `[tracking] sent 2 run(s) to MLflow` after it was fixed; the run's params/tags were in `.run.result.backup.json`. The loss charts could not be seen until the MLflow server allowed the UI's own origin (CORS; `deploy/mlflow/docker-compose.yml`, redeploy on the NAS). Still to confirm in the UI: curves, `train.*` metrics, stage tags, the report artifact, merge/gguf/eval in the same run.
   Also unchecked: `train_results.json` / `trainer_state.json` land in the run dir (`train_result_records` finds them there), and a failed stage tags `stage.<name>=failed` without closing the run.
 
 - **Offline queue (2026-10-01, `claude/relaxed-pascal-xjeh11`):** `run_queue.py` / `tracker.py` are unit-tested with a fake client and were run end to end against a real MLflow 3.16.1
