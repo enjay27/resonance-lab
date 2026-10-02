@@ -249,6 +249,18 @@ def trainer_tags(state):
     return {"train.best_checkpoint": re.split(r"[\\/]", best)[-1]} if best else {}
 
 
+_PARAM_COUNTS = re.compile(r"trainable params: ([\d,]+) \|\| all params: ([\d,]+)")
+
+
+def model_size_tags(log_text):
+    """The LoRA's trainable and total parameter counts, from the line LLaMA-Factory logs when it attaches the adapter
+    (`trainable params: 13,434,880 || all params: ...`); {} when the log has none (a run that died before it)."""
+    found = _PARAM_COUNTS.search(log_text)
+    if not found:
+        return {}
+    return {"train.trainable_params": found.group(1).replace(",", ""), "train.all_params": found.group(2).replace(",", "")}
+
+
 _STEP_KEYS = (("loss", "loss"), ("lr", "learning_rate"), ("eval_loss", "eval_loss"), ("epoch", "epoch"), ("grad_norm", "grad_norm"))
 
 

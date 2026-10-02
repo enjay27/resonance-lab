@@ -1,4 +1,5 @@
 import json
+import os
 
 import pytest
 
@@ -65,25 +66,65 @@ def test_a_training_starts_its_run_before_it_records_anything():
     assert t.named("params")[0][1][0]["profile"] == "tg" and t.named("tags")[0][1][0]["stage"] == "train"
 
 
-def test_a_finished_training_sends_its_curves_results_and_log_then_closes_the_run(tmp_path):
+def _training_files(tmp_path):
     _write(tmp_path / "trainer_log.jsonl", '{"current_steps": 1, "loss": 2.0}\n')
     _write(tmp_path / "train_results.json", {"train_runtime": 100.0})
     _write(tmp_path / "trainer_state.json", {"global_step": 9, "best_model_checkpoint": "o/checkpoint-8", "log_history": []})
-    _write(tmp_path / "train_stdout.log", "log")
+    _write(tmp_path / "train_stdout.log", "[INFO] trainable params: 13,434,880 || all params: 3,893,000,000 || trainable%: 0.3451\nstep 1\n")
+    yaml_file, manifest = tmp_path / "train.yaml", tmp_path / "lora_train_data.meta.json"
+    _write(yaml_file, "learning_rate: 1.0e-5\n")
+    _write(manifest, {"style": "translategemma"})
+    return str(yaml_file), str(manifest)
+
+
+def test_a_finished_training_sends_its_curves_results_and_recipe_then_closes_the_run(tmp_path):
+    train_yaml, manifest = _training_files(tmp_path)
     t = Recorder()
 
-    stage_tracking.finish_training(t, str(tmp_path), "FINISHED")
+    stage_tracking.finish_training(t, str(tmp_path), "FINISHED", train_yaml=train_yaml, manifest_file=manifest)
 
     assert t.named("step_log")[0][1] == (str(tmp_path / "trainer_log.jsonl"),)
-    assert t.named("metrics")[0][1][0]["train.runtime_s"] == 100.0 and t.named("tags")[0][1][0] == {"train.best_checkpoint": "checkpoint-8"}
-    assert t.named("artifact")[0][1][0] == str(tmp_path / "train_stdout.log")
-    assert [c[0] for c in t.calls][-2:] == ["finish", "flush"] and t.named("finish")[0][1] == ("FINISHED",)
+    assert t.named("metrics")[0][1][0]["train.runtime_s"] == 100.0
+    tags = {k: v for call in t.named("tags") for k, v in call[1][0].items()}
+    assert tags["train.best_checkpoint"] == "checkpoint-8"
+    assert tags["train.trainable_params"] == "13434880" and tags["train.all_params"] == "3893000000"
+    sent = [os.path.basename(c[1][0]) for c in t.named("artifact")]
+    assert sent == ["train.yaml", "lora_train_data.meta.json", "trainer_state.json"]  # the recipe and data record, not the noisy log
+    assert all(c[1][1] == "train" for c in t.named("artifact"))
+    assert t.calls[-1][0] == "flush" and t.named("finish")[0][1] == ("FINISHED",)
+
+
+@pytest.mark.parametrize("status", ["FAILED", "KILLED"])
+def test_a_failed_or_cancelled_training_also_sends_its_log_where_the_traceback_is(tmp_path, status):
+    train_yaml, manifest = _training_files(tmp_path)
+    t = Recorder()
+
+    stage_tracking.finish_training(t, str(tmp_path), status, train_yaml=train_yaml, manifest_file=manifest)
+
+    assert "train_stdout.log" in [os.path.basename(c[1][0]) for c in t.named("artifact")]
+    assert t.named("finish")[0][1] == (status,)
+
+
+def test_the_status_is_closed_before_the_artifacts_go_up(tmp_path):
+    train_yaml, manifest = _training_files(tmp_path)
+    t = Recorder()
+
+    stage_tracking.finish_training(t, str(tmp_path), "FINISHED", train_yaml=train_yaml, manifest_file=manifest)
+
+    names = [c[0] for c in t.calls]
+    assert names.index("finish") < names.index("artifact")  # a slow or failing upload cannot keep the run RUNNING
+
+
+def test_an_interrupted_training_is_killed_and_a_crashed_one_failed():
+    assert stage_tracking.training_status(KeyboardInterrupt()) == "KILLED"
+    assert stage_tracking.training_status(SystemExit(1)) == "FAILED"
+    assert stage_tracking.training_status(RuntimeError("x")) == "FAILED"
 
 
 def test_a_failed_training_with_no_result_files_still_closes_its_run(tmp_path):
     t = Recorder()
 
-    stage_tracking.finish_training(t, str(tmp_path), "FAILED")
+    stage_tracking.finish_training(t, str(tmp_path), "FAILED", manifest_file=str(tmp_path / "none.json"))
 
     assert not t.named("step_log") and not t.named("metrics") and not t.named("artifact")
     assert t.named("finish")[0][1] == ("FAILED",) and t.named("flush")

@@ -176,6 +176,77 @@ def test_a_failure_stops_the_queue_in_place_and_the_next_sync_resumes_without_re
     assert len(client.named("create_run")) == 2
 
 
+def _run_with_artifact(queue, tmp_path, name="hy", now=1):
+    """params, then an artifact, then the status that closes the run (the order finish_training records them)."""
+    local = _run(queue, name, now=now, params={"a": "1"})
+    report = tmp_path / f"{name}.txt"
+    report.write_text("log", encoding="utf-8")
+    queue.add_artifact(local, str(report), artifact_path="train")
+    queue.finish(local, "FINISHED", now_ms=9)
+    return local
+
+
+def test_a_failed_artifact_does_not_stop_the_status_that_closes_the_run(queue, client, tmp_path):
+    """MinIO unreachable made the log upload fail; the run stayed RUNNING for good because the status came after it."""
+    local = _run_with_artifact(queue, tmp_path)
+    client.fail_on_call["log_artifact"] = 1
+    lines = []
+
+    report = sync(queue, client, log=lines.append)
+
+    assert client.named("set_terminated") == [("set_terminated", "remote-1", "FINISHED", 9)]
+    assert [(e["type"], e["sent"]) for e in queue.get(local)["events"]] == [("params", True), ("artifact", False), ("status", True)]
+    assert report.error is None and report.runs_sent == 1
+    assert any("artifact" in line and "again" in line for line in lines)
+
+
+def test_a_failed_artifact_does_not_hold_back_the_runs_after_it(queue, client, tmp_path):
+    _run_with_artifact(queue, tmp_path, "first", now=1)
+    second = _run(queue, "second", now=2, params={"c": "3"})
+    client.fail_on_call["log_artifact"] = 1
+
+    sync(queue, client, log=lambda *a: None)
+
+    assert queue.get(second)["remote_id"] == "remote-2"  # created and filled although the first run's artifact failed
+
+
+def test_the_failed_artifact_is_retried_at_the_next_sync_and_goes_up_then(queue, client, tmp_path):
+    local = _run_with_artifact(queue, tmp_path)
+    client.fail_on_call["log_artifact"] = 1
+    sync(queue, client, log=lambda *a: None)
+
+    sync(queue, client, log=lambda *a: None)
+
+    assert client.named("log_artifact") == [("log_artifact", "remote-1", "log", "train")] and queue.pending() == []
+    assert all(e["sent"] for e in queue.get(local)["events"])
+
+
+def test_an_artifact_that_keeps_failing_is_given_up_after_three_tries_so_it_cannot_slow_every_start(queue, client, tmp_path):
+    local = _run_with_artifact(queue, tmp_path)
+    lines = []
+    for _ in range(3):
+        client.fail_on_call["log_artifact"] = client.counts.get("log_artifact", 0) + 1
+        sync(queue, client, log=lines.append)
+
+    artifact = queue.get(local)["events"][1]
+    assert artifact["sent"] is True and artifact["gave_up"] is True and artifact["attempts"] == 3
+    assert queue.pending() == [] and any("giving up" in line for line in lines)
+    calls = client.counts.get("log_artifact", 0)
+    sync(queue, client, log=lambda *a: None)
+    assert client.counts.get("log_artifact", 0) == calls  # not tried a fourth time
+
+
+def test_another_failure_still_stops_the_queue_in_place(queue, client, tmp_path):
+    first = _run_with_artifact(queue, tmp_path, "first", now=1)
+    second = _run(queue, "second", now=2, params={"c": "3"})
+    client.fail_on_call["set_terminated"] = 1
+
+    report = sync(queue, client, log=lambda *a: None)
+
+    assert report.error and "set_terminated failed" in report.error and queue.get(second)["remote_id"] is None
+    assert [e["sent"] for e in queue.get(first)["events"]] == [True, True, False]
+
+
 def test_a_run_created_on_the_server_before_a_crash_is_found_again_not_created_twice(queue, client):
     local = _run(queue, params={"a": "1"})
     client.remote_runs["remote-9"] = local  # the server has it: we crashed before writing its id down

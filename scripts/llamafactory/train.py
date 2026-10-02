@@ -6,7 +6,7 @@ from config import TRAIN_LOG_NAME
 from lf_tools import check_training_data, profile_from_args, run_logged, train_command, train_config
 from manifest import ManifestError
 from runs import finish_run, start_run
-from stage_tracking import finish_training, open_tracker, start_training, training_context
+from stage_tracking import finish_training, open_tracker, start_training, training_context, training_status
 
 
 def train(argv=None):
@@ -23,12 +23,12 @@ def train(argv=None):
     print("Watch it from a second terminal: python scripts/llamafactory/watch_training.py")
     try:
         run_logged(train_command(profile.train_yaml, run.dir), os.path.join(run.dir, TRAIN_LOG_NAME), "Training")
-    except SystemExit:
+    except (SystemExit, KeyboardInterrupt) as e:  # a failed command, or Ctrl+C: the run is closed either way (KILLED in MLflow)
         finish_run(run.dir, "failed")
-        finish_training(tracker, run.dir, "FAILED")
+        finish_training(tracker, run.dir, training_status(e), profile.train_yaml)
         raise
     finish_run(run.dir, "complete")
-    finish_training(tracker, run.dir, "FINISHED")
+    finish_training(tracker, run.dir, "FINISHED", profile.train_yaml)
     print(f"\nTraining complete: run {run.id}.")
 
 

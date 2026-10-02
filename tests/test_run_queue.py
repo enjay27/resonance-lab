@@ -160,6 +160,18 @@ def test_a_corrupt_queue_file_is_set_aside_not_lost_and_not_fatal(tmp_path):
     assert len(queue.pending()) == 1
 
 
+def test_a_failing_optional_event_is_counted_and_given_up_after_the_limit(queue, tmp_path):
+    local = _new(queue, "r", now=1)
+    (tmp_path / "f.txt").write_text("x", encoding="utf-8")
+    queue.add_artifact(local, str(tmp_path / "f.txt"))
+
+    assert queue.fail_event(local, 0, give_up_after=3) == 1 and queue.get(local)["events"][0]["sent"] is False
+    assert queue.fail_event(local, 0, give_up_after=3) == 2
+    assert queue.fail_event(local, 0, give_up_after=3) == 3
+    event = queue.get(local)["events"][0]
+    assert event["sent"] is True and event["gave_up"] is True and event["attempts"] == 3
+
+
 def test_a_run_that_later_stages_continued_is_pruned_once_everything_is_sent(queue):
     """Merge, GGUF and eval add events after the training closed the run, so the last event is no longer its status."""
     done = _new(queue, "continued", now=1)

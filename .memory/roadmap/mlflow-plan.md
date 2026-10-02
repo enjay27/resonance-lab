@@ -48,6 +48,9 @@
   `--prompt` in one run write the same `eval.*` metric keys (history of one metric, tag = the last prompt).
 - **Found on the first GPU run (2026-10-01): `report_to` unset = transformers' `all`**, so with `mlflow-skinny` installed the trainer's own MLflow callback started and died on a local
   `sqlite:///mlflow.db` the skinny client cannot open (`UnsupportedModelRegistryStoreURIException`, Fine-Tuning FAILED after 22 s). Every `train.yaml` now has `report_to: none` (a test guards it).
+- **Tracker rough edges (2026-10-02, after the first tracked runs):** a failed artifact upload (MinIO unreachable) blocked the run's closing status and every later run; Ctrl+C left the run RUNNING.
+  Now: artifact failures are retried 3 times then given up (`RunQueue.fail_event`), the run is closed before its artifacts, Ctrl+C -> KILLED, artifacts are the recipe/manifest/trainer state
+  (log only on failure), model size tags from the log.
 - **PR 4b (done in code 2026-10-01, NOT VERIFIED on the GPU, see `unverified-on-gpu.md`): the thin wiring** via the tested `stage_tracking.py` (`open_tracker` never raises, `start_training`, `finish_training`, `resume_stage`, `record_stage`, `fail_stage`); `run_queue.prune` now also prunes runs that later stages continued. Plan as written: Callers checked: `train.py` (`start_run`/`finish_run`), `merge.py` (`resolve_adapter`/`write_merge_record`), `gguf.py`, `eval.py`
   (hardcodes `max_new_tokens=256` -> use `config.EVAL_MAX_NEW_TOKENS`). `train.py`: `tracker.from_environment()`, `begin(MLFLOW_EXPERIMENT, name, local_run_id)`, params + tags (`git_info`, `package_versions`,
   `read_state(data/hf/fetch_state.json)`, `read_manifest`), after training `step_log(trainer_log.jsonl)` + `train_result_records` (read `train_results.json`/`trainer_state.json` from the run dir) + `finish`,

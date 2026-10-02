@@ -60,21 +60,46 @@ def start_training(tracker, profile, run, train_cfg, fetch_state, manifest, git=
     return local_id
 
 
-def finish_training(tracker, run_dir, status):
-    """Send the curves, the result metrics and the log of a training, close its run (`FINISHED` / `FAILED`) and flush."""
+def training_status(error):
+    """The MLflow status a training that stopped with `error` is closed with: KILLED for Ctrl+C, else FAILED."""
+    return "KILLED" if isinstance(error, KeyboardInterrupt) else "FAILED"
+
+
+def _first_text(path, limit=1_000_000):
+    """The start of a log (the trainer prints the model size early); '' when there is none."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return f.read(limit)
+    except OSError:
+        return ""
+
+
+def finish_training(tracker, run_dir, status, train_yaml=None, manifest_file=manifest_path(PROCESSED_LOGS)):
+    """Send the curves, the result metrics and the model size of a training, close its run (`FINISHED` / `FAILED` /
+    `KILLED`), then upload the files that say how it was made and flush.
+
+    The run is closed BEFORE the artifacts: a slow or failing upload (MinIO down) must not leave it RUNNING. Artifacts:
+    the recipe (`train.yaml`), the data record and the trainer state; the noisy log only for a run that did not finish,
+    where it holds the traceback.
+    """
     log = os.path.join(run_dir, TRAINER_LOG)
     if os.path.isfile(log):
         tracker.step_log(log)
     metrics, tags = track_records.train_result_records(track_records.read_json(os.path.join(run_dir, TRAIN_RESULTS)),
                                                       track_records.read_json(os.path.join(run_dir, TRAINER_STATE)))
+    stdout = os.path.join(run_dir, TRAIN_LOG_NAME)
+    tags = {**tags, **tracking.model_size_tags(_first_text(stdout))}
     if metrics:
         tracker.metrics(metrics)
     if tags:
         tracker.tags(tags)
-    stdout = os.path.join(run_dir, TRAIN_LOG_NAME)
-    if os.path.isfile(stdout):
-        tracker.artifact(stdout, "train")
     tracker.finish(status)
+    files = [train_yaml, manifest_file, os.path.join(run_dir, TRAINER_STATE)]
+    if status != "FINISHED":
+        files.append(stdout)
+    for path in files:
+        if path and os.path.isfile(path):
+            tracker.artifact(path, "train")
     tracker.flush()
 
 
