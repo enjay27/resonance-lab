@@ -9,7 +9,8 @@ TranslateGemma profiles stay in the repo, not developed. Work now, in this order
 4. **Sweeps on `hy-mt2-1.8b-fast` (~4 min each), from the notebook's sweep cell (or by hand):** `train.py --fast --lr L [--epochs E]` (override, recorded in MLflow), then `merge.py --fast`, `eval.py --fast --prompt training`, `mlflow_compare.py --profile hy-mt2-1.8b-fast --sort eval-loss`.
    **First sweep done (lr 5e-5 / 1e-4 / 2e-4: higher is better, 2e-4 best, eval loss still falling at the end; table in the notebook note).** Next: lr 4e-4, 8e-4, and 2e-4 with `--epochs 6`; then confirm the best on the full profile (~25 min, both eval prompts) and set it in the profiles.
 5. Then the 7B (QLoRA: bf16 does not fit 16 GB), the prompt copy to resonance-stream once Hy beats the shipped model.
-6. **Idea, not started: per-sample evaluation in MLflow (`mlflow.genai.evaluate`, custom scorers, no LLM judge)** — design, feasibility checks and open questions in [`mlflow-genai-eval.md`](mlflow-genai-eval.md); the maintainer starts it from a new session, after the notebook.
+6. **Per-sample evaluation in MLflow (`mlflow.genai.evaluate`)** — PR 1 built 2026-10-03 (deterministic per-line scores, `scripts/mlflow_genai_eval.py`, `eval.py` saves the predictions; not yet run on the maintainer's machine). Next, one PR at a time:
+   2a a typed judge with an open model (llama-server logprobs + a Jev-spec backend) and a planted-error probe to pick the model, 2b `--judge`. Design, decisions and sources in [`mlflow-genai-eval.md`](mlflow-genai-eval.md).
 
 ## Done 2026-10-02 (maintainer's idea): the run queue is an append-only journal, `run_queue.py` / `.run.result.backup.jsonl`
 One line per write; a sent event is acknowledged by a `sent` line and dropped (with its copied file) at the next start; the run header + server id stay for resuming (and for `prune`); a torn last line is ignored; two

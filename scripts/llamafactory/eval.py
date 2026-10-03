@@ -2,7 +2,8 @@
 
 Generation lives here (it needs the model and a GPU); the scoring and the report are the shared
 eval_metrics module, the same one the unsloth pipeline uses. The report is printed and saved to
-outputs/eval/<profile>-<prompt>.txt so runs of different models can be compared.
+outputs/eval/<profile>-<prompt>.txt so runs of different models can be compared; the translations are saved beside it as
+<profile>-<prompt>.jsonl for scripts/mlflow_genai_eval.py (per-line scores in MLflow).
 """
 
 import argparse
@@ -12,6 +13,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from config import EVAL_DATASET_PATH, EVAL_MAX_NEW_TOKENS, EVAL_OUTPUT_DIR
 from eval_metrics import comet_score, evaluate, format_report, load_eval_dataset, strip_think
+from genai_eval import prediction_rows, predictions_path, write_predictions
 from lf_tools import add_model_argument, chat_messages, generate_inputs, load_profile, model_name, training_prompt, training_user_text, with_bos
 from runs import read_merge_record
 from stage_tracking import open_tracker, record_stage, resume_stage
@@ -84,6 +86,9 @@ def main(argv=None):
     with open(out, "w", encoding="utf-8") as f:
         f.write(report)
     print(f"\nReport saved: {out}")
+    saved = predictions_path(EVAL_OUTPUT_DIR, profile.name, args.prompt)
+    write_predictions(saved, prediction_rows(samples, predictions, raw_outputs))
+    print(f"Predictions saved: {saved}  (per-line scores in MLflow: scripts/mlflow_genai_eval.py)")
 
     tracker = open_tracker()
     if resume_stage(tracker, read_merge_record(profile.merged_dir)):  # the run the merged model came from
