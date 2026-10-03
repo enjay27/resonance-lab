@@ -17,6 +17,11 @@ Code or config changed in a session without CUDA. Delete an item once it has run
   the update migrates your old `.run.result.backup.json` (renamed `.migrated`; a run still unsent there is sent at the next sync) -- check `[tracking]` shows no warning, and that `.run.result.backup.jsonl` exists.
   `pip uninstall tinydb` is optional (no longer a requirement). Compaction replaces the file: on Windows it is skipped (retried next start) if another process has the journal open.
 
+- **Per-sample evaluation (2026-10-03):** `eval.py` now also writes `outputs/eval/<profile>-<prompt>.jsonl` (model part, NOT VERIFIED: generation is unchanged, only the save is added). `genai_eval.py` and
+  `scripts/mlflow_genai_eval.py` are data part: unit-tested and run against a real MLflow 3.16.1 server with the pinned skinny client (3 made-up lines -> 3 traces with assessments, run means, tags). Not run with real eval output,
+  the NAS, Python 3.13 / Windows, or seen in the web UI. Check: `eval.py --prompt training` prints `Predictions saved: ...`, then `python scripts\mlflow_genai_eval.py --prompt training` prints an evaluation run id; open it
+  under Evaluation runs of `resonance-lab-eval` (51 traces, scores per line), and `pip show pandas` is installed.
+
 - **`scripts/mlflow_compare.py` (2026-10-02):** data part (needs `.env.mlflow` and `mlflow-skinny`, no GPU). Unit-tested with a stand-in client and run against a real MLflow 3.16.1 server with runs recorded through
   the tracker (sorted by eval loss / chrF, killed run hidden, markdown). Not run against the NAS or your real runs: `python scripts\mlflow_compare.py` should list `hy-mt2-1.8b-fast-...` with their eval loss;
   the eval columns stay `-` until a run's eval stage ran (two evals with different `--prompt` in one run share the same metric keys: the table shows the last prompt).

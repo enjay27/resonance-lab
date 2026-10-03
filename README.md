@@ -49,6 +49,11 @@ to `outputs/eval/`. `python scripts/llamafactory/eval.py --prompt training` eval
 instead of the model's chat template (the default, which is what resonance-stream sends) -- the gap between the two
 is the prompt mismatch in `.memory/active-issues/stream-contract.md`.
 
+The llamafactory `eval.py` also saves the translations to `outputs/eval/<profile>-<prompt>.jsonl`. With tracking on,
+`python scripts/mlflow_genai_eval.py --prompt training` then sends every eval line to MLflow as a trace with its own scores
+(chrF, JP leakage, term check, `discord`, think leak, exact match) in the experiment `resonance-lab-eval`, tagged with the
+training run it came from (no LLM, no API key; needs `pandas` next to `mlflow-skinny`).
+
 ## Prerequisites
 - Python 3.13
 - Windows OS (Linux not tested yet)
