@@ -1,0 +1,6 @@
+{
+  "description": "Only the stray note 'Never trained on.' removed from the description of `other` (it is a note about the translator's training data, not for the judge). Isolates that one change.",
+  "descriptions": {
+    "other": "Does not fit any other category or cannot be read: symbols only, emoticons only, cut-off fragments, a lone character."
+  }
+}

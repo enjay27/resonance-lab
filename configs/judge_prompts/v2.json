@@ -1,0 +1,11 @@
+{
+  "description": "Judge-facing rewrite: short reactions belong to chat, a question about the game is a question, party-ad slot notation (@T1 @H1 @D2 28k↑ M15) is recruitment, coordination is for people already playing together; the stray 'Never trained on.' removed. Social, bot and spam as in the default.",
+  "descriptions": {
+    "chat": "Everyday conversation between players: what someone is doing, jokes, opinions, personal remarks, and very short reactions or laughter (草, ww, すごい, ナイス, やば, えぐ, かわいい, さすが). Not recruiting, not a question, not coordination, and not a statement about how the game works.",
+    "game": "A statement about how the game works or what to do in it: classes, skills, builds, stats, gear, quests, dungeons, bosses, events, the open market, maintenance, bugs. A question about the game is a question, not game.",
+    "question": "A player asks other players for information, an opinion or help and expects an answer, including questions about the game and about what to sell or buy: どうやって〜？, 〜はどこですか, 〜ですか？, 〜かな？, 〜よね？, 教えてください, 何を売ればいい？, 誰か〜わかる人いますか. A line that asks something is a question even when it is about the game; a request to join a party is recruitment, not a question.",
+    "coordination": "Real-time coordination between players who are already playing together: ready checks, waiting, calling targets or positions, asking for a heal or a revive, gathering, deciding to start or repeat a run, announcing which content you are going to (準備OK, ちょっと待って, 集合, ボス行きます, もう一周行く？, 回復お願い). Looking for new people to join is recruitment, not coordination.",
+    "recruitment": "A player or a guild is looking for people to join: members for a party, dungeon, raid or boss run, or members for a guild. Party ads are short and use slot and requirement notation: @T1, @H1, @D2 or T1H1D2 (open tank, healer and DPS slots), 28k↑ or MS3800～ (minimum power), M15 or NM (the content and its level), plus 募集, 周回, お願いします. A line like this is recruitment even when it has no verb, and so is a call for helpers (ヘルプ, 助けてください, 手伝ってください) that names a boss, a level or a slot.",
+    "other": "Does not fit any other category or cannot be read: symbols only, emoticons only, cut-off fragments, a lone character."
+  }
+}

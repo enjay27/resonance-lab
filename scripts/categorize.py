@@ -29,9 +29,11 @@ from config import CATEGORIES_FILE, GATE1_COMPARE_DIR, GATE1_SAMPLE, JUDGE_CUTOF
 from dataset_recipe import line_key
 from gate_compare import check_label, collect_answers, probe_path, probe_record, save_probe
 from gate_eval import SampleError, evaluate_categorizer, format_gate_report, read_sample
-from gate_judge import (INSTRUCTIONS, SWEEP_CUTOFFS, GateJudge, JournalError, categories_from, choice_options, cutoff_sweep, format_sweep,
+from gate_judge import (SWEEP_CUTOFFS, GateJudge, JournalError, categories_from, cutoff_sweep, format_sweep,
                         judge_id, journal_row, read_journal, trim_torn_tail, write_categories)
 from judge_client import JudgeError, SystemOneClient
+from judge_prompts import DEFAULT as DEFAULT_PROMPT
+from judge_prompts import PromptError, judge_question, list_variants, load_variant
 from judge_local import DTYPES, LocalKevClient
 from taxonomy import load_taxonomy
 
@@ -180,7 +182,8 @@ def probe(args, rows, judge, by):
     print(f"\n{seconds_per_line:.2f} s per line on this pass")
     if args.save_probe:
         path = save_probe(args.probe_dir, probe_record(args.save_probe, by, collect_answers(rows, judge, args.use_channel),
-                                                       seconds_per_line, args.use_channel))
+                                                       seconds_per_line, args.use_channel,
+                                                       notes=f"prompt {args.judge_prompt}"))
         print(f"probe saved: {path} (compare judges with scripts/compare_judges.py)")
 
 
@@ -201,12 +204,21 @@ def main(argv=None, post=None, loader=None):
     parser.add_argument("--save-probe", metavar="LABEL", help="with --probe and a judge: save what the judge answered as data/eval/gate1-compare/LABEL.json, "
                         "to compare judges with scripts/compare_judges.py (a plain name like 9b-q8; never replaces a saved probe)")
     parser.add_argument("--probe-dir", default=GATE1_COMPARE_DIR, help="where saved probes go (default: %(default)s)")
+    parser.add_argument("--judge-prompt", default=DEFAULT_PROMPT, metavar="NAME",
+                        help=f"what the judge is asked: a file of configs/judge_prompts/ (there are: {', '.join(list_variants())}); "
+                        "default = the taxonomy's root descriptions as they are. Another wording is another judge: its journal and probe never mix")
     parser.add_argument("--journal", default=JUDGE_PASS_FILE, help="the judge's answers, resumable (default: %(default)s)")
     parser.add_argument("--use-channel", action="store_true", help="give the judge the chat channel of a line (a `channel` field of the row)")
     parser.add_argument("--force", action="store_true", help="start the judge journal again instead of stopping on rows of another judge")
     args = parser.parse_args(argv)
     if args.judge_local and (args.judge_url or args.judge_model):
         parser.error("--judge-local runs the model in this process: it excludes --judge-url and --judge-model")
+    if args.judge_prompt != DEFAULT_PROMPT and not (args.judge_url or args.judge_local):
+        parser.error("--judge-prompt changes what a judge is asked: it needs --judge-url or --judge-local")
+    try:  # before any model loads
+        instructions, options = judge_question(load_taxonomy(), load_variant(args.judge_prompt))
+    except PromptError as error:
+        parser.error(str(error))
     if args.save_probe:
         if args.probe is None or not (args.judge_url or args.judge_local):
             parser.error("--save-probe saves what a judge answered on the sample: it needs --probe and --judge-url or --judge-local")
@@ -224,10 +236,9 @@ def main(argv=None, post=None, loader=None):
     elif args.judge_url:
         client, where, who, kind = SystemOneClient(args.judge_url, model=args.judge_model, post=post), args.judge_url, "the server", "systemone"
     if args.judge_local or args.judge_url:
-        options = choice_options(load_taxonomy())
         try:
-            by = judge_id(client.check_server(), INSTRUCTIONS, options, kind=kind)
-            judge = GateJudge(client, options, args.cutoff)
+            by = judge_id(client.check_server(), instructions, options, kind=kind)
+            judge = GateJudge(client, options, args.cutoff, instructions)
         except JudgeError as error:
             if args.probe is not None:
                 print(f"[ERROR] the judge cannot be used: {error}")

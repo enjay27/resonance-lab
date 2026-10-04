@@ -1,0 +1,6 @@
+{
+  "description": "`other` left out of the question: the cutoff abstains on unclear lines instead. Everything else as the default. Isolates the effect of having an `other` option.",
+  "drop": [
+    "other"
+  ]
+}
