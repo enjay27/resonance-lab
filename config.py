@@ -61,6 +61,8 @@ PREPROCESS_MAX_SUSPICIOUS = 0.30  # share of usable rows dropped as Hangeul-in-s
 # configs/hf_dataset.yaml pins repo + revision; the app's per-channel dataset_<CHANNEL>.jsonl files are downloaded
 # into HF_DATA_DIR and merged into RAW_LOGS. RESONANCE_RAW_LOGS (a hand-made raw log) switches the stage off.
 HF_DATASET_CONFIG = os.path.join(BASE_DIR, "configs", "hf_dataset.yaml")
+# A dataset recipe (category -> share of the training file) is one JSON file here; see dataset_recipe.py.
+RECIPE_DIR = os.path.join(BASE_DIR, "configs", "datasets")
 HF_DATA_DIR = os.path.join(BASE_DIR, "data", "hf")
 
 # --- Experiment tracking (tracking.py) ---
