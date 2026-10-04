@@ -34,11 +34,12 @@ def choice_options(taxonomy, root=None):
     return options
 
 
-def judge_id(model, instructions, options):
-    """`systemone:<model>:<hash8>`: the model (its file name, without .gguf) and a hash of the question it answered."""
+def judge_id(model, instructions, options, kind="systemone"):
+    """`<kind>:<model>:<hash8>`: how it was asked (`systemone`: llama-server, `kev-local`: judge_local.py), the model (its file
+    name, without .gguf) and a hash of the question it answered. A journal of another id is never mixed with this one."""
     name = os.path.basename(model or "unknown").removesuffix(".gguf")
     question = json.dumps({"instructions": instructions, "options": options}, ensure_ascii=False, sort_keys=True)
-    return f"systemone:{name}:{hashlib.sha1(question.encode('utf-8')).hexdigest()[:8]}"
+    return f"{kind}:{name}:{hashlib.sha1(question.encode('utf-8')).hexdigest()[:8]}"
 
 
 def state_for(text, channel=None):
