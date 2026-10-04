@@ -82,6 +82,7 @@ compare_runs.py       the experiment's runs as one table (profile, lr, epochs, b
 tracker.py            sends queued runs to the NAS oldest-first, resumable, never raises into a training; `from_environment()` -> Tracker or NullTracker; tested with a fake client
 judge_client.py       client of llama-server's `POST /v1/systemone` (a decision model answers typed questions): `SystemOneClient.choice` / `check_server`, `JudgeError`; injected `post`, stdlib only; fixtures recorded from a real server; tested
 categorizer.py        Gate 1 baseline: rules put a chat line in a root category of the taxonomy, or nothing; pure; tested
+gate_judge.py         Gate 1 with a judge (llama-server decision model): the question (`choice_options` from the taxonomy, `INSTRUCTIONS`, `judge_id` = model + prompt hash), `GateJudge` (cutoff on the margin, cached answers), `cutoff_sweep`, the resumable journal (`read_journal`, `trim_torn_tail`) and `categories_from` (the categories file is derived from the journal for a cutoff); pure; tested with `tests/judge_stub.py`
 gate_eval.py          scores a categorizer on a hand-labelled sample (accuracy, coverage, precision / recall per root, confusions); pure; tested
 taxonomy.py           configs/category_taxonomy.json: the categories (roots, children, descriptions), `coverage`: eval lines per root; pure; tested
 dataset_recipe.py     a recipe (configs/datasets/<name>.json: category -> weight) + a categories file choose the training lines, seeded and nested; pure; `preprocess.py --recipe` applies it; tested
@@ -98,7 +99,7 @@ scripts/
   mlflow_compare.py     data: `python scripts/mlflow_compare.py [--profile hy] [--sort eval-loss|chrf|term] [--markdown] [--all]` prints compare_runs' table from the NAS's MLflow
   mlflow_genai_eval.py  data: `python scripts/mlflow_genai_eval.py [--model M] [--prompt ...]` evaluates `eval.py`'s saved predictions line by line in MLflow (traces + assessments, experiment `resonance-lab-eval`)
   judge_check.py        data: `python scripts/judge_check.py [--url U]` is the judge server up, new enough, serving a decision model? (exit 1 with the reason)
-  categorize.py         data: `python scripts/categorize.py [--probe [SAMPLE]]` raw log -> data/processed/categories.jsonl (Gate 1 baseline), or score it on a labelled sample
+  categorize.py         data: `python scripts/categorize.py [--judge-url URL [--cutoff X] [--use-channel]] [--probe [SAMPLE]]` raw log -> data/processed/categories.jsonl (rule baseline, or the judge: resumable via data/processed/gate1_judge.jsonl; falls back to the rules with a warning when the server is unreachable), or score the baseline / the judge (+ cutoff sweep) on a labelled sample; `tests/test_judge_live.py` runs against a real server when `RESONANCE_JUDGE_URL` is set
   validate.py           shared data: raw-log sanity gate (empty/missing file, >1% damaged lines, >10% Hangeul in `original` -> ValidationError; limits in config.py)
   preprocess.py         shared data: raw {original, translated} -> {instruction, input, output};
                           `clean_reason` drops empty/untranslated, Hangeul-in-source,

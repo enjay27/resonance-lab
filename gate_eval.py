@@ -42,7 +42,10 @@ def read_sample(path):
                 raise SampleError(f"{path} line {number}: needs a non-empty \"original\" and a \"category\"")
             if category not in taxonomy.paths:
                 raise SampleError(f"{path} line {number}: '{category}' is not a category of configs/category_taxonomy.json")
-            rows.append({"original": original, "category": category})
+            row_out = {"original": original, "category": category}
+            if isinstance(row.get("channel"), str) and row["channel"]:  # optional: the chat channel the line was said in
+                row_out["channel"] = row["channel"]
+            rows.append(row_out)
     return rows
 
 
