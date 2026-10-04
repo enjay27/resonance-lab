@@ -70,6 +70,9 @@ GATE1_SAMPLE = os.path.join(BASE_DIR, "data", "eval", "gate1-sample.jsonl")
 # {key, category} per line, what a recipe selects by (written by Gate 1, or by any script); preprocess.py --categories.
 CATEGORIES_FILE = os.path.join(PROCESSED_DATA_DIR, "categories.jsonl")
 HF_DATA_DIR = os.path.join(BASE_DIR, "data", "hf")
+# Gate 1's judge: a local llama-server serving a decision model (POST /v1/systemone, judge_client.py). Never a hosted service:
+# the chat lines stay on this machine.
+JUDGE_URL = "http://127.0.0.1:8080"
 
 # --- Experiment tracking (tracking.py) ---
 # The NAS server's URL and credentials: gitignored, see .env.mlflow.example and deploy/mlflow/README.md.

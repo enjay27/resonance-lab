@@ -1,0 +1,25 @@
+{
+ "status": 200,
+ "request": {
+  "state": "x",
+  "questions": {
+   "q": {
+    "type": "noul",
+    "instructions": "Is this a greeting?"
+   }
+  }
+ },
+ "body": {
+  "model": "models/Julia-1-Q8_0.gguf",
+  "answers": {
+   "q": {
+    "type": "noul",
+    "noul": 0.9916130216552174
+   }
+  },
+  "usage": {
+   "input_tokens": 18,
+   "output_tokens": 0
+  }
+ }
+}

@@ -1,0 +1,20 @@
+{
+ "status": 400,
+ "request": {
+  "state": "x",
+  "questions": {
+   "q": {
+    "type": "choice",
+    "instructions": "x",
+    "criteria": {}
+   }
+  }
+ },
+ "body": {
+  "error": {
+   "code": 400,
+   "message": "questions.q: \"criteria\" must be a non-empty object",
+   "type": "invalid_request_error"
+  }
+ }
+}

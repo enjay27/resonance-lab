@@ -1,0 +1,38 @@
+{
+ "status": 200,
+ "request": {
+  "state": "ID:12345 ダンジョン行きませんか？ 2人募集",
+  "questions": {
+   "cat": {
+    "type": "choice",
+    "instructions": "Which category is this in-game chat message?",
+    "criteria": {
+     "social": "greetings, thanks, small talk",
+     "recruitment": "looking for party members, guild members, dungeon runs",
+     "question": "asking for help or information",
+     "other": "anything else"
+    }
+   }
+  }
+ },
+ "body": {
+  "model": "models/Julia-1-Q8_0.gguf",
+  "answers": {
+   "cat": {
+    "type": "choice",
+    "choice": "recruitment",
+    "probabilities": {
+     "social": 0.0001751695108801889,
+     "recruitment": 0.9996720021553178,
+     "question": 0.00015116015913558818,
+     "other": 1.668174666458258e-06
+    },
+    "confidence": 0.9995626695404237
+   }
+  },
+  "usage": {
+   "input_tokens": 60,
+   "output_tokens": 0
+  }
+ }
+}
