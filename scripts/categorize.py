@@ -1,7 +1,8 @@
-"""Gate 1: categorise every raw chat message into a root category -- by rules, or by a judge on a local llama-server.
+"""Gate 1: categorise every raw chat message into a root category -- by rules, or by a judge: a local llama-server, or the Kev model loaded in this process.
 
     python scripts/categorize.py                          raw log -> data/processed/categories.jsonl (rule baseline)
     python scripts/categorize.py --judge-url URL          the same with a decision model as the judge (llama-server, /v1/systemone)
+    python scripts/categorize.py --judge-local [RUN]      the same, the Kev model loaded in this process (no server; .venv-kev, judge_local.py)
     python scripts/categorize.py --probe [SAMPLE]         score the baseline on a hand-labelled sample; writes nothing
     python scripts/categorize.py --probe [SAMPLE] --judge-url URL    ... and the judge, with a cutoff sweep
 
@@ -23,12 +24,13 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from categorizer import BASELINE, categorize
-from config import CATEGORIES_FILE, GATE1_SAMPLE, JUDGE_CUTOFF, JUDGE_PASS_FILE, JUDGE_URL, RAW_LOGS
+from config import CATEGORIES_FILE, GATE1_SAMPLE, JUDGE_CUTOFF, JUDGE_LOCAL_RUN, JUDGE_PASS_FILE, JUDGE_URL, RAW_LOGS
 from dataset_recipe import line_key
 from gate_eval import SampleError, evaluate_categorizer, format_gate_report, read_sample
 from gate_judge import (INSTRUCTIONS, SWEEP_CUTOFFS, GateJudge, JournalError, categories_from, choice_options, cutoff_sweep, format_sweep,
                         judge_id, journal_row, read_journal, trim_torn_tail, write_categories)
 from judge_client import JudgeError, SystemOneClient
+from judge_local import DTYPES, LocalKevClient
 from taxonomy import load_taxonomy
 
 MAX_CONSECUTIVE_FAILURES = 20  # requests that fail one after the other: the server is gone, stop instead of skipping the log
@@ -142,13 +144,17 @@ def probe(args, rows, judge, by):
     print("\n" + format_sweep(sweep, by))
 
 
-def main(argv=None, post=None):
+def main(argv=None, post=None, loader=None):
     parser = argparse.ArgumentParser(description="Categorise the raw chat log into root categories (rules, or a judge on llama-server).")
     parser.add_argument("--raw", default=RAW_LOGS, help="raw log to categorise (default: %(default)s)")
     parser.add_argument("--out", default=CATEGORIES_FILE, help="categories file to write (default: %(default)s)")
     parser.add_argument("--probe", nargs="?", const=GATE1_SAMPLE, metavar="SAMPLE",
                         help="score the baseline (and the judge) on a hand-labelled sample instead (default sample: %s)" % GATE1_SAMPLE)
     parser.add_argument("--judge-url", metavar="URL", help=f"llama-server serving a decision model, e.g. {JUDGE_URL}: the judge decides")
+    parser.add_argument("--judge-local", nargs="?", const=JUDGE_LOCAL_RUN, metavar="RUN",
+                        help=f"the judge is the Kev model loaded in this process instead (a Hub id[@revision] or a directory; default {JUDGE_LOCAL_RUN})")
+    parser.add_argument("--dtype", choices=DTYPES, default="bf16", help="with --judge-local: the precision (default: %(default)s)")
+    parser.add_argument("--device", help="with --judge-local: cuda or cpu (default: cuda when there is one)")
     parser.add_argument("--judge-model", metavar="NAME", help="the model to ask, when the server runs several (router mode)")
     parser.add_argument("--cutoff", type=float, default=JUDGE_CUTOFF, help="smallest margin (top probability minus the second) that counts "
                         "as an answer (default: %(default)s, a guess: choose it with --probe)")
@@ -156,13 +162,18 @@ def main(argv=None, post=None):
     parser.add_argument("--use-channel", action="store_true", help="give the judge the chat channel of a line (a `channel` field of the row)")
     parser.add_argument("--force", action="store_true", help="start the judge journal again instead of stopping on rows of another judge")
     args = parser.parse_args(argv)
+    if args.judge_local and (args.judge_url or args.judge_model):
+        parser.error("--judge-local runs the model in this process: it excludes --judge-url and --judge-model")
 
     judge = by = None
-    if args.judge_url:
-        client = SystemOneClient(args.judge_url, model=args.judge_model, post=post)
+    if args.judge_local:
+        client, where, who, kind = LocalKevClient(args.judge_local, device=args.device, dtype=args.dtype, loader=loader), args.judge_local, "the model", "kev-local"
+    elif args.judge_url:
+        client, where, who, kind = SystemOneClient(args.judge_url, model=args.judge_model, post=post), args.judge_url, "the server", "systemone"
+    if args.judge_local or args.judge_url:
         options = choice_options(load_taxonomy())
         try:
-            by = judge_id(client.check_server(), INSTRUCTIONS, options)
+            by = judge_id(client.check_server(), INSTRUCTIONS, options, kind=kind)
             judge = GateJudge(client, options, args.cutoff)
         except JudgeError as error:
             if args.probe is not None:
@@ -171,7 +182,7 @@ def main(argv=None, post=None):
             made_by = existing_judges(args.out)
             if made_by:
                 print(f"[ERROR] the judge cannot be used ({error}) and {args.out} was made by {', '.join(sorted(made_by))}: "
-                      "not replacing it with the rules. Start the server, or use another --out.", file=sys.stderr)
+                      "not replacing it with the rules. Fix that, or use another --out.", file=sys.stderr)
                 sys.exit(1)
             print(f"[WARNING] the judge cannot be used ({error}): categorising with the rule baseline ({BASELINE}) instead.", file=sys.stderr)
 
@@ -202,10 +213,10 @@ def main(argv=None, post=None):
     except JournalError as error:
         print(f"[ERROR] {error}")
         sys.exit(1)
-    print(f"Judge {by} at {args.judge_url}: {len(done)} lines already in {args.journal}")
+    print(f"Judge {by} at {where}: {len(done)} lines already in {args.journal}")
     keys, unjudged, damaged, gone = judge_raw(args.raw, args.journal, judge, by, args.use_channel, done)
     if gone:
-        print(f"[ERROR] the judge failed {MAX_CONSECUTIVE_FAILURES} requests in a row: is the server still running? "
+        print(f"[ERROR] the judge failed {MAX_CONSECUTIVE_FAILURES} requests in a row: is {who} still working? "
               f"The answers so far are in {args.journal}: run again to resume.")
         sys.exit(1)
     categories, uncertain = categories_from({key: done[key] for key in keys if key in done}, args.cutoff)
@@ -214,9 +225,9 @@ def main(argv=None, post=None):
     for row in categories:
         per_root[row["category"]] = per_root.get(row["category"], 0) + 1
     report_distribution(per_root, uncertain + unjudged, damaged, args.out, by=by,
-                        why=f"margin below the cutoff {args.cutoff}, or the server failed: left out of the file")
+                        why=f"margin below the cutoff {args.cutoff}, or {who} failed: left out of the file")
     if unjudged:
-        print(f"{unjudged} line(s) unjudged (the server failed on them): run again to ask about them.")
+        print(f"{unjudged} line(s) unjudged ({who} failed on them): run again to ask about them.")
 
 
 if __name__ == "__main__":
