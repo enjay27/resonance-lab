@@ -65,6 +65,8 @@ HF_DATASET_CONFIG = os.path.join(BASE_DIR, "configs", "hf_dataset.yaml")
 RECIPE_DIR = os.path.join(BASE_DIR, "configs", "datasets")
 # The categories a message can be in (roots = Gate 1's choices, children = Gate 1-A's) with the description of each.
 CATEGORY_TAXONOMY = os.path.join(BASE_DIR, "configs", "category_taxonomy.json")
+# Gate 1's accuracy check: lines hand-labelled with a taxonomy category ({original, category}); gitignored like the eval set.
+GATE1_SAMPLE = os.path.join(BASE_DIR, "data", "eval", "gate1-sample.jsonl")
 # {key, category} per line, what a recipe selects by (written by Gate 1, or by any script); preprocess.py --categories.
 CATEGORIES_FILE = os.path.join(PROCESSED_DATA_DIR, "categories.jsonl")
 HF_DATA_DIR = os.path.join(BASE_DIR, "data", "hf")

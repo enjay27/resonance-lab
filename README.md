@@ -49,6 +49,15 @@ per line, `key` = `dataset_recipe.line_key(original)`). `configs/datasets/exampl
 file is the same for every recipe; the recipe, its hash and the lines each category gave are recorded in the manifest and
 in MLflow (tags `dataset.recipe*`, params `data.cat.<category>`, a `recipe` column in `scripts/mlflow_compare.py`).
 
+### Categorising the messages (Gate 1)
+`python scripts/categorize.py` reads the raw log and writes `data/processed/categories.jsonl` -- the file `preprocess.py --recipe`
+selects by -- with a rule-based first pass (`categorizer.py`): each message gets a root of `configs/category_taxonomy.json`, or
+nothing when no rule recognises it (it stays `uncategorized`; rules never guess). It also prints how the log splits by root, which
+is the natural mix to weigh a recipe against. `python scripts/categorize.py --probe [SAMPLE]` scores the rules on a hand-labelled
+sample (`{"original", "category"}` per line; default `data/eval/gate1-sample.jsonl`, gitignored): accuracy, coverage, precision and
+recall per root, and what each root was mistaken for. `tests/fixtures/gate1_sample.jsonl` is a made-up sample that shows the
+format; it was written together with the rules, so its score is not a measure of real accuracy -- label real lines yourself.
+
 ## Evaluation
 `data/eval/bp-eval-dataset.jsonl` (gitignored; one JSON per line: `original`, `translated`, optional `category`).
 Both pipelines print the same report (chrF/BLEU/TER, COMET if `unbabel-comet` is installed, JP and `<think>`
