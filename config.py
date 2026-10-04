@@ -73,6 +73,7 @@ HF_DATA_DIR = os.path.join(BASE_DIR, "data", "hf")
 # Gate 1's judge: a local llama-server serving a decision model (POST /v1/systemone, judge_client.py). Never a hosted service:
 # the chat lines stay on this machine.
 JUDGE_URL = "http://127.0.0.1:8080"
+JUDGE_LOCAL_RUN = "jaredpalmer/kev-9b@v1.0"  # the same judge WITHOUT llama-server, loaded in Python (judge_local.py, .venv-kev); weights pinned at v1.0
 # One row per line the judge has answered ({key, by, choice, margin, p, probabilities}): the pass resumes from it, and the
 # categories file is derived from it for a cutoff. Gitignored with the rest of data/.
 JUDGE_PASS_FILE = os.path.join(PROCESSED_DATA_DIR, "gate1_judge.jsonl")

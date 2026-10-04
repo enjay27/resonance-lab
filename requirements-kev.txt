@@ -1,0 +1,22 @@
+# --- the local Gate judge (judge_local.py, notebooks/gate_pipeline.ipynb) -- its own virtualenv `.venv-kev` ---
+# Kev (jaredpalmer/kev, Apache-2.0) needs torch >=2.6,<2.9 and transformers >=5.17,<6: that conflicts with the llamafactory
+# stack (torch 2.9.1 / transformers 4.57.1) and the unsloth stack, so it cannot share their virtualenv.
+# Python 3.13. Versions are what the 2026-10-04 spike resolved to (CPU run of kev-0.8b; the GPU run on Windows is not verified).
+#   py -3.13 -m venv .venv-kev ; .venv-kev\Scripts\pip install -r requirements-kev.txt
+--extra-index-url https://download.pytorch.org/whl/cu126
+
+torch==2.8.0
+transformers==5.18.0
+peft==0.21.2
+accelerate==1.15.0
+numpy==2.5.3
+pydantic==2.13.5
+# imported by kev.serve (the in-process engine); no server is started
+fastapi==0.142.2
+uvicorn==0.54.0
+pyyaml
+
+# The Kev code, pinned to the commit the spike validated (D3). Not on PyPI; its own dependency list (datasets, scikit-learn, ...)
+# is more than the judge needs, hence --no-deps: install this file with `pip install -r`, then
+#   pip install --no-deps git+https://github.com/jaredpalmer/kev.git@fe64b12
+# The weights are pinned by revision in config.JUDGE_LOCAL_RUN (`jaredpalmer/kev-9b@v1.0`).
