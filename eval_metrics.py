@@ -8,6 +8,8 @@ and the printed report live here and are unit-tested. Samples are the rows of th
 import json
 import re
 
+from config import CATEGORY_TAXONOMY
+from taxonomy import TaxonomyError, coverage, load_taxonomy, root_of
 from text_rules import JP_PATTERN
 
 # Localized game terms the model must use: Japanese term in the source -> Korean term expected.
@@ -30,6 +32,7 @@ TERM_DICT = {
 }
 
 MISSES_SHOWN = 5
+SMALL_CATEGORY = 10  # a category with fewer eval lines than this is marked: its chrF and term accuracy are noise
 
 
 # --- the eval dataset ----------------------------------------------------------------------------
@@ -128,13 +131,36 @@ def comet_score(samples, predictions):
 # --- evaluate + report ---------------------------------------------------------------------------
 
 
-def evaluate(samples, predictions, raw_outputs=None):
-    """Score a run. `raw_outputs` are the undecoded generations (to catch <think>); default: predictions."""
+def category_chrf(predictions, references):
+    """chrF of one category's predictions (corpus level, like the run's chrF)."""
+    import sacrebleu
+
+    return sacrebleu.corpus_chrf(predictions, [list(references)]).score
+
+
+def _new_stats():
+    return {"total": 0, "jp_leak": 0, "term_total": 0, "term_miss": 0, "discord_viol": 0}
+
+
+def _default_taxonomy():
+    try:
+        return load_taxonomy(CATEGORY_TAXONOMY)
+    except TaxonomyError:
+        return None  # no taxonomy, no coverage section; the scores do not need it
+
+
+def evaluate(samples, predictions, raw_outputs=None, taxonomy=None):
+    """Score a run. `raw_outputs` are the undecoded generations (to catch <think>); default: predictions.
+
+    The scores are also kept per category as the samples label it (`categories`) and per root (`roots`: `game/combat`
+    counts for `game`), each with its own chrF and term counts. `coverage` says how many lines each root of the
+    `taxonomy` (default: configs/category_taxonomy.json) has; None when there is no taxonomy to read."""
     raw_outputs = predictions if raw_outputs is None else raw_outputs
     if not samples:
         raise ValueError("the eval dataset is empty")
     if len(samples) != len(predictions):
         raise ValueError(f"{len(samples)} samples but {len(predictions)} predictions")
+    taxonomy = taxonomy or _default_taxonomy()
 
     report = {
         "n": len(samples),
@@ -146,35 +172,74 @@ def evaluate(samples, predictions, raw_outputs=None):
         "discord_violations": 0,
         "exact_match": 0,
         "categories": {},
+        "roots": {},
         "standard": standard_metrics(predictions, [s["translated"] for s in samples]),
+        "coverage": coverage(samples, taxonomy) if taxonomy else None,
     }
+    texts = {}  # (where, name) -> ([predictions], [references]), for each category's chrF
     for sample, prediction in zip(samples, predictions):
         jp, ref = sample["original"], sample["translated"]
-        category = report["categories"].setdefault(
-            sample.get("category", "unknown"), {"total": 0, "jp_leak": 0, "term_miss": 0, "discord_viol": 0}
-        )
-        category["total"] += 1
+        label = sample.get("category") or "unknown"
+        groups = (("categories", label), ("roots", root_of(label)))
+        stats = [report[where].setdefault(name, _new_stats()) for where, name in groups]
+        for group in groups:
+            texts.setdefault(group, ([], []))
+            texts[group][0].append(prediction)
+            texts[group][1].append(ref)
+        for category in stats:
+            category["total"] += 1
 
         if has_jp(prediction):
             report["jp_leakage"] += 1
-            category["jp_leak"] += 1
+            for category in stats:
+                category["jp_leak"] += 1
         if discord_violation(jp, prediction):
             report["discord_violations"] += 1
-            category["discord_viol"] += 1
+            for category in stats:
+                category["discord_viol"] += 1
         if prediction == ref:
             report["exact_match"] += 1
         for jp_term, ko_term, used in term_results(jp, prediction):
             report["term_total"] += 1
+            for category in stats:
+                category["term_total"] += 1
             if used:
                 report["term_hits"] += 1
             else:
-                category["term_miss"] += 1
+                for category in stats:
+                    category["term_miss"] += 1
                 report["term_misses"].append({"jp": jp, "pred": prediction, "ref": ref, "term": jp_term, "expected": ko_term})
+    for (where, name), (category_predictions, category_references) in texts.items():
+        report[where][name]["chrf"] = category_chrf(category_predictions, category_references)
     return report
 
 
 def _share(count, n):
     return f"{count}/{n} ({count / n * 100:.1f}%)"
+
+
+def _score_table(table):
+    """Rows of `name  n  chrF  term accuracy  JP leak`, a category with few lines marked."""
+    width = max(len("category"), *(len(name) for name in table))
+    lines = [f"  {'category':<{width}}  {'n':>3}  {'chrF':>5}  {'terms':>7}  {'JP leak':>7}"]
+    for name, stats in table.items():
+        terms = f"{stats['term_total'] - stats['term_miss']}/{stats['term_total']}" if stats["term_total"] else "-"
+        mark = "  (n small)" if stats["total"] < SMALL_CATEGORY else ""
+        lines.append(f"  {name:<{width}}  {stats['total']:>3}  {stats['chrf']:>5.1f}  {terms:>7}  {stats['jp_leak']:>3}/{stats['total']:<3}{mark}")
+    return lines
+
+
+def _coverage_lines(found):
+    lines = ["  (eval lines per root; configs/category_taxonomy.json)"]
+    width = max(len(root) for root in found["counts"])
+    for root, count in found["counts"].items():
+        gap = "   <- no lines, add some" if count == 0 and root != "other" else ""  # 'other' is the catch-all
+        lines.append(f"  {root:<{width}}  {count:>3}{gap}")
+    if found["unlabeled"]:
+        lines.append(f"  {found['unlabeled']} line{' has' if found['unlabeled'] == 1 else 's have'} no category")
+    for label, count in found["unknown"].items():
+        lines.append(f"  '{label}' x{count}: not in the taxonomy (use a name above, or 'game/combat' for a child)")
+    return lines
 
 
 def format_report(report, samples, predictions, comet=None):
@@ -212,8 +277,16 @@ def format_report(report, samples, predictions, comet=None):
         f"Discord Kept Latin: {report['discord_violations']} violations (디스코드 where Discord was written)",
         f"Exact Match   : {_share(report['exact_match'], n)}",
         "",
-        "--- Category Breakdown ---",
+        "--- Category Scores ---",
+        f"  (by root; fewer than {SMALL_CATEGORY} lines is too few to trust a score)",
+        *_score_table(report["roots"]),
+        "",
     ]
+    if any("/" in name for name in report["categories"]):
+        lines += ["--- Sub-categories ---", *_score_table({k: v for k, v in report["categories"].items() if "/" in k}), ""]
+    if report.get("coverage"):
+        lines += ["--- Eval Set Coverage ---", *_coverage_lines(report["coverage"]), ""]
+    lines += ["--- Category Breakdown ---"]
     for name, stats in report["categories"].items():
         lines += [
             f"\n  [{name}] ({stats['total']} samples)",

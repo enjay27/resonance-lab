@@ -181,6 +181,27 @@ def test_eval_metrics_are_numbers_with_rates_and_per_category_counts():
     assert metrics["eval.cat.party chat.jp_leak"] == 1 and metrics["eval.cat.party chat.total"] == 20
 
 
+def test_eval_metrics_carry_the_chrf_and_term_accuracy_of_each_category_and_root():
+    report = {**REPORT,
+              "categories": {"game/combat": {"total": 6, "jp_leak": 0, "term_total": 4, "term_miss": 1, "discord_viol": 0, "chrf": 61.5},
+                             "chat": {"total": 8, "jp_leak": 1, "term_total": 0, "term_miss": 0, "discord_viol": 0, "chrf": 48.0}},
+              "roots": {"game": {"total": 6, "jp_leak": 0, "term_total": 4, "term_miss": 1, "discord_viol": 0, "chrf": 61.5},
+                        "chat": {"total": 8, "jp_leak": 1, "term_total": 0, "term_miss": 0, "discord_viol": 0, "chrf": 48.0}}}
+
+    metrics = tracking.eval_metrics(report)
+
+    assert metrics["eval.cat.game/combat.chrf"] == 61.5 and metrics["eval.cat.game/combat.term_accuracy"] == pytest.approx(0.75)
+    assert metrics["eval.root.game.n"] == 6 and metrics["eval.root.game.chrf"] == 61.5 and metrics["eval.root.game.term_accuracy"] == pytest.approx(0.75)
+    assert metrics["eval.root.chat.n"] == 8 and metrics["eval.root.chat.chrf"] == 48.0
+    assert "eval.root.chat.term_accuracy" not in metrics and "eval.cat.chat.term_accuracy" not in metrics  # no term, no accuracy
+
+
+def test_a_report_from_before_the_per_category_scores_still_gives_metrics():
+    metrics = tracking.eval_metrics(REPORT)
+
+    assert metrics["eval.cat.party chat.total"] == 20 and not [key for key in metrics if key.startswith("eval.root.")]
+
+
 def test_eval_metrics_leave_out_what_was_not_measured():
     metrics = tracking.eval_metrics({**REPORT, "term_total": 0, "term_hits": 0})
 
