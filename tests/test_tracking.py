@@ -327,3 +327,40 @@ def test_without_a_state_file_the_curves_are_the_log_itself():
     log = _log({"current_steps": 1, "loss": 5.3, "elapsed_time": "0:00:01"})
 
     assert [json.loads(line) for line in tracking.curve_lines(log, None)] == [json.loads(log[0])]
+
+
+# --- the dataset recipe -------------------------------------------------------------------------------------------
+
+
+RECIPE = {"name": "balanced", "sha256": "s" * 64, "seed": 42, "keep": ["recruitment spam"], "weights": {"chat": "3", "recruitment/party": "1"},
+          "categories_file": "categories.jsonl", "categories_sha256": "c" * 64, "total": 120, "requested": None, "limited_by": "chat",
+          "available": {"chat": 90, "recruitment/party": 400}, "selected": {"chat": 90, "recruitment/party": 30}}
+
+
+def test_the_dataset_tags_name_the_recipe_and_hash_it_and_its_categories_file():
+    tags = tracking.dataset_tags(STATE, {**MANIFEST, "recipe": RECIPE})
+
+    assert tags["dataset.recipe"] == "balanced"
+    assert tags["dataset.recipe_sha256"] == "s" * 64 and tags["data.categories_sha256"] == "c" * 64
+
+
+def test_without_a_recipe_there_are_no_recipe_tags_or_params():
+    tags = tracking.dataset_tags(STATE, MANIFEST)
+    params = tracking.data_params(MANIFEST)
+
+    assert not [key for key in tags if "recipe" in key or "categories" in key]
+    assert not [key for key in params if key.startswith(("data.recipe", "data.cat."))]
+
+
+def test_data_params_say_how_many_lines_each_category_gave_and_what_limited_the_recipe():
+    params = tracking.data_params({**MANIFEST, "recipe": RECIPE})
+
+    assert params["data.cat.chat"] == "90" and params["data.cat.recruitment/party"] == "30"
+    assert params["data.recipe.seed"] == "42" and params["data.recipe.keep"] == '["recruitment spam"]'
+    assert params["data.recipe.limited_by"] == "chat"
+
+
+def test_a_recipe_that_nothing_limited_has_no_limited_by_param():
+    params = tracking.data_params({**MANIFEST, "recipe": {**RECIPE, "limited_by": None}})
+
+    assert "data.recipe.limited_by" not in params

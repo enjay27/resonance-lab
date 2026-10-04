@@ -167,6 +167,10 @@ def dataset_tags(fetch_state, manifest):
         if manifest.get("eval_set"):
             tags["data.eval_set"] = manifest["eval_set"]
             tags["data.eval_overlap"] = str(counts.get("eval overlap", 0) + counts.get("eval overlap (near)", 0))
+        recipe = manifest.get("recipe")
+        if recipe:
+            tags.update({"dataset.recipe": recipe.get("name"), "dataset.recipe_sha256": recipe.get("sha256"),
+                         "data.categories_sha256": recipe.get("categories_sha256")})
     return {key: clean_value(value, MAX_TAG_VALUE) for key, value in tags.items() if value is not None}
 
 
@@ -174,12 +178,18 @@ _COUNT_KEYS = {"total": "data.rows_total", "passed": "data.rows_passed", "valida
 
 
 def data_params(manifest):
-    """How the training file was made: layout, direction mix, validation share, row counts and the drop reasons."""
+    """How the training file was made: layout, direction mix, validation share, row counts and the drop reasons; with a
+    dataset recipe also its seed, the filters it kept, which category limited it and the lines each category gave."""
     counts = manifest.get("counts", {})
     params = {"data.format": manifest.get("format"), "data.reverse": manifest.get("reverse"),
               "data.val_fraction": manifest.get("val_fraction")}
     params.update({name: counts[key] for key, name in _COUNT_KEYS.items() if key in counts})
     params.update({f"data.drop.{reason}": n for reason, n in counts.items() if reason not in _COUNT_KEYS})
+    recipe = manifest.get("recipe")
+    if recipe:
+        params.update({"data.recipe.seed": recipe.get("seed"), "data.recipe.keep": recipe.get("keep"),
+                       "data.recipe.limited_by": recipe.get("limited_by")})
+        params.update({f"data.cat.{category}": n for category, n in (recipe.get("selected") or {}).items()})
     return {clean_key(key): clean_value(value) for key, value in params.items() if value is not None}
 
 

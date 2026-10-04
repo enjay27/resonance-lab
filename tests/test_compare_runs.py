@@ -149,3 +149,22 @@ def test_an_unknown_experiment_is_a_clear_error():
 
 def test_the_whole_thing_is_json_free_of_surprises():
     assert json.dumps(compare_runs.summarize(FULL))  # every cell is plain text
+
+
+# --- the dataset recipe ------------------------------------------------------------------------------------------------
+
+
+def test_a_run_trained_on_a_recipe_shows_its_name_and_a_plain_run_a_dash():
+    with_recipe = compare_runs.summarize(run(tags={"dataset.recipe": "balanced"}))
+
+    assert with_recipe["recipe"] == "balanced"
+    assert compare_runs.summarize(FULL)["recipe"] == "-"
+
+
+def test_the_recipe_is_a_column_of_both_tables_next_to_the_rows_it_chose():
+    rows = compare_runs.build_rows([run(params={"profile": "p"}, tags={"dataset.recipe": "balanced"})])
+    headers = [header for _, header in compare_runs.COLUMNS]
+
+    assert headers.index("recipe") == headers.index("rows") + 1
+    assert "recipe" in compare_runs.render_text(rows).splitlines()[0].split()
+    assert "| balanced |" in compare_runs.render_markdown(rows)
