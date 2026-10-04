@@ -44,3 +44,51 @@ def test_an_old_llama_cpp_exits_non_zero_with_the_update_hint(capsys):
         judge_check.main([], post=lambda url, payload, timeout: (404, "{}"))
 
     assert "llama update" in capsys.readouterr().err
+
+
+def test_local_checks_the_in_process_model_through_the_loader(capsys):
+    import judge_local
+
+    class Engine:
+        @staticmethod
+        def answer(request):
+            return NOUL_BODY
+
+    loads = []
+    judge_check.main(["--local", "jaredpalmer/kev-0.8b", "--dtype", "fp32", "--device", "cpu"],
+                     loader=lambda run, device, dtype: loads.append((run, device, dtype)) or Engine())
+
+    assert loads == [("jaredpalmer/kev-0.8b", "cpu", "fp32")]
+    assert judge_local.model_name("jaredpalmer/kev-0.8b", "fp32") in capsys.readouterr().out
+
+
+def test_local_without_a_run_checks_the_configs_run(capsys):
+    import config
+
+    class Engine:
+        @staticmethod
+        def answer(request):
+            return NOUL_BODY
+
+    loads = []
+    judge_check.main(["--local"], loader=lambda run, device, dtype: loads.append((run, device, dtype)) or Engine())
+
+    assert loads == [(config.JUDGE_LOCAL_RUN, None, "bf16")]
+
+
+def test_local_exits_non_zero_with_the_reason_when_the_model_does_not_load(capsys):
+    def loader(run, device, dtype):
+        raise OSError("no such file")
+
+    with pytest.raises(SystemExit) as info:
+        judge_check.main(["--local", "jaredpalmer/kev-0.8b"], loader=loader)
+
+    assert info.value.code == 1
+    assert "no such file" in capsys.readouterr().err
+
+
+def test_local_and_url_exclude_each_other():
+    with pytest.raises(SystemExit) as info:
+        judge_check.main(["--local", "--url", "http://box:9000"])
+
+    assert info.value.code == 2
