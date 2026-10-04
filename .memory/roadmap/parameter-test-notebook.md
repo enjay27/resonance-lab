@@ -50,13 +50,15 @@ high steps included), not a final loss: do not read a train/eval gap from it. Tr
 `hy-mt2-1.8b` (~25 min) with both eval prompts, and set the winner in the base + `-fast` profiles (a PR with tests). The profile default is 2e-4 already.
 
 
-## Second sweep (2026-10-04, from the notebook under Jupyter) — same setup; 2e-4 reproduced a fourth time (identical 0.8317 / 1.2382 / 58.1 / 33.3%)
-| lr | best eval loss (@step) | train loss (run mean) | chrF | term acc | JP leak |
+## Second sweep (2026-10-04, from the notebook under Jupyter, `RUN_SWEEP = True`) — same setup; 2e-4 reproduced a fourth time (identical 0.8317 / 1.2382 / 58.1 / 33.3%)
+| lr / epochs | best eval loss (@step) | last train loss | chrF | term acc | JP leak |
 |---|---|---|---|---|---|
-| 4e-4 | 0.7724 (80) | 1.0131 | 53.8 | 42.9% | 0.0% |
-| 8e-4 | 0.7938 (80) | 0.9009 | not evaluated | | |
-| 2e-4 | 0.8317 (80) | 1.2382 | 58.1 | 33.3% | 0.0% |
-Reading: eval loss is lowest at 4e-4 and turns back up at 8e-4, but chrF is *lower* at 4e-4 than at 2e-4 (53.8 vs 58.1) while term accuracy is higher (9/21 vs 7/21): eval loss and the 51-line scores disagree, and one line moves them
-by points, so do not pick on chrF alone (`--prompt chat-template` and the full profile are the tie-breakers). 8e-4 was never merged/evaluated: the sweep cell was interrupted by hand during its training. **That training still ended
-FINISHED in MLflow with an eval loss at step 80** (the next training's startup sent the queued run), i.e. the interrupt on Windows probably did not stop it (`taskkill /T /F` on `train.py`'s tree) -- to check on the machine:
-`outputs\hy-mt2-1.8b-fast_lora\20261004-082157\run.json` and `train_stdout.log`. Open: `--lr 2e-4 --epochs 6`, then the full profile with both eval prompts.
+| 4e-4 / 3 | **0.7724** (80, still falling) | 0.3748 | 53.8 | 42.9% (9/21) | 0.0% |
+| 8e-4 / 3 | 0.7938 (80, still falling) | 0.2434 | **62.9** | **61.9%** (13/21) | see report |
+| 2e-4 / 6 | 0.7933 (110: turned up after) | 0.1535 | 51.7 | 38.1% (8/21) | see report |
+| 2e-4 / 3 | 0.8317 (80) | (run mean 1.2382) | 58.1 | 33.3% (7/21) | 0.0% |
+Reading: **eval loss and the generation scores disagree.** Eval loss (199 validation rows) is lowest at 4e-4; chrF and term accuracy (51 lines, 21 terms: one term = 4.8 points) are best at 8e-4 and worst at 6 epochs; 6 epochs is the only run whose
+eval loss turned up (overfits after ~epoch 4, last train loss 0.15). The step-9 "decide" cell picks by eval loss only (`best_result`) and would name 4e-4; the chrF/term of a result are not in the sweep's local table (known gap: read them from step 7 / MLflow).
+Not decidable on the fast profile: next is the **full `hy-mt2-1.8b` (~25 min) with both eval prompts at 4e-4 and 8e-4** (2e-4 as the control), then set the winner in the profiles (a PR with tests). The interrupted 8e-4 training of the first attempt (run 20261004-082157) ended FINISHED
+in MLflow with the identical eval loss (0.7938 @80) as the re-run, so it ran to the end although the cell was interrupted: the Windows interrupt (`taskkill /T /F` on `train.py`'s tree) probably does not stop the training -- confirm with
+that run's `run.json` / `train_stdout.log`, then fix with a test first. Also: every eval overwrites `outputs\eval\<profile>-<prompt>.txt` (the MLflow run keeps each report).
