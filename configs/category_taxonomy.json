@@ -17,15 +17,16 @@
       }
     },
     "game": {
-      "description": "Talk about how the game works or what to do in it, said as a statement and not as a question: classes, skills, builds, quests, dungeons, bosses, gear, events, maintenance, bugs.",
+      "description": "Talk about how the game works or what to do in it, said as a statement and not as a question: classes, skills, builds, quests, dungeons, bosses, gear, events, the open market, maintenance, bugs.",
       "children": {
         "combat": {"description": "Combat talk: classes, skills, builds, damage, rotations, stats and equipment effects."},
         "progress": {"description": "Progression talk: quests, levels, maps, dungeons, bosses, gear goals, farming, events as something to do."},
-        "system": {"description": "The game as a service: maintenance, patches, updates, bugs, lag, servers, login problems."}
+        "system": {"description": "The game as a service: maintenance, patches, updates, bugs, lag, servers, login problems."},
+        "market": {"description": "Talk about the open market, where players list items for sale and buy what others listed (there is no trade between two players): prices, what is worth listing, what sells, that something was listed or bought, the market tax."}
       }
     },
     "question": {
-      "description": "A player asks for information or help and expects an answer: どうやって〜？, 〜はどこですか, 教えてください, 誰か〜わかる人いますか.",
+      "description": "A player asks for information or help and expects an answer, including what to sell or buy on the open market: どうやって〜？, 〜はどこですか, 教えてください, 何を売ればいい？, 誰か〜わかる人いますか.",
       "children": {
         "game": {"description": "A question about the game: where, how, what, which, how much."},
         "other": {"description": "Any other question, including questions to a person and rhetorical ones."}
@@ -39,13 +40,6 @@
       "children": {
         "party": {"description": "Looking for members for a party, dungeon, raid or boss run, often with requirements (遺跡1F 29k↑ @T1, 杖@2募集, 火力募集)."},
         "guild": {"description": "A guild advertises itself or a player looks for a guild (ギルメン募集, 初心者歓迎, ギルド探してます)."}
-      }
-    },
-    "trade": {
-      "description": "Buying, selling or exchanging items or currency, usually with a price or an offer (売ります, 買取, 〇〇と交換, 相場教えて).",
-      "children": {
-        "sell": {"description": "Selling or offering an item: 売ります, 出品しました."},
-        "buy": {"description": "Wanting to buy or exchange: 買います, 買取, 交換希望."}
       }
     },
     "bot": {

@@ -10,11 +10,11 @@
     "game/combat": {"weight": 9},
     "game/progress": {"weight": 8},
     "game/system": {"weight": 4},
+    "game/market": {"weight": 6},
     "question": {"weight": 12},
     "coordination": {"weight": 10},
     "recruitment/party": {"weight": 8},
     "recruitment/guild": {"weight": 4},
-    "trade": {"weight": 6},
     "bot": {"weight": 3},
     "spam": {"weight": 2}
   }
