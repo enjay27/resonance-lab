@@ -80,6 +80,7 @@ track_records.py      what each stage records (params/tags/metrics for train, me
 stage_tracking.py     the stages' use of the tracker (open_tracker never raises; start/finish_training, resume_stage, record_stage, fail_stage); tested
 compare_runs.py       the experiment's runs as one table (profile, lr, epochs, best eval loss, eval scores, data revision), sorted/filtered; pure; tested
 tracker.py            sends queued runs to the NAS oldest-first, resumable, never raises into a training; `from_environment()` -> Tracker or NullTracker; tested with a fake client
+dataset_recipe.py     a recipe (configs/datasets/<name>.json: category -> weight) + a categories file choose the training lines, seeded and nested; pure; `preprocess.py --recipe` applies it; tested
 overlap.py            is a training line also an eval line? (normalised + near-duplicate); preprocess drops them; tested
 valsplit.py           which lines are validation: sha1 of the normalised line, so pairs/variants stay together and lines keep their side as data grows; tested
 manifest.py           lora_train_data.meta.json: how the training file was made (style, reverse, shas, counts); update_dataset_info/train check it; tested
@@ -96,7 +97,8 @@ scripts/
   preprocess.py         shared data: raw {original, translated} -> {instruction, input, output};
                           `clean_reason` drops empty/untranslated, Hangeul-in-source,
                           JP-left-in-output, 10x-long, recruitment-spam, duplicate rows
-                          and counts each reason; exits 1 when >30% of the usable rows are suspicious (--max-drop)
+                          and counts each reason; exits 1 when >30% of the usable rows are suspicious (--max-drop);
+                          `--recipe` keeps only the lines a dataset recipe selects by category weight (dataset_recipe.py)
   unsloth/              pipeline `unsloth` (Qwen3 1.7B)
     split_dataset.py      data: dedup by input, shuffle (seed 42), train/val -> lora_dataset/
     train.py              model: LoRA fine-tune (unsloth), merge -> model_f16/

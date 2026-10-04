@@ -149,3 +149,17 @@ def test_a_validation_file_changed_after_preprocessing_is_refused(tmp_path):
 
     with pytest.raises(ManifestError, match="changed"):
         manifest.require_for_style(data, "hy")
+
+
+def test_a_recipe_block_is_recorded_only_when_there_is_one(tmp_path):
+    data = tmp_path / "out.jsonl"
+    data.write_text("{}\n", encoding="utf-8")
+    raw = tmp_path / "raw.jsonl"
+    raw.write_text("{}\n", encoding="utf-8")
+    kwargs = dict(fmt="pair", style=None, reverse=False, raw_path=str(raw), counts={}, eval_set=None, eval_lines=0)
+
+    plain = manifest.read_manifest(manifest.write_manifest(str(data), **kwargs))
+    with_recipe = manifest.read_manifest(manifest.write_manifest(str(data), recipe={"name": "balanced", "sha256": "abc"}, **kwargs))
+
+    assert "recipe" not in plain
+    assert with_recipe["recipe"] == {"name": "balanced", "sha256": "abc"}

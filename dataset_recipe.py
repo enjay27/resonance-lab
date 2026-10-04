@@ -168,7 +168,11 @@ def line_rank(seed, key):
 def read_categories(path):
     """{line key: category} from a JSONL file of {"key": sha1, "category": path, ...} (other fields are ignored)."""
     categories = {}
-    with open(path, encoding="utf-8") as f:
+    try:
+        f = open(path, encoding="utf-8")
+    except OSError as error:
+        raise RecipeError(f"{path}: categories file cannot be read ({error.strerror or error})") from None
+    with f:
         for number, line in enumerate(f, 1):
             if not line.strip():
                 continue
