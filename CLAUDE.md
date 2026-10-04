@@ -110,7 +110,7 @@ scripts/
     gguf.py               model: convert to F16 GGUF, quantize to q4_k_m -> model_gguf/
     eval.py               model: generate on the eval set (--prompt chat-template|training), shared report
     watch_training.py     data: live training monitor (`rich`); TrainingState parses the two logs, tested
-notebooks/            parameter_test.ipynb: one parameter test / a sweep, train -> merge -> eval -> compare -> decide (PyCharm, project .venv, requirements-notebook.txt); committed with outputs CLEARED (tests/test_notebooks.py)
+notebooks/            parameter_test.ipynb: one parameter test / a sweep, train -> merge -> eval -> compare -> decide (Jupyter Lab from the project .venv, requirements-notebook.txt); committed with outputs CLEARED (tests/test_notebooks.py)
 configs/llamafactory/<profile>/   train.yaml + merge.yaml per model (tests check they agree)
 deploy/mlflow/        the MLflow tracking server for the maintainer's NAS (Dockerfile, compose, basic_auth.ini, .env.example, README); tests/test_deploy_mlflow.py guards it
 tests/                pytest for the data part; conftest.py has the JSONL fixtures

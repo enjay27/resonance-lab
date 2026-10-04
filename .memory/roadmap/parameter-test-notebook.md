@@ -25,7 +25,7 @@ which need steps 2 again. A generic allow-listed `--set key=value` would be the 
 - Failure handling follows the stage rule: a failing stage stops the lifecycle with its tail log; nothing is retried silently.
 
 ## Answers of the maintainer (2026-10-02) and what was built
-1. PyCharm notebook support (live output = line-by-line streaming into the cell; plots = inline matplotlib). 2. `.ipynb`, outputs stripped, guarded by `tests/test_notebooks.py`; executed copies `*.executed.ipynb` are gitignored.
+1. PyCharm notebook support at first (live output = line-by-line streaming into the cell; plots = inline matplotlib). 2. `.ipynb`, outputs stripped, guarded by `tests/test_notebooks.py`; executed copies `*.executed.ipynb` are gitignored.
 3. One notebook. 4. The sweep runs only the `training` prompt unless a parameter set (or `PROMPTS`) lists `chat-template` too.
 Built: `parameter_test.py` (`ParamSet`, `lifecycle`, `run_command` with process-tree stop on interrupt, `read_curves`/`run_curves`, `run_lifecycle`/`run_sweep`/`best_result`, `decision_text`, `results_markdown`, `kernel_warning`);
 `notebooks/parameter_test.ipynb` (parameters, data, train, merge, eval, curves, MLflow compare, sweep, decide); `requirements-notebook.txt` (ipykernel, matplotlib).
@@ -33,7 +33,7 @@ Left out / next: an interrupted cell on Windows is a hard `taskkill` (the MLflow
 only `lr`/`epochs` are sweepable (the generic `--set key=value` override is the next PR).
 
 ## Open questions that were asked (kept for the record)
-1. Where does it run: PyCharm's notebook support, or `jupyter lab` in a terminal? (affects the live-output cell and the plotting choice)
+1. Where does it run: PyCharm's notebook support, or `jupyter lab` in a terminal? **Answer 2026-10-04: `jupyter lab`** (PyCharm's launch of it failed with `PermissionError` on `%APPDATA%\jupyter\runtime`; fix: `JUPYTER_RUNTIME_DIR` to a writable folder). Converted: `jupyterlab` in `requirements-notebook.txt`, launch steps in the notebook, a `RUN_SWEEP = False` switch so "Run All" cannot start the sweep. No change to the live-output cell or the plots (print loop, `plt.show()`).
 2. Stored how: `.ipynb` with stripped outputs (guard test), or jupytext percent-format `.py` (clean diffs, opened as a notebook)?
 3. One notebook for the whole lifecycle, or a small set (`01_data`, `02_parameter_test`, `03_compare`)?
 4. Should the sweep loop also run both eval prompts for every parameter set (doubles the eval time, small), or only `training` unless asked?
@@ -48,3 +48,16 @@ Reading: higher lr is better on every metric and 2e-4 is the edge of the sweep; 
 high steps included), not a final loss: do not read a train/eval gap from it. Training is reproducible (three 2e-4 runs: identical train loss 1.2382); the noise is the 51-line eval set. The fast profile has effective batch 32 + packing =
 ~87 updates, far fewer than the full profile, so it may want a higher lr or more epochs. **Next sweep:** `--lr 4e-4`, `--lr 8e-4` (watch `grad_norm`/loss spikes), `--lr 2e-4 --epochs 6` (where does eval loss turn up?). Then confirm the best on the full
 `hy-mt2-1.8b` (~25 min) with both eval prompts, and set the winner in the base + `-fast` profiles (a PR with tests). The profile default is 2e-4 already.
+
+
+## Second sweep (2026-10-04, from the notebook under Jupyter, `RUN_SWEEP = True`) — same setup; 2e-4 reproduced a fourth time (identical 0.8317 / 1.2382 / 58.1 / 33.3%)
+| lr / epochs | best eval loss (@step) | last train loss | chrF | term acc | JP leak |
+|---|---|---|---|---|---|
+| 4e-4 / 3 | **0.7724** (80, still falling) | 0.3748 | 53.8 | 42.9% (9/21) | 0.0% |
+| 8e-4 / 3 | 0.7938 (80, still falling) | 0.2434 | **62.9** | **61.9%** (13/21) | see report |
+| 2e-4 / 6 | 0.7933 (110: turned up after) | 0.1535 | 51.7 | 38.1% (8/21) | see report |
+| 2e-4 / 3 | 0.8317 (80) | (run mean 1.2382) | 58.1 | 33.3% (7/21) | 0.0% |
+Reading: **eval loss and the generation scores disagree.** Eval loss (199 validation rows) is lowest at 4e-4; chrF and term accuracy (51 lines, 21 terms: one term = 4.8 points) are best at 8e-4 and worst at 6 epochs; 6 epochs is the only run whose
+eval loss turned up (overfits after ~epoch 4, last train loss 0.15). The step-9 "decide" cell still picks by eval loss (`best_result`, so it names 4e-4) but now says when chrF / term accuracy pick another run, and the sweep table has a `chrF / term acc` column (2026-10-04: `Result.scores`, read from `outputs\\eval\\<profile>-<prompt>.txt` when it is newer than the run's training log).
+Not decidable on the fast profile: next is the **full `hy-mt2-1.8b` (~25 min) with both eval prompts at 4e-4 and 8e-4** (2e-4 as the control), then set the winner in the profiles (a PR with tests). The interrupted 8e-4 training of the first attempt (run 20261004-082157) ended FINISHED
+in MLflow with the identical eval loss (0.7938 @80) as the re-run, so it ran to the end although the cell was interrupted: the Windows interrupt (`taskkill /T /F` on `train.py`'s tree) probably does not stop the training. **Made visible 2026-10-04:** `terminate_tree` checks taskkill's exit code, kills the process itself as a fallback and raises `StopFailed` (PID + taskkill's message). Root cause still unknown: interrupt a `-fast` training on the machine and read the message. Also: every eval overwrites `outputs\eval\<profile>-<prompt>.txt` (the MLflow run keeps each report).
