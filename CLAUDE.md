@@ -72,7 +72,7 @@ config.py             every path and hyper-parameter; INSTRUCTION (system prompt
 eval_metrics.py       shared eval scoring + report (chrF/BLEU/TER, COMET, JP/think leakage, terms); tested
 genai_eval.py         per-sample eval for `mlflow.genai.evaluate`: the predictions JSONL, the per-line scores (chrF, JP leak, term, discord, ...), `build_scorers`; tested
 text_rules.py         JP / Hangeul patterns shared by preprocess and the eval metrics
-hf_data.py            the HF dataset: config, `hf download` command, merge of the per-channel files, fetch state; tested (no network)
+hf_data.py            the HF dataset: config, `hf download` command, merge of the per-channel files (each row tagged with its `channel`, `MERGE_FORMAT`), fetch state; tested (no network)
 runs.py               one training = one run dir `<output_dir>/<run id>/` + run.json status; merge takes the latest complete run; tested
 tracking.py           what a run records in MLflow, pure: .env.mlflow settings, params/tags/metrics from yaml, manifest, fetch state, eval report, trainer files (no mlflow import); tested
 run_queue.py          the local record of every run: an append-only JSON-lines journal `.run.result.backup.jsonl` (one line per write; sent events acknowledged by a `sent` line and dropped at the next start, the run header + server id kept; the old TinyDB file is migrated once); written BEFORE anything is sent; tested
