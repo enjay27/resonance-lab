@@ -9,11 +9,10 @@ Files: `configs/category_taxonomy.json` (the categories + the description a clas
 |---|---|---|
 | `social` | greeting, thanks | polite formulas: おはよう, ありがとう, 乙 |
 | `chat` | casual, reaction | everyday talk; reaction = 草, ww, すごい |
-| `game` | combat, progress, system | statements about how the game works (classes, quests, bosses, patches, bugs) |
+| `game` | combat, progress, system, market | statements about how the game works (classes, quests, bosses, patches, bugs, the open market) |
 | `question` | game, other | a player asks for information or help |
 | `coordination` | | real-time call-outs while playing: 準備OK, 待って, 集合, 回復お願い |
 | `recruitment` | party, guild | looking for party / raid members, or guild members |
-| `trade` | sell, buy | buying, selling, exchanging |
 | `bot` | system, ad | automated messages (maintainer: translated, so a category, not a drop) |
 | `spam` | wall, flood | pasted walls, floods, repetition (recruitment walls included) |
 | `other` | | unreadable, symbols only, fragments: **never trained on** (in no recipe) |
@@ -21,11 +20,12 @@ Files: `configs/category_taxonomy.json` (the categories + the description a clas
 Single label per message; overlaps are settled by the descriptions: a *question* about the game is `question`, a *statement* about it is `game`; a laughing reaction inside a conversation is `chat/reaction`.
 
 ## The weights (percent, a root's share = weight / total) and why
-social 8 · chat 26 (casual 18, reaction 8) · game 21 (combat 9, progress 8, system 4) · question 12 · coordination 10 · recruitment 12 (party 8, guild 4) · trade 6 · bot 3 · spam 2.
+social 8 · chat 26 (casual 18, reaction 8) · game 27 (combat 9, progress 8, system 4, market 6) · question 12 · coordination 10 · recruitment 12 (party 8, guild 4) · bot 3 · spam 2.
 - **Not the natural mix.** Recruitment is the most templated, most repetitive text: it is held to 12% (a big share teaches memorisation, and `dedup` leaves little unique anyway).
-- **Lifted:** `game` (21%): game terms are the weakest metric (term accuracy 1/21 on the first TG eval); `question` and `coordination`: short, varied, imperative or interrogative phrasing the translator meets constantly in a party.
+- **Lifted:** `game` (27%): game terms are the weakest metric (term accuracy 1/21 on the first TG eval); `question` and `coordination`: short, varied, imperative or interrogative phrasing the translator meets constantly in a party.
 - **`chat/reaction` 8%**: the failures `草` -> `고블린` and `ww` left as `ww` are reactions; enough to learn them, small because there are few distinct ones.
-- **`social` 8%**: formulaic, saturates fast. **`trade` 6%**: price and item phrasing, needs the item terms.
+- **`social` 8%**: formulaic, saturates fast. **`game/market` 6%**: price and item phrasing, needs the item terms; the first weight to lower if the data shows little market talk.
+- **There is no `trade` category (maintainer, 2026-10-04):** Star Resonance has no trade between players, only the open market where players list items. Chat about it is market talk (`game/market`, a statement) or a question (`question`: "what should I sell?").
 - **`bot` 3%, `spam` 2%** with `keep: ["recruitment spam"]` (maintainer: allow walls, trusting Gate 1, in a small share). `cutoff_len` is 256: a wall's Korean can be cut mid-sentence; check `inspect_pair.py`.
 
 ## What to know before tuning

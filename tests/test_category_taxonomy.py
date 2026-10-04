@@ -46,6 +46,14 @@ def test_every_category_is_a_valid_path_with_a_description(flat):
         assert isinstance(node.get("description"), str) and len(node["description"]) > 20, path
 
 
+def test_market_talk_is_a_game_category_because_players_cannot_trade_with_each_other(flat):
+    # Star Resonance has no player-to-player trade: players list items on the open market, so chat is about the market
+    # (prices, what to list, what to buy), not an exchange between two players.
+    assert "trade" not in flat and not [path for path in flat if path.startswith("trade/")]
+    assert "game/market" in flat and "open market" in flat["game/market"]["description"].lower()
+    assert "open market" in flat["question"]["description"].lower()  # "what should I sell?" is a question, not market talk
+
+
 def test_the_taxonomy_has_a_catch_all_that_is_not_the_uncategorized_marker(flat):
     assert NOT_TRAINED_ON in flat and UNCATEGORIZED not in flat
 
@@ -54,7 +62,7 @@ def test_the_roots_are_the_choices_of_the_first_gate(taxonomy):
     roots = list(taxonomy["categories"])
 
     assert len(roots) >= 8 and len(roots) == len(set(roots))
-    assert {"social", "chat", "game", "question", "coordination", "recruitment", "trade", "bot", "spam"} <= set(roots)
+    assert {"social", "chat", "game", "question", "coordination", "recruitment", "bot", "spam"} <= set(roots)
 
 
 @pytest.mark.parametrize("name", SHIPPED)
@@ -100,6 +108,13 @@ def test_the_shipped_recipes_let_recruitment_walls_through_in_a_small_share():
         assert recipe.shares["spam"] <= 0.05 if "spam" in recipe.shares else True
 
 
+def test_the_market_has_its_own_weight_in_the_detailed_recipe_and_trade_is_gone_from_both():
+    roots, detailed = _weights("balanced-v1"), _weights("balanced-v1-detailed")
+
+    assert "trade" not in roots and "trade" not in detailed
+    assert detailed["game/market"] > 0 and roots["game"] == sum(w for key, w in detailed.items() if key.startswith("game/"))
+
+
 def test_the_example_recipe_is_not_one_of_the_shipped_ones():
     assert "example" not in SHIPPED and os.path.exists(recipe_path("example"))
 
@@ -119,7 +134,8 @@ def test_the_root_recipe_gives_every_root_its_weight_as_a_percent_when_the_pool_
     selection = select_lines(recipe, _pool({**roots, "other": 500}))
 
     assert selection.allocation.targets == {root: 12 * int(weight) for root, weight in recipe.weights.items()}
-    assert selection.allocation.total == 1200 and selection.allocation.limited_by == "chat"  # the biggest weight runs out first
+    biggest = max(recipe.weights, key=recipe.weights.get)
+    assert selection.allocation.total == 1200 and selection.allocation.limited_by == biggest  # the biggest weight runs out first
     assert not any(key for key, category in _pool({"other": 500}) if key in selection.keys)
 
 

@@ -1,16 +1,15 @@
 {
-  "description": "First guess at a balanced mix, by root category (needs only Gate 1). Weights read as percent. The mix is NOT the natural one: recruitment is templated and repetitive, so it is held down; game talk (terms, the weakest eval metric), questions and coordination are lifted; greetings are formulaic and saturate quickly. Spam is a small share on purpose (recruitment walls are kept). Tune once there is data: preprocess prints which category limits the dataset.",
+  "description": "First guess at a balanced mix, by root category (needs only Gate 1). Weights read as percent. The mix is NOT the natural one: recruitment is templated and repetitive, so it is held down; game talk (terms, the weakest eval metric; includes open-market talk, there is no player trade), questions and coordination are lifted; greetings are formulaic and saturate quickly. Spam is a small share on purpose (recruitment walls are kept). Tune once there is data: preprocess prints which category limits the dataset.",
   "seed": 42,
   "total": null,
   "keep": ["recruitment spam"],
   "categories": {
     "social": {"weight": 8},
     "chat": {"weight": 26},
-    "game": {"weight": 21},
+    "game": {"weight": 27},
     "question": {"weight": 12},
     "coordination": {"weight": 10},
     "recruitment": {"weight": 12},
-    "trade": {"weight": 6},
     "bot": {"weight": 3},
     "spam": {"weight": 2}
   }
