@@ -1,0 +1,41 @@
+{
+ "status": 200,
+ "request": {
+  "state": {
+   "channel": "party",
+   "message": "2人募集"
+  },
+  "questions": {
+   "cat": {
+    "type": "choice",
+    "instructions": "Which category is this in-game chat message?",
+    "criteria": {
+     "social": "greetings, thanks, small talk",
+     "recruitment": "looking for party members, guild members, dungeon runs",
+     "question": "asking for help or information",
+     "other": "anything else"
+    }
+   }
+  }
+ },
+ "body": {
+  "model": "models/Julia-1-Q8_0.gguf",
+  "answers": {
+   "cat": {
+    "type": "choice",
+    "choice": "recruitment",
+    "probabilities": {
+     "social": 0.0007064826278514957,
+     "recruitment": 0.9991724382804358,
+     "question": 0.00011375875339033999,
+     "other": 7.320338322591227e-06
+    },
+    "confidence": 0.9988965843739144
+   }
+  },
+  "usage": {
+   "input_tokens": 58,
+   "output_tokens": 0
+  }
+ }
+}
