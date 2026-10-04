@@ -145,3 +145,29 @@ def test_an_unknown_stage_stops_before_anything_runs(monkeypatch, capsys):
 
     assert exc.value.code != 0 and not ran
     assert "Merge LoRA" in capsys.readouterr().err
+
+
+# --- --recipe: the training lines are chosen by a dataset recipe (preprocess.py reads it from the environment) -------
+
+
+def test_stage_env_puts_the_recipe_in_the_environment():
+    assert run_pipeline.stage_env(None, {"PATH": "x"}, recipe="balanced") == {"PATH": "x", "RESONANCE_RECIPE": "balanced"}
+    assert run_pipeline.stage_env(None, {"RESONANCE_RECIPE": "old"}, recipe="balanced")["RESONANCE_RECIPE"] == "balanced"  # the parameter wins
+
+
+def test_stage_env_without_a_recipe_leaves_the_environment_alone():
+    base = {"PATH": "x", "RESONANCE_RECIPE": "from-env"}
+
+    assert run_pipeline.stage_env(None, base) == base
+    assert "RESONANCE_RECIPE" not in run_pipeline.stage_env(None, {"PATH": "x"})
+
+
+def test_main_runs_every_stage_with_the_recipe_in_the_environment(monkeypatch):
+    _fake_pipeline(monkeypatch, ["--recipe", "balanced"])
+    envs = []
+    monkeypatch.setattr(run_pipeline, "run_step", lambda name, path, args=(), env=None: envs.append(env) or True)
+    monkeypatch.delenv("RESONANCE_RECIPE", raising=False)
+
+    run_pipeline.main()
+
+    assert {e["RESONANCE_RECIPE"] for e in envs} == {"balanced"} and len(envs) == 3

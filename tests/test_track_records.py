@@ -164,3 +164,13 @@ def test_a_missing_or_broken_json_file_reads_as_none(tmp_path):
 
     assert track_records.read_json(str(good)) == {"x": 1}
     assert track_records.read_json(str(bad)) is None and track_records.read_json(str(tmp_path / "nope.json")) is None
+
+
+def test_a_training_with_a_recipe_records_it_in_its_tags_and_params():
+    recipe = {"name": "balanced", "sha256": "s" * 64, "seed": 7, "keep": [], "categories_sha256": "c" * 64, "limited_by": None,
+              "selected": {"chat": 12}}
+
+    params, tags = track_records.train_records("hy-mt2-1.8b", "base", "tmpl", TRAIN_CFG, FETCH, {**MANIFEST, "recipe": recipe}, "20261001-185200")
+
+    assert tags["dataset.recipe"] == "balanced" and tags["data.categories_sha256"] == "c" * 64
+    assert params["data.cat.chat"] == "12" and params["data.recipe.seed"] == "7"

@@ -33,10 +33,13 @@ def check_system():
             print("GPU: NOT FOUND (Check CUDA drivers)")
     print("-" * 25 + "\n")
 
-def stage_env(model, base=None, fast=False):
+def stage_env(model, base=None, fast=False, recipe=None):
     """The environment the stage scripts run in: --model, when given, overrides RESONANCE_LF_PROFILE; --fast makes it that
-    model's fast profile (the model being --model, else the variable, else the default)."""
+    model's fast profile (the model being --model, else the variable, else the default); --recipe, when given,
+    overrides RESONANCE_RECIPE, the dataset recipe preprocess.py chooses the training lines with."""
     env = dict(os.environ if base is None else base)
+    if recipe:
+        env["RESONANCE_RECIPE"] = recipe
     if fast:
         sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "llamafactory"))
         from lf_tools import model_name
@@ -70,6 +73,8 @@ def main():
     parser.add_argument("--model", help="llamafactory model profile (default: $RESONANCE_LF_PROFILE, else "
                         "the default profile); the parameter wins over the environment")
     parser.add_argument("--fast", action="store_true", help="llamafactory: run on the model's fast profile (<model>-fast)")
+    parser.add_argument("--recipe", metavar="NAME_OR_FILE", help="choose the training lines by category weight with this dataset "
+                        "recipe (configs/datasets/<name>.json or a JSON file; default: $RESONANCE_RECIPE, else every clean line)")
     which = parser.add_mutually_exclusive_group()
     which.add_argument("--from", dest="from_stage", metavar="STAGE",
                        help="start at this stage (name or unique prefix, e.g. 'merge') and run the rest")
@@ -80,7 +85,7 @@ def main():
 
     check_system()
     print(f"Pipeline: {args.pipeline}\n")
-    env = stage_env(args.model, fast=args.fast)
+    env = stage_env(args.model, fast=args.fast, recipe=args.recipe)
     total_start = time.perf_counter()
 
     try:

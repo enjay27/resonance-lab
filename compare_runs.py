@@ -16,7 +16,7 @@ class CompareError(Exception):
 COLUMNS = [
     ("run", "run"), ("status", "status"), ("profile", "profile"), ("lr", "lr"), ("epochs", "epochs"), ("batch", "batch"),
     ("eval_loss", "eval loss"), ("at_step", "@step"), ("train_loss", "train loss"), ("chrf", "chrF"), ("term_acc", "term acc"),
-    ("jp_leak", "JP leak"), ("prompt", "prompt"), ("rows", "rows"), ("data", "data"), ("when", "when (UTC)"),
+    ("jp_leak", "JP leak"), ("prompt", "prompt"), ("rows", "rows"), ("recipe", "recipe"), ("data", "data"), ("when", "when (UTC)"),
 ]
 SORT_KEYS = ("created", "eval-loss", "chrf", "term")
 
@@ -55,7 +55,7 @@ def summarize(run):
         "eval_loss": _fixed(metrics.get("eval.best_loss"), 4), "at_step": _general(metrics.get("eval.best_loss_step")),
         "train_loss": _fixed(metrics.get("train.loss"), 4), "chrf": _fixed(metrics.get("eval.chrf"), 1),
         "term_acc": _percent(metrics.get("eval.term_accuracy")), "jp_leak": _percent(metrics.get("eval.jp_leak_rate")),
-        "prompt": tags.get("eval.prompt", "-"), "rows": params.get("data.rows_passed", "-"),
+        "prompt": tags.get("eval.prompt", "-"), "rows": params.get("data.rows_passed", "-"), "recipe": tags.get("dataset.recipe", "-"),
         "data": revision[:8] if revision else "-",
         "when": datetime.fromtimestamp(run["start_ms"] / 1000, timezone.utc).strftime("%Y-%m-%d %H:%M"),
     }
