@@ -21,11 +21,13 @@ import argparse
 import json
 import os
 import sys
+import time
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from categorizer import BASELINE, categorize
-from config import CATEGORIES_FILE, GATE1_SAMPLE, JUDGE_CUTOFF, JUDGE_LOCAL_RUN, JUDGE_PASS_FILE, JUDGE_URL, RAW_LOGS
+from config import CATEGORIES_FILE, GATE1_COMPARE_DIR, GATE1_SAMPLE, JUDGE_CUTOFF, JUDGE_LOCAL_RUN, JUDGE_PASS_FILE, JUDGE_URL, RAW_LOGS
 from dataset_recipe import line_key
+from gate_compare import check_label, collect_answers, probe_path, probe_record, save_probe
 from gate_eval import SampleError, evaluate_categorizer, format_gate_report, read_sample
 from gate_judge import (INSTRUCTIONS, SWEEP_CUTOFFS, GateJudge, JournalError, categories_from, choice_options, cutoff_sweep, format_sweep,
                         judge_id, journal_row, read_journal, trim_torn_tail, write_categories)
@@ -168,11 +170,18 @@ def probe(args, rows, judge, by):
     if judge is None:
         return
     channels = {row["original"]: row.get("channel") for row in rows}
+    started = time.time()
     sweep = cutoff_sweep(rows, judge, SWEEP_CUTOFFS)
+    seconds_per_line = (time.time() - started) / len(rows)
     print("\n" + format_gate_report(evaluate_categorizer(rows, lambda text: judge.predict(text, channels.get(text))), f"{by}, cutoff {args.cutoff}"))
     if judge.failures:
         print(f"\n{judge.failures} request(s) failed: counted as no answer.")
     print("\n" + format_sweep(sweep, by))
+    print(f"\n{seconds_per_line:.2f} s per line on this pass")
+    if args.save_probe:
+        path = save_probe(args.probe_dir, probe_record(args.save_probe, by, collect_answers(rows, judge, args.use_channel),
+                                                       seconds_per_line, args.use_channel))
+        print(f"probe saved: {path} (compare judges with scripts/compare_judges.py)")
 
 
 def main(argv=None, post=None, loader=None):
@@ -189,12 +198,25 @@ def main(argv=None, post=None, loader=None):
     parser.add_argument("--judge-model", metavar="NAME", help="the model to ask, when the server runs several (router mode)")
     parser.add_argument("--cutoff", type=float, default=JUDGE_CUTOFF, help="smallest margin (top probability minus the second) that counts "
                         "as an answer (default: %(default)s, a guess: choose it with --probe)")
+    parser.add_argument("--save-probe", metavar="LABEL", help="with --probe and a judge: save what the judge answered as data/eval/gate1-compare/LABEL.json, "
+                        "to compare judges with scripts/compare_judges.py (a plain name like 9b-q8; never replaces a saved probe)")
+    parser.add_argument("--probe-dir", default=GATE1_COMPARE_DIR, help="where saved probes go (default: %(default)s)")
     parser.add_argument("--journal", default=JUDGE_PASS_FILE, help="the judge's answers, resumable (default: %(default)s)")
     parser.add_argument("--use-channel", action="store_true", help="give the judge the chat channel of a line (a `channel` field of the row)")
     parser.add_argument("--force", action="store_true", help="start the judge journal again instead of stopping on rows of another judge")
     args = parser.parse_args(argv)
     if args.judge_local and (args.judge_url or args.judge_model):
         parser.error("--judge-local runs the model in this process: it excludes --judge-url and --judge-model")
+    if args.save_probe:
+        if args.probe is None or not (args.judge_url or args.judge_local):
+            parser.error("--save-probe saves what a judge answered on the sample: it needs --probe and --judge-url or --judge-local")
+        try:
+            check_label(args.save_probe)
+        except ValueError as error:
+            parser.error(str(error))
+        if os.path.exists(probe_path(args.probe_dir, args.save_probe)):  # before the model loads: not after a long run
+            print(f"[ERROR] {probe_path(args.probe_dir, args.save_probe)} exists: use another label, or delete that file to probe again")
+            sys.exit(1)
 
     judge = by = None
     if args.judge_local:

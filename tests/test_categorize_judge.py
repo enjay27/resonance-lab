@@ -4,6 +4,7 @@ import os
 import pytest
 
 import categorize
+import gate_compare
 import gate_judge
 from conftest import read_jsonl
 from dataset_recipe import line_key, read_categories
@@ -199,3 +200,70 @@ def test_judge_pass_is_the_cli_pass_as_a_function_and_raises_instead_of_exiting(
     assert BY in capsys.readouterr().out
     with pytest.raises(categorize.PassError, match="--force"):
         categorize.judge_pass(raw, str(journal), str(out), judge, "systemone:other:00000000", 0.3, False)
+
+
+# --- --save-probe: what the judge answered on the sample, for scripts/compare_judges.py -------------------------------------
+
+
+def write_sample(tmp_path, lines):
+    path = tmp_path / "sample.jsonl"
+    path.write_text("\n".join(json.dumps({"original": text, "category": category}, ensure_ascii=False) for text, category in lines), encoding="utf-8")
+    return str(path)
+
+
+def probe_run(tmp_path, sample, stub, *extra):
+    categorize.main(["--probe", sample, "--judge-url", "http://stub", "--probe-dir", str(tmp_path / "probes"), *extra], post=stub)
+
+
+def test_save_probe_writes_what_the_judge_answered_for_every_sample_line(tmp_path, capsys):
+    sample = write_sample(tmp_path, [("おはよう", "social"), ("2人募集", "recruitment"), ("草", "chat")])
+
+    probe_run(tmp_path, sample, StubJudge(ANSWERS), "--save-probe", "stub-a")
+
+    (record,) = gate_compare.load_probes(str(tmp_path / "probes"))
+    assert record["label"] == "stub-a" and record["by"] == BY and record["use_channel"] is False
+    assert record["seconds_per_line"] >= 0 and record["n"] == 3
+    assert record["answers"][line_key("2人募集")]["choice"] == "recruitment"
+    assert record["answers"][line_key("草")]["choice"] == "chat"
+    assert "probe saved" in capsys.readouterr().out
+
+
+def test_a_saved_probe_compares_with_the_same_numbers_the_probe_printed(tmp_path):
+    sample = write_sample(tmp_path, [("おはよう", "social"), ("2人募集", "recruitment"), ("草", "chat")])
+    probe_run(tmp_path, sample, StubJudge(ANSWERS), "--save-probe", "stub-a")
+
+    (record,) = gate_compare.load_probes(str(tmp_path / "probes"))
+    row = gate_compare.compare_probes([record], categorize.read_sample(sample), 0.3)["rows"][0]
+
+    assert (row["covered"], row["correct"]) == (2, 2)  # 草 has margin 0.2: below the cutoff 0.3
+
+
+def test_the_same_label_twice_stops_before_the_model_is_asked_anything(tmp_path, capsys):
+    sample = write_sample(tmp_path, [("おはよう", "social")])
+    probe_run(tmp_path, sample, StubJudge(ANSWERS), "--save-probe", "stub-a")
+    second = StubJudge(ANSWERS)
+
+    with pytest.raises(SystemExit) as stopped:
+        probe_run(tmp_path, sample, second, "--save-probe", "stub-a")
+
+    assert stopped.value.code == 1 and "another label" in capsys.readouterr().out
+    assert second.calls == []  # not even the server check: a refusal costs nothing
+
+
+@pytest.mark.parametrize("extra", [["--save-probe", "../x"], ["--save-probe", "a b"]])
+def test_a_label_that_is_not_a_file_name_is_a_usage_error(tmp_path, extra):
+    sample = write_sample(tmp_path, [("おはよう", "social")])
+
+    with pytest.raises(SystemExit) as stopped:
+        probe_run(tmp_path, sample, StubJudge(ANSWERS), *extra)
+
+    assert stopped.value.code == 2
+
+
+def test_save_probe_needs_a_probe_and_a_judge(tmp_path):
+    with pytest.raises(SystemExit) as stopped:
+        categorize.main(["--save-probe", "x", "--judge-url", "http://stub"], post=StubJudge(ANSWERS))
+    assert stopped.value.code == 2
+    with pytest.raises(SystemExit) as stopped:
+        categorize.main(["--probe", write_sample(tmp_path, [("おはよう", "social")]), "--save-probe", "x"])
+    assert stopped.value.code == 2

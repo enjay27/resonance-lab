@@ -116,3 +116,13 @@ def test_the_gate_notebooks_default_judge_is_the_configs():
 
     assert "RUN = config.JUDGE_LOCAL_RUN" in "\n".join(source(GATE_NOTEBOOK))
     assert config.JUDGE_LOCAL_RUN.startswith("jaredpalmer/kev-")
+
+
+def test_the_gate_notebook_saves_no_probe_unless_asked_and_compares_without_a_model():
+    cells = source(GATE_NOTEBOOK)
+    text = "\n".join(cells)
+    assert "PROBE_LABEL = None" in text
+    (save_cell,) = [cell for cell in cells if "gate_compare.save_probe(" in cell]
+    assert "if PROBE_LABEL:" in save_cell.split("gate_compare.save_probe(")[0]
+    (compare_cell,) = [cell for cell in cells if "gate_compare.compare_probes(" in cell]
+    assert "JUDGE" not in compare_cell and "client" not in compare_cell, "the comparison reads saved files: it must work in a kernel with no judge loaded"
