@@ -165,6 +165,11 @@ def line_rank(seed, key):
     return int(digest[:12], 16) / 16**12
 
 
+def is_category(text):
+    """True when `text` is a lower-case category path like `recruitment/party`."""
+    return isinstance(text, str) and bool(_CATEGORY.match(text))
+
+
 def read_categories(path):
     """{line key: category} from a JSONL file of {"key": sha1, "category": path, ...} (other fields are ignored)."""
     categories = {}

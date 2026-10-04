@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "description": "The categories a Blue Protocol: Star Resonance chat message can be in. A root is what the first gate (Gate 1) chooses between; its children are what a deeper gate (Gate 1-A) chooses between, and a deeper gate can add a level below them. A category is a lower-case path, 'chat/reaction'. Each description is written to be shown to a classifier next to the others: a bare label is easy to misroute, a described one is not. The example phrases are made up. 'other' is the catch-all and is never trained on.",
+  "categories": {
+    "social": {
+      "description": "Polite formulas between players: greetings, farewells, thanks, apologies, congratulations (おはよう, ありがとう, お疲れ様, よろしくお願いします, おめでとう).",
+      "children": {
+        "greeting": {"description": "Hello and goodbye: おはよう, こんばんは, お先に失礼します, また明日."},
+        "thanks": {"description": "Thanks, apologies and congratulations: ありがとう, ごめんなさい, 乙, おめでとう."}
+      }
+    },
+    "chat": {
+      "description": "Everyday conversation between players that is not about recruiting, trading, a question or the game's mechanics.",
+      "children": {
+        "casual": {"description": "Ordinary talk: what someone is doing, jokes, opinions, personal remarks, small talk."},
+        "reaction": {"description": "Very short emotional reactions or laughter: 草, ww, すごい, ナイス, えぐ, かわいい."}
+      }
+    },
+    "game": {
+      "description": "Talk about how the game works or what to do in it, said as a statement and not as a question: classes, skills, builds, quests, dungeons, bosses, gear, events, maintenance, bugs.",
+      "children": {
+        "combat": {"description": "Combat talk: classes, skills, builds, damage, rotations, stats and equipment effects."},
+        "progress": {"description": "Progression talk: quests, levels, maps, dungeons, bosses, gear goals, farming, events as something to do."},
+        "system": {"description": "The game as a service: maintenance, patches, updates, bugs, lag, servers, login problems."}
+      }
+    },
+    "question": {
+      "description": "A player asks for information or help and expects an answer: どうやって〜？, 〜はどこですか, 教えてください, 誰か〜わかる人いますか.",
+      "children": {
+        "game": {"description": "A question about the game: where, how, what, which, how much."},
+        "other": {"description": "Any other question, including questions to a person and rhetorical ones."}
+      }
+    },
+    "coordination": {
+      "description": "Real-time coordination while playing together: ready checks, waiting, calling targets or positions, asking for a heal or a revive, gathering, starting a run (準備OK, ちょっと待って, 集合, ボス行きます, 回復お願い)."
+    },
+    "recruitment": {
+      "description": "A player or a guild is looking for people: members for a party, dungeon, raid or boss run, or members for a guild.",
+      "children": {
+        "party": {"description": "Looking for members for a party, dungeon, raid or boss run, often with requirements (遺跡1F 29k↑ @T1, 杖@2募集, 火力募集)."},
+        "guild": {"description": "A guild advertises itself or a player looks for a guild (ギルメン募集, 初心者歓迎, ギルド探してます)."}
+      }
+    },
+    "trade": {
+      "description": "Buying, selling or exchanging items or currency, usually with a price or an offer (売ります, 買取, 〇〇と交換, 相場教えて).",
+      "children": {
+        "sell": {"description": "Selling or offering an item: 売ります, 出品しました."},
+        "buy": {"description": "Wanting to buy or exchange: 買います, 買取, 交換希望."}
+      }
+    },
+    "bot": {
+      "description": "Automated messages: system notices, loot or queue announcements, and auto-posting bots (not a person typing).",
+      "children": {
+        "system": {"description": "Notices produced by the game or a tool: loot, queue pops, timers, status lines."},
+        "ad": {"description": "Automated advertisement posts, for example repeated service or link ads."}
+      }
+    },
+    "spam": {
+      "description": "Floods and walls: the same text pasted again and again, long advertisement walls with many IDs, meaningless repetition.",
+      "children": {
+        "wall": {"description": "A long pasted wall, typically a recruitment or advertisement text with several IDs."},
+        "flood": {"description": "Repeated characters or the same short text posted over and over without meaning."}
+      }
+    },
+    "other": {
+      "description": "Does not fit any other category or cannot be read: symbols only, emoticons only, cut-off fragments, a lone character. Never trained on."
+    }
+  }
+}

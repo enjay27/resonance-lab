@@ -1,0 +1,21 @@
+{
+  "description": "balanced-v1 with the chat, game and recruitment roots split into their children (needs Gate 1-A: a line categorised only as a root, e.g. 'chat', is not covered by 'chat/casual'). Each root keeps the weight it has in balanced-v1; a test pins that.",
+  "seed": 42,
+  "total": null,
+  "keep": ["recruitment spam"],
+  "categories": {
+    "social": {"weight": 8},
+    "chat/casual": {"weight": 18},
+    "chat/reaction": {"weight": 8},
+    "game/combat": {"weight": 9},
+    "game/progress": {"weight": 8},
+    "game/system": {"weight": 4},
+    "question": {"weight": 12},
+    "coordination": {"weight": 10},
+    "recruitment/party": {"weight": 8},
+    "recruitment/guild": {"weight": 4},
+    "trade": {"weight": 6},
+    "bot": {"weight": 3},
+    "spam": {"weight": 2}
+  }
+}
