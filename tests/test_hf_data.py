@@ -88,7 +88,7 @@ def test_a_last_line_without_a_newline_does_not_glue_to_the_next_channel(tmp_pat
 def test_a_state_matches_only_the_same_repo_revision_and_an_untouched_raw_file(tmp_path):
     raw = tmp_path / "raw.jsonl"
     raw.write_text('{"original": "a"}\n', encoding="utf-8")
-    state = {"repo": CFG["repo"], "revision": CFG["revision"], "raw_sha256": file_sha256(str(raw))}
+    state = {"repo": CFG["repo"], "revision": CFG["revision"], "raw_sha256": file_sha256(str(raw)), "merge_format": hf_data.MERGE_FORMAT}
 
     assert hf_data.is_current(state, CFG, str(raw))
     assert not hf_data.is_current(None, CFG, str(raw))
@@ -328,3 +328,57 @@ def test_a_failed_download_stops_the_pipeline(monkeypatch):
     with pytest.raises(SystemExit) as exc:
         fetch_data.run_download(["hf", "download", "x"])
     assert exc.value.code == 1
+
+
+def _merged_rows(tmp_path, files):
+    out = tmp_path / "raw.jsonl"
+    hf_data.merge_channels(files, str(out))
+    return out.read_text(encoding="utf-8").splitlines()
+
+
+def test_each_row_gets_the_channel_its_file_is_named_after(tmp_path):
+    folder = _channel(tmp_path, "dataset_PARTY.jsonl", [{"pid": 2, "original": "2人募集", "translated": None}])
+    _channel(tmp_path, "dataset_GUILD.jsonl", [{"pid": 1, "original": "おはよう", "translated": "안녕"}])
+
+    lines = _merged_rows(tmp_path, hf_data.channel_files(folder, "dataset_*.jsonl"))
+
+    assert [(json.loads(l)["pid"], json.loads(l)["channel"]) for l in lines] == [(1, "GUILD"), (2, "PARTY")]
+    assert "2人募集" in lines[1]  # not escaped: the raw log stays readable, as the app wrote it
+    assert json.loads(lines[1]) == {"pid": 2, "original": "2人募集", "translated": None, "channel": "PARTY"}
+
+
+def test_a_channel_the_row_already_has_is_kept(tmp_path):
+    folder = _channel(tmp_path, "dataset_PARTY.jsonl", [{"original": "a", "channel": "WORLD"}])
+
+    (line,) = _merged_rows(tmp_path, hf_data.channel_files(folder, "dataset_*.jsonl"))
+
+    assert json.loads(line)["channel"] == "WORLD"
+
+
+def test_a_file_not_named_after_a_channel_adds_no_field(tmp_path):
+    folder = _channel(tmp_path, "bp-training-dataset-2026.jsonl", [{"original": "a", "translated": "x"}])
+
+    (line,) = _merged_rows(tmp_path, hf_data.channel_files(folder, "bp-training-dataset-*.jsonl"))
+
+    assert json.loads(line) == {"original": "a", "translated": "x"}
+
+
+def test_a_damaged_line_is_kept_as_it_is_for_the_validation_gate(tmp_path):
+    folder = tmp_path / "hf"
+    folder.mkdir()
+    (folder / "dataset_PARTY.jsonl").write_text('{"original": "a"\n["not", "a", "row"]\n', encoding="utf-8")
+
+    lines = _merged_rows(tmp_path, hf_data.channel_files(str(folder), "dataset_*.jsonl"))
+
+    assert lines == ['{"original": "a"', '["not", "a", "row"]']
+
+
+def test_the_summary_names_the_merge_format_and_an_older_state_is_not_current(tmp_path):
+    folder = _channel(tmp_path, "dataset_PARTY.jsonl", [{"original": "a"}])
+    out = tmp_path / "raw.jsonl"
+    summary = hf_data.merge_channels(hf_data.channel_files(folder, "dataset_*.jsonl"), str(out))
+    state = {"repo": CFG["repo"], "revision": CFG["revision"], **summary}
+
+    assert hf_data.is_current(state, CFG, str(out))
+    del state["merge_format"]  # a raw log merged before rows carried their channel
+    assert not hf_data.is_current(state, CFG, str(out))
