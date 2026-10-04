@@ -73,6 +73,12 @@ HF_DATA_DIR = os.path.join(BASE_DIR, "data", "hf")
 # Gate 1's judge: a local llama-server serving a decision model (POST /v1/systemone, judge_client.py). Never a hosted service:
 # the chat lines stay on this machine.
 JUDGE_URL = "http://127.0.0.1:8080"
+# One row per line the judge has answered ({key, by, choice, margin, p, probabilities}): the pass resumes from it, and the
+# categories file is derived from it for a cutoff. Gitignored with the rest of data/.
+JUDGE_PASS_FILE = os.path.join(PROCESSED_DATA_DIR, "gate1_judge.jsonl")
+# A judge's answer counts when its margin (top probability minus the second) reaches this; below it the line stays
+# uncategorized. A GUESS: the cutoff is per model, choose it with `categorize.py --probe SAMPLE --judge-url ...` (the sweep).
+JUDGE_CUTOFF = 0.3
 
 # --- Experiment tracking (tracking.py) ---
 # The NAS server's URL and credentials: gitignored, see .env.mlflow.example and deploy/mlflow/README.md.
