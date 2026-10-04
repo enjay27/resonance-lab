@@ -70,3 +70,49 @@ def test_run_all_does_not_start_the_sweep():
     assert "RUN_SWEEP = False" in cell
     call = next(line for line in cell.splitlines() if "pt.run_sweep(" in line)
     assert call.startswith(" ") and "if RUN_SWEEP:" in cell.split(call)[0]
+
+
+GATE_NOTEBOOK = os.path.join(BASE_DIR, "notebooks", "gate_pipeline.ipynb")
+
+
+def test_the_gate_notebook_exists_and_is_for_jupyter_in_its_own_venv():
+    assert GATE_NOTEBOOK in COMMITTED
+    text = "\n".join(source(GATE_NOTEBOOK))
+    assert "pycharm" not in text.lower()
+    assert "jupyter lab" in text and ".venv-kev" in text
+    with open(os.path.join(BASE_DIR, "requirements-kev.txt"), encoding="utf-8") as f:
+        requirements = [line.split("#")[0].strip().lower() for line in f]
+    assert "jupyterlab" in requirements and "ipykernel" in requirements
+
+
+def test_run_all_in_the_gate_notebook_starts_nothing_long_and_overwrites_nothing():
+    """Re-fetching, the draft (a file a human edits) and the full pass (hours) each sit behind a switch that is off."""
+    cells = source(GATE_NOTEBOOK)
+    text = "\n".join(cells)
+    for switch in ("REFRESH_DATA", "DRAFT_SAMPLE", "RUN_FULL_PASS"):
+        assert f"{switch} = False" in text
+    (pass_cell,) = [cell for cell in cells if "categorize.judge_pass(" in cell]
+    assert "if RUN_FULL_PASS:" in pass_cell.split("categorize.judge_pass(")[0]
+    (draft_cell,) = [cell for cell in cells if "gate_pipeline.write_draft(" in cell]
+    assert "if DRAFT_SAMPLE:" in draft_cell.split("gate_pipeline.write_draft(")[0]
+    assert "overwrite=True" not in text
+    (fetch_cell,) = [cell for cell in cells if "subprocess.run(" in cell]
+    assert "if REFRESH_DATA:" in fetch_cell.split("subprocess.run(")[0]
+
+
+def test_the_gate_notebook_imports_torch_and_kev_only_where_they_are_needed():
+    """The server backend must work in a kernel without torch: judge_local is imported under the local branch, torch guarded."""
+    for index, cell in enumerate(source(GATE_NOTEBOOK)):
+        for number, line in enumerate(cell.splitlines(), 1):
+            if "import judge_local" in line or "from judge_local" in line:
+                assert line.startswith("    "), f"cell {index} line {number}: judge_local must be imported inside `if BACKEND == \"local\":`"
+            assert not line.startswith(("import kev", "from kev")), f"cell {index}: kev is imported by judge_local, lazily"
+    setup = source(GATE_NOTEBOOK)[1]
+    assert "except ImportError" in setup.split("import torch")[1]
+
+
+def test_the_gate_notebooks_default_judge_is_the_configs():
+    import config
+
+    assert "RUN = config.JUDGE_LOCAL_RUN" in "\n".join(source(GATE_NOTEBOOK))
+    assert config.JUDGE_LOCAL_RUN.startswith("jaredpalmer/kev-")

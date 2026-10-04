@@ -2,14 +2,15 @@
 
 The notebook is thin; what is here is pure and tested (no torch, no network, no judge): the stratified draft of the labelled
 sample that a human then corrects, the channel mix of the raw log, what a dataset recipe would take from the categories, the
-text of the decision for the memory notes, and the progress line of the long pass. The judge itself is `gate_judge.GateJudge`
+text of the decision for the memory notes, and whether the model fits the card. The judge itself is `gate_judge.GateJudge`
 over either client (judge_client.SystemOneClient or judge_local.LocalKevClient); the scores are gate_eval's.
 """
 
 import json
 import os
+import re
 
-from dataset_recipe import line_rank, select_lines
+from dataset_recipe import line_rank, load_recipe, recipe_path, select_lines
 
 UNGUESSED = "?"  # the draft's label for a line the judge gave no answer for: not a category, so read_sample refuses it until a human labels the line
 
@@ -105,6 +106,12 @@ def recipe_preview(recipe, categories, keys):
             "outside": len(pairs) - covered}
 
 
+def recipe_preview_by_name(name, categories, keys):
+    """`recipe_preview` of a recipe file of configs/datasets/ by its name (RecipeError when it is not there or not usable)."""
+    recipe, _ = load_recipe(recipe_path(name))
+    return recipe_preview(recipe, categories, keys)
+
+
 def format_recipe_preview(preview, name):
     lines = [f"--- Recipe {name} on {preview['distinct']:,} distinct lines: would select {preview['total']:,} ---",
              f"  {'category':<16}{'recipe':>8}{'natural':>9}{'available':>11}{'selected':>10}"]
@@ -115,7 +122,7 @@ def format_recipe_preview(preview, name):
     return "\n".join(lines)
 
 
-# --- the decision, the progress ---------------------------------------------------------------------------------------
+# --- the decision ---------------------------------------------------------------------------------------
 
 
 def _percent(value):
@@ -137,14 +144,27 @@ def decision_text(by, cutoff, judge, rules, seconds_per_line=None, lines=None, c
     return "\n".join(out)
 
 
-def eta_text(done, total, seconds):
-    """`12,000 / 48,000 (25%), 20.0 lines/s, about 30 min left`."""
-    head = f"{done:,} / {total:,} ({done / total:.0%})" if total else f"{done:,}"
-    if not done or seconds <= 0:
-        return f"{head}, no speed yet"
-    speed = done / seconds
-    left = (total - done) / speed
-    minutes = round(left / 60)
-    remaining = f"{minutes // 60} h {minutes % 60} min" if minutes >= 60 else f"{minutes} min" if minutes else "under a minute"
-    return f"{head}, {speed:.1f} lines/s, about {remaining} left"
+# --- will the model fit the card --------------------------------------------------------------------------------------
 
+_SIZE = re.compile(r"kev-(\d+(?:\.\d+)?)b", re.IGNORECASE)
+_BYTES_PER_PARAMETER = {"bf16": 2, "fp32": 4}
+_OVERHEAD_GB = 1.0  # the pointer head, the activations of a short state, the CUDA context: kev's README measures ~9 GB for Kev-4B in bf16
+
+
+def estimated_gb(run, dtype):
+    """About how much GPU memory the model takes, from the size in the run's name (`kev-9b`) and the precision; None when the name
+    does not say (a local directory). The weights are merged into the base, so it is the base's size."""
+    found = _SIZE.search(run)
+    if not found or dtype not in _BYTES_PER_PARAMETER:
+        return None
+    return float(found.group(1)) * _BYTES_PER_PARAMETER[dtype] + _OVERHEAD_GB
+
+
+def memory_warning(run, dtype, free_gb):
+    """Text when the model will not fit in `free_gb` of GPU memory, None when it fits or cannot be judged (CPU, unknown size).
+    kev has no 4-bit / 8-bit loading: the way down is a smaller model."""
+    needed = estimated_gb(run, dtype)
+    if needed is None or free_gb is None or needed <= free_gb:
+        return None
+    return (f"{run} ({dtype}) needs about {needed:.0f} GB and {free_gb:.1f} GB are free: it will probably run out of memory. "
+            "Free the GPU (a training run, llama-server) or use a smaller model (jaredpalmer/kev-4b is ~9 GB, kev-0.8b ~3 GB).")

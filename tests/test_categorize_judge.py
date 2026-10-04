@@ -185,3 +185,17 @@ def test_probe_gives_the_judge_the_channel_of_a_sample_line_when_asked(tmp_path)
 
     assert plain.states() == ["2人募集"]
     assert with_channel.states() == [{"channel": "PARTY", "message": "2人募集"}]
+
+
+def test_judge_pass_is_the_cli_pass_as_a_function_and_raises_instead_of_exiting(write_jsonl, tmp_path, capsys):
+    """What the notebook calls on the judge it already loaded."""
+    raw = raw_of(write_jsonl, "おはよう", "2人募集")
+    judge = gate_judge.GateJudge(categorize.SystemOneClient("http://stub", post=StubJudge(ANSWERS)), gate_judge.choice_options(load_taxonomy()), 0.3)
+    out, journal = tmp_path / "categories.jsonl", tmp_path / "judge.jsonl"
+
+    categorize.judge_pass(raw, str(journal), str(out), judge, BY, 0.3, False)
+
+    assert [r["category"] for r in read_jsonl(out)] == ["social", "recruitment"]
+    assert BY in capsys.readouterr().out
+    with pytest.raises(categorize.PassError, match="--force"):
+        categorize.judge_pass(raw, str(journal), str(out), judge, "systemone:other:00000000", 0.3, False)
