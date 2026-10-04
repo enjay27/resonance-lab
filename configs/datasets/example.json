@@ -1,12 +1,12 @@
 {
-  "description": "Illustration of the format only, NOT a target: the real ratios come once the dataset is big. Categories are placeholders until Gate 1 defines them.",
+  "description": "Illustration of the format only, NOT a target: the real weights come once the dataset is big. A category's share is its weight / the total weight (here 1/10, 2/10, 6/10, 1/10). Categories are placeholders until Gate 1 defines them.",
   "seed": 42,
   "total": null,
   "keep": [],
   "categories": {
-    "greetings": {"share": 0.1},
-    "recruitment/party": {"share": 0.2},
-    "chat": {"share": 0.6},
-    "bot": {"share": 0.1}
+    "greetings": {"weight": 1},
+    "recruitment/party": {"weight": 2},
+    "chat": {"weight": 6},
+    "bot": {"weight": 1}
   }
 }

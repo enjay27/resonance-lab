@@ -14,53 +14,63 @@ from valsplit import bucket
 
 
 def recipe(**changes):
-    data = {"seed": 7, "categories": {"greetings": {"share": 0.25}, "chat": {"share": 0.75}}, **changes}
+    data = {"seed": 7, "categories": {"greetings": {"weight": 1}, "chat": {"weight": 3}}, **changes}
     return parse_recipe(data)
 
 
 # --- the recipe file --------------------------------------------------------------------------------------------
 
 
-def test_a_recipe_has_a_seed_a_total_and_shares_as_exact_fractions():
+def test_a_recipe_has_a_seed_a_total_and_weights_whose_share_is_weight_over_total_weight():
     parsed = recipe(total=1000)
 
     assert parsed.seed == 7
     assert parsed.total == 1000
+    assert parsed.weights == {"greetings": Fraction(1), "chat": Fraction(3)}
     assert parsed.shares == {"greetings": Fraction(1, 4), "chat": Fraction(3, 4)}
     assert parsed.keep == ()
 
 
 def test_the_defaults_are_a_fixed_seed_no_total_and_nothing_kept():
-    parsed = parse_recipe({"categories": {"chat": {"share": 1}}})
+    parsed = parse_recipe({"categories": {"chat": {"weight": 1}}})
 
     assert (parsed.seed, parsed.total, parsed.keep) == (42, None, ())
 
 
-def test_shares_that_do_not_add_up_to_one_are_refused_with_their_sum():
-    with pytest.raises(RecipeError, match=r"add up to 0\.9"):
-        parse_recipe({"categories": {"a": {"share": 0.4}, "b": {"share": 0.5}}})
+def test_weights_are_relative_so_they_need_not_add_up_to_anything():
+    parsed = parse_recipe({"categories": {"a": {"weight": 1}, "b": {"weight": 1}, "c": {"weight": 2}}})
+
+    assert parsed.shares == {"a": Fraction(1, 4), "b": Fraction(1, 4), "c": Fraction(1, 2)}
 
 
-def test_float_shares_that_look_like_one_are_accepted():
-    parse_recipe({"categories": {"a": {"share": 0.1}, "b": {"share": 0.2}, "c": {"share": 0.7}}})
+def test_decimal_weights_give_the_same_shares_as_whole_ones():
+    decimals = parse_recipe({"categories": {"a": {"weight": 0.1}, "b": {"weight": 0.2}, "c": {"weight": 0.7}}})
+    wholes = parse_recipe({"categories": {"a": {"weight": 1}, "b": {"weight": 2}, "c": {"weight": 7}}})
+
+    assert decimals.shares == wholes.shares == {"a": Fraction(1, 10), "b": Fraction(1, 5), "c": Fraction(7, 10)}
 
 
-def test_only_share_is_supported_and_a_fraction_says_so():
-    with pytest.raises(RecipeError, match="only 'share'"):
-        parse_recipe({"categories": {"a": {"fraction": 0.5}}})
+def test_a_single_category_takes_the_whole_dataset_whatever_its_weight():
+    assert parse_recipe({"categories": {"a": {"weight": 5}}}).shares == {"a": Fraction(1)}
 
 
-@pytest.mark.parametrize("share", [0, -0.1, 1.5, True, "0.5", None])
-def test_a_share_must_be_a_number_above_0_and_up_to_1(share):
-    with pytest.raises(RecipeError, match="share"):
-        parse_recipe({"categories": {"a": {"share": share}}})
+@pytest.mark.parametrize("key", ["share", "fraction"])
+def test_only_weight_is_supported_and_share_or_fraction_says_so(key):
+    with pytest.raises(RecipeError, match="only 'weight'"):
+        parse_recipe({"categories": {"a": {key: 0.5}}})
+
+
+@pytest.mark.parametrize("weight", [0, -0.1, True, "2", None])
+def test_a_weight_must_be_a_number_above_0(weight):
+    with pytest.raises(RecipeError, match="weight"):
+        parse_recipe({"categories": {"a": {"weight": weight}}})
 
 
 def test_an_unknown_key_is_refused_so_a_typo_cannot_silently_do_nothing():
     with pytest.raises(RecipeError, match="shares"):
-        parse_recipe({"categories": {"a": {"share": 1}}, "shares": {}})
+        parse_recipe({"categories": {"a": {"weight": 1}}, "shares": {}})
     with pytest.raises(RecipeError, match="max"):
-        parse_recipe({"categories": {"a": {"share": 1, "max": 3}}})
+        parse_recipe({"categories": {"a": {"weight": 1, "max": 3}}})
 
 
 def test_a_recipe_without_categories_is_refused():
@@ -73,7 +83,7 @@ def test_a_recipe_without_categories_is_refused():
 @pytest.mark.parametrize("name", ["", "/chat", "chat/", "a//b", "Chat", "a b", "chat/Party"])
 def test_a_category_is_a_lower_case_path(name):
     with pytest.raises(RecipeError, match="category"):
-        parse_recipe({"categories": {name: {"share": 1}}})
+        parse_recipe({"categories": {name: {"weight": 1}}})
 
 
 @pytest.mark.parametrize("total", [0, -5, 1.5, True, "10"])
@@ -95,7 +105,7 @@ def test_a_description_is_allowed_and_kept():
 
 
 def test_a_recipe_file_is_loaded_with_a_hash_that_ignores_formatting(tmp_path):
-    data = {"seed": 1, "categories": {"a": {"share": 0.5}, "b": {"share": 0.5}}}
+    data = {"seed": 1, "categories": {"a": {"weight": 1}, "b": {"weight": 1}}}
     one, two, three = tmp_path / "one.json", tmp_path / "two.json", tmp_path / "three.json"
     one.write_text(json.dumps(data), encoding="utf-8")
     two.write_text(json.dumps(data, indent=4, sort_keys=True), encoding="utf-8")
@@ -282,7 +292,7 @@ def test_a_category_the_recipe_does_not_cover_is_never_selected():
 
 
 def test_children_count_towards_their_parent_key():
-    parsed = parse_recipe({"categories": {"recruitment": {"share": 0.5}, "chat": {"share": 0.5}}})
+    parsed = parse_recipe({"categories": {"recruitment": {"weight": 1}, "chat": {"weight": 1}}})
     pool = lines({"recruitment/party": 30, "recruitment/guild": 30, "chat": 500})
 
     selection = select_lines(parsed, pool, )
@@ -291,8 +301,8 @@ def test_children_count_towards_their_parent_key():
     assert selection.allocation.targets == {"recruitment": 60, "chat": 60}
 
 
-def test_uncategorized_lines_can_get_a_share_like_any_category():
-    parsed = parse_recipe({"categories": {UNCATEGORIZED: {"share": 0.5}, "chat": {"share": 0.5}}})
+def test_uncategorized_lines_can_get_a_weight_like_any_category():
+    parsed = parse_recipe({"categories": {UNCATEGORIZED: {"weight": 1}, "chat": {"weight": 1}}})
     pool = lines({UNCATEGORIZED: 10, "chat": 40})
 
     assert select_lines(parsed, pool).allocation.targets == {UNCATEGORIZED: 10, "chat": 10}
@@ -347,3 +357,9 @@ def test_when_a_key_runs_out_the_lines_entering_at_the_same_time_stay_out_too():
 
     assert result.targets == {"chat": 60, "recruitment": 60}
     assert result.limited_by == "recruitment"
+
+
+def test_only_the_ratio_of_the_sizes_matters_to_the_allocation():
+    pool = {"a": 1000, "b": 1000}
+
+    assert allocate({"a": Fraction(1), "b": Fraction(3)}, pool, total=40) == allocate(shares(a=0.25, b=0.75), pool, total=40)

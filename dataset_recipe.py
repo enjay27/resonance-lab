@@ -1,13 +1,15 @@
-"""Which lines go into the training file, by category share. Pure, no torch, no network.
+"""Which lines go into the training file, by category weight. Pure, no torch, no network.
 
-A recipe (`configs/datasets/<name>.json`) says how much of the dataset each category gets:
+A recipe (`configs/datasets/<name>.json`) says how much of the dataset each category gets, as a weight:
 
-    {"seed": 42, "total": null, "keep": [], "categories": {"greetings": {"share": 0.1}, "chat": {"share": 0.9}}}
+    {"seed": 42, "total": null, "keep": [], "categories": {"greetings": {"weight": 1}, "chat": {"weight": 9}}}
 
+- A category's share of the dataset is its weight / the total weight (here 10% and 90%). Weights are relative: they
+  need not add up to anything.
 - A category is a lower-case path (`recruitment/party`). A key of the recipe covers its children; the most specific
   key wins. Lines whose category no key covers are left out. Lines with no entry in the categories file are
-  `uncategorized`, which can get a share like any category.
-- `total` null = the largest dataset the shares allow: it ends where the first category runs out of lines.
+  `uncategorized`, which can get a weight like any category.
+- `total` null = the largest dataset the weights allow: it ends where the first category runs out of lines.
 - Lines are drawn per category by a salted hash rank, so the draw is the same on every machine and a smaller `total`
   is always inside a bigger one (a learning curve over the data is nested).
 - A line belongs to a category by its key: the sha1 of the normalised line, as valsplit.py and overlap.py normalise it.
@@ -34,7 +36,6 @@ _CATEGORY = re.compile(r"^[a-z0-9_-]+(/[a-z0-9_-]+)*$")
 _LINE_KEY = re.compile(r"^[0-9a-f]{40}$")
 _RECIPE_NAME = re.compile(r"^[A-Za-z0-9_.-]+$")
 _RECIPE_KEYS = {"description", "seed", "total", "keep", "categories"}
-_SUM_TOLERANCE = Fraction(1, 10**6)
 
 
 class RecipeError(ValueError):
@@ -45,8 +46,14 @@ class Recipe(NamedTuple):
     seed: int
     total: int | None
     keep: tuple
-    shares: dict  # category key -> Fraction
+    weights: dict  # category key -> Fraction, relative sizes
     description: str | None = None
+
+    @property
+    def shares(self):
+        """category key -> its share of the dataset: weight / total weight."""
+        total = sum(self.weights.values())
+        return {name: weight / total for name, weight in self.weights.items()}
 
 
 class Allocation(NamedTuple):
@@ -69,18 +76,19 @@ def _is_number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def _share(name, value):
+def _weight(name, value):
     if not isinstance(value, dict):
-        raise RecipeError(f"category {name!r}: expected {{\"share\": number}}")
-    if "fraction" in value:
-        raise RecipeError(f"category {name!r}: only 'share' is supported (a category's share of the dataset), not 'fraction'")
-    unknown = sorted(set(value) - {"share"})
+        raise RecipeError(f"category {name!r}: expected {{\"weight\": number}}")
+    for other in ("share", "fraction"):
+        if other in value:
+            raise RecipeError(f"category {name!r}: only 'weight' is supported (its relative size: the share is weight / total weight), not {other!r}")
+    unknown = sorted(set(value) - {"weight"})
     if unknown:
         raise RecipeError(f"category {name!r} has unknown key(s): {', '.join(unknown)}")
-    share = value.get("share")
-    if not _is_number(share) or not 0 < share <= 1:
-        raise RecipeError(f"category {name!r}: share must be a number above 0 and at most 1, got {share!r}")
-    return Fraction(str(share))
+    weight = value.get("weight")
+    if not _is_number(weight) or not weight > 0:
+        raise RecipeError(f"category {name!r}: weight must be a number above 0, got {weight!r}")
+    return Fraction(str(weight))
 
 
 def parse_recipe(mapping):
@@ -93,15 +101,12 @@ def parse_recipe(mapping):
 
     categories = mapping.get("categories")
     if not isinstance(categories, dict) or not categories:
-        raise RecipeError("the recipe needs 'categories': {category: {\"share\": number}, ...}")
-    shares = {}
+        raise RecipeError("the recipe needs 'categories': {category: {\"weight\": number}, ...}")
+    weights = {}
     for name, value in categories.items():
         if not isinstance(name, str) or not _CATEGORY.match(name):
             raise RecipeError(f"category {name!r} is not a lower-case path like 'recruitment/party'")
-        shares[name] = _share(name, value)
-    added = sum(shares.values())
-    if abs(added - 1) > _SUM_TOLERANCE:
-        raise RecipeError(f"the shares add up to {float(added):g}, not 1")
+        weights[name] = _weight(name, value)
 
     seed = mapping.get("seed", DEFAULT_SEED)
     if not isinstance(seed, int) or isinstance(seed, bool):
@@ -120,7 +125,7 @@ def parse_recipe(mapping):
     description = mapping.get("description")
     if description is not None and not isinstance(description, str):
         raise RecipeError("description must be text")
-    return Recipe(seed=seed, total=total, keep=tuple(keep), shares=shares, description=description)
+    return Recipe(seed=seed, total=total, keep=tuple(keep), weights=weights, description=description)
 
 
 def recipe_path(name, directory=RECIPE_DIR):
@@ -195,15 +200,16 @@ def recipe_key(category, keys):
 # --- how many lines each key gets -----------------------------------------------------------------------------------
 
 
-def allocate(shares, available, total=None):
-    """Lines per key. Line j of a key enters the dataset at time (2j-1)/share, and the dataset is the lines that enter
+def allocate(weights, available, total=None):
+    """Lines per key. `weights` are relative sizes (shares work too: only the ratio matters). Line j of a key enters
+    the dataset at time (2j-1)/weight, and the dataset is the lines that enter
     first (Sainte-Lague: counts follow the shares, and a longer dataset only ever adds lines). It ends when `total`
     lines are in, or when the next line to enter does not exist: that key is `limited_by`."""
-    names = sorted(shares)
-    denominator = math.lcm(*(shares[name].denominator for name in names))
-    weights = {name: int(shares[name] * denominator) for name in names}
-    scale = math.lcm(*weights.values())
-    step = {name: scale // weights[name] for name in names}
+    names = sorted(weights)
+    denominator = math.lcm(*(weights[name].denominator for name in names))
+    whole = {name: int(weights[name] * denominator) for name in names}
+    scale = math.lcm(*whole.values())
+    step = {name: scale // whole[name] for name in names}
 
     targets = dict.fromkeys(names, 0)
     queue = [(step[name], name, 1) for name in names]  # (entry time, key, line number); ties go to the key name
@@ -225,13 +231,13 @@ def allocate(shares, available, total=None):
 
 def select_lines(recipe, pairs):
     """The line keys the recipe selects from `pairs` of (line key, category)."""
-    groups = {name: set() for name in recipe.shares}
+    groups = {name: set() for name in recipe.weights}
     for key, category in pairs:
-        name = recipe_key(category, recipe.shares)
+        name = recipe_key(category, recipe.weights)
         if name is not None:
             groups[name].add(key)
     available = {name: len(keys) for name, keys in groups.items()}
-    allocation = allocate(recipe.shares, available, recipe.total)
+    allocation = allocate(recipe.weights, available, recipe.total)
 
     chosen = set()
     for name, keys in groups.items():
