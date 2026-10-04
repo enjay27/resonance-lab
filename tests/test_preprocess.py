@@ -646,3 +646,294 @@ def test_the_default_limit_comes_from_config():
     import config
 
     assert preprocess.MAX_SUSPICIOUS == config.PREPROCESS_MAX_SUSPICIOUS
+
+
+# --- the output without a recipe is what it was before recipes existed ---------------------------------------------
+
+
+def test_without_a_recipe_the_output_is_exactly_what_it_was_before_recipes_existed(write_jsonl, tmp_path):
+    # Golden values taken from the code before the recipe change (pair format, hy style, reverse, eval line, validation split).
+    import manifest
+
+    src = write_jsonl("raw.jsonl", [
+        {"original": "遺跡1F", "translated": "유적 1F"},
+        {"original": "スカイ", "translated": "스카이"},
+        {"original": "おやすみ", "translated": "잘 자"},
+        {"original": "ID:1 " + "あ" * 150 + " ID:2", "translated": "모집"},
+        {"original": "ムクボ3돌", "translated": "무크보 3돌"},
+        {"original": "ウルト溜まった", "translated": "궁 찼다"},
+        {"original": "遺跡1F", "translated": "중복"},
+        {"original": "杖@2募集", "translated": "법사@2 모집"},
+        "{broken",
+        {"original": "レイド募集 1", "translated": "레이드 모집 1"},
+        {"original": "レイド募集 2", "translated": "레이드 모집 2"},
+        {"original": "あ", "translated": "가" * 50},
+        {"original": "ログイン", "translated": None},
+        {"original": "ありがとう", "translated": "고마워"},
+        {"original": "こんにちは", "translated": "안녕하세요"},
+    ])
+    out, val = tmp_path / "out.jsonl", tmp_path / "val.jsonl"
+
+    counts = preprocess.transform_for_lora(src, str(out), fmt="pair", style="hy", reverse=True, eval_originals=["スカイ"],
+                                           val_file=str(val), val_fraction=0.3)
+
+    assert counts == {
+        "total": 23, "passed": 16, "empty field": 1, "hangeul in original": 1, "JP residual in translation": 0,
+        "JP in original (ko_ja)": 0, "Hangeul residual in translation (ko_ja)": 0, "hallucination": 1,
+        "recruitment spam": 1, "eval overlap": 1, "eval overlap (near)": 0, "duplicate": 1, "json error": 1,
+        "validation": 10,
+    }
+    assert manifest.file_sha256(str(out)) == "250aa89d7d22bf84fe57e1cd3b07e11dd0027374c6f858057879bf532bcc51c1"
+    assert manifest.file_sha256(str(val)) == "fde8995a9bbd13bfe49cad1a9996c6bbafe8f2e27df5d25a0839596171933eb8"
+
+
+# --- keep: a recipe can let recruitment walls through ---------------------------------------------------------------
+
+WALL = "ID:1 " + "あ" * 150 + " ID:2"
+
+
+def test_a_recipe_can_keep_recruitment_walls_but_no_other_filter():
+    assert preprocess.clean_reason(WALL, "모집") == "recruitment spam"
+    assert preprocess.clean_reason(WALL, "모집", keep=("recruitment spam",)) is None
+    assert preprocess.clean_reason(WALL, "가" * 5000, keep=("recruitment spam",)) == "hallucination"
+    assert preprocess.clean_reason("모집 " + "あ" * 150 + " ID:1 ID:2", "x", keep=("recruitment spam",)) == "hangeul in original"
+    korean_wall = "모집 " + "a" * 150 + " ID:1 ID:2"
+    assert preprocess.clean_reason(korean_wall, "募集", direction="ko-ja") == "recruitment spam"
+    assert preprocess.clean_reason(korean_wall, "募集", direction="ko-ja", keep=("recruitment spam",)) is None
+
+
+# --- recipes: the training lines are chosen by category weight ----------------------------------------------------------
+
+
+def _categorized(write_jsonl, groups):
+    """(raw log, categories file) for {category: [(japanese, korean), ...]}; the lines are the made-up ones given."""
+    from dataset_recipe import line_key
+
+    raw = [{"original": ja, "translated": ko} for pairs in groups.values() for ja, ko in pairs]
+    categories = [{"key": line_key(ja), "category": category} for category, pairs in groups.items() for ja, _ in pairs]
+    return write_jsonl("raw.jsonl", raw), write_jsonl("categories.jsonl", categories)
+
+
+_KOREAN = {"挨拶": "인사", "雑談": "잡담", "売ります": "판매", "募集": "모집", "通知": "알림", "未分類": "미분류", "ギルド": "길드"}
+
+
+def _lines(prefix, n):
+    """Made-up (Japanese, Korean) lines; the Korean differs per prefix so no reverse row is a duplicate of another."""
+    return [(f"{prefix} {i}", f"{_KOREAN[prefix]} {i}") for i in range(n)]
+
+
+def _recipe(**changes):
+    from dataset_recipe import parse_recipe
+
+    return parse_recipe({"seed": 3, "categories": {"greetings": {"weight": 1}, "chat": {"weight": 3}}, **changes})
+
+
+def _run(src, categories_path, out, recipe, **options):
+    from dataset_recipe import read_categories
+
+    report = {}
+    counts = preprocess.transform_for_lora(src, str(out), fmt="pair", recipe=recipe, categories=read_categories(categories_path),
+                                           recipe_report=report, **options)
+    return counts, report, read_jsonl(out)
+
+
+def test_a_recipe_selects_training_lines_by_weight_and_counts_the_rest_as_not_selected(write_jsonl, tmp_path):
+    src, cats = _categorized(write_jsonl, {"greetings": _lines("挨拶", 40), "chat": _lines("雑談", 60), "trade": _lines("売ります", 20)})
+
+    counts, report, rows = _run(src, cats, tmp_path / "out.jsonl", _recipe(total=40))
+
+    assert len(rows) == 40
+    assert sum(r["original"].startswith("挨拶") for r in rows) == 10
+    assert sum(r["original"].startswith("雑談") for r in rows) == 30
+    assert not any(r["original"].startswith("売ります") for r in rows)
+    assert counts["passed"] == 40 and counts["total"] == 120
+    assert counts["not selected (recipe)"] == 80
+    assert report["targets"] == {"greetings": 10, "chat": 30}
+    assert report["available"] == {"greetings": 40, "chat": 60}
+    assert report["limited_by"] is None and report["total"] == 40
+
+
+def test_without_a_total_the_dataset_ends_where_the_first_category_runs_out(write_jsonl, tmp_path):
+    src, cats = _categorized(write_jsonl, {"greetings": _lines("挨拶", 40), "chat": _lines("雑談", 60)})
+
+    counts, report, rows = _run(src, cats, tmp_path / "out.jsonl", _recipe())
+
+    assert (len(rows), report["limited_by"], report["total"]) == (80, "chat", 80)
+    assert report["targets"] == {"greetings": 20, "chat": 60}
+
+
+def test_a_report_without_a_recipe_has_no_recipe_reason(write_jsonl, tmp_path):
+    src = write_jsonl("raw.jsonl", [{"original": "おやすみ", "translated": "잘 자"}])
+
+    counts = preprocess.transform_for_lora(src, str(tmp_path / "out.jsonl"))
+
+    assert "not selected (recipe)" not in counts
+
+
+def test_the_recipe_leaves_validation_rows_alone_so_every_recipe_has_the_same_validation_file(write_jsonl, tmp_path):
+    src, cats = _categorized(write_jsonl, {"greetings": _lines("挨拶", 400), "chat": _lines("雑談", 600)})
+    one, other = tmp_path / "one", tmp_path / "other"
+    one.mkdir(), other.mkdir()
+
+    _, _, train_one = _run(src, cats, one / "out.jsonl", _recipe(total=100), val_file=str(one / "val.jsonl"), val_fraction=0.1)
+    _, _, train_two = _run(src, cats, other / "out.jsonl", _recipe(total=200, seed=9), val_file=str(other / "val.jsonl"), val_fraction=0.1)
+
+    val_one, val_two = read_jsonl(one / "val.jsonl"), read_jsonl(other / "val.jsonl")
+    assert val_one == val_two and 50 < len(val_one) < 150  # the whole 1000 lines, not just the selected ones
+    assert len(train_one) == 100 and len(train_two) == 200
+    assert not {r["original"] for r in train_one} & {r["original"] for r in val_one}
+
+
+def test_a_smaller_total_is_inside_a_bigger_one_in_the_training_file(write_jsonl, tmp_path):
+    src, cats = _categorized(write_jsonl, {"greetings": _lines("挨拶", 300), "chat": _lines("雑談", 300)})
+
+    _, _, small = _run(src, cats, tmp_path / "small.jsonl", _recipe(total=40))
+    _, _, big = _run(src, cats, tmp_path / "big.jsonl", _recipe(total=200))
+
+    assert {r["original"] for r in small} < {r["original"] for r in big}
+
+
+def test_a_reverse_row_is_written_only_with_its_selected_forward_row(write_jsonl, tmp_path):
+    src, cats = _categorized(write_jsonl, {"greetings": _lines("挨拶", 20), "chat": _lines("雑談", 20), "trade": _lines("売ります", 20)})
+
+    counts, _, rows = _run(src, cats, tmp_path / "out.jsonl", _recipe(total=8), reverse=True)
+
+    forward = [r for r in rows if r["original"].startswith(("挨拶", "雑談"))]
+    reverse = [r for r in rows if r["translated"].startswith(("挨拶", "雑談"))]  # Korean in, Japanese out
+    assert len(forward) == len(reverse) == 8 and len(rows) == 16
+    assert {r["translated"] for r in reverse} == {r["original"] for r in forward}
+    assert counts["passed"] == 16
+
+
+def test_the_recipe_decides_about_recruitment_walls(write_jsonl, tmp_path):
+    groups = {"recruitment/guild": [(WALL, "모집 벽")] + _lines("ギルド", 5), "chat": _lines("雑談", 10)}
+    src, cats = _categorized(write_jsonl, groups)
+    recipe = {"recruitment": {"weight": 1}, "chat": {"weight": 1}}
+
+    from dataset_recipe import parse_recipe
+
+    counts, _, rows = _run(src, cats, tmp_path / "default.jsonl", parse_recipe({"categories": recipe}))
+    assert counts["recruitment spam"] == 1 and not any(r["original"] == WALL for r in rows)
+
+    counts, _, rows = _run(src, cats, tmp_path / "kept.jsonl", parse_recipe({"categories": recipe, "keep": ["recruitment spam"]}))
+    assert counts["recruitment spam"] == 0 and any(r["original"] == WALL for r in rows)
+
+
+def test_lines_the_recipe_leaves_out_do_not_trip_the_suspicious_drop_guard(write_jsonl, tmp_path):
+    src, cats = _categorized(write_jsonl, {"greetings": _lines("挨拶", 50), "chat": _lines("雑談", 50)})
+
+    counts, _, rows = _run(src, cats, tmp_path / "out.jsonl", _recipe(total=8), max_drop=0.05)
+
+    assert len(rows) == 8 and counts["not selected (recipe)"] == 92
+
+
+def test_a_recipe_that_selects_nothing_stops(write_jsonl, tmp_path):
+    src, cats = _categorized(write_jsonl, {"trade": _lines("売ります", 10)})
+
+    with pytest.raises(SystemExit) as stopped:
+        _run(src, cats, tmp_path / "out.jsonl", _recipe())
+
+    assert stopped.value.code == 1
+
+
+def test_lines_without_a_category_are_uncategorized_and_can_be_weighted(write_jsonl, tmp_path):
+    from dataset_recipe import parse_recipe
+
+    src, cats = _categorized(write_jsonl, {"chat": _lines("雑談", 20)})
+    with open(src, "a", encoding="utf-8") as f:
+        for ja, ko in _lines("未分類", 20):
+            f.write(json.dumps({"original": ja, "translated": ko}, ensure_ascii=False) + "\n")
+
+    _, report, rows = _run(src, cats, tmp_path / "out.jsonl", parse_recipe({"categories": {"uncategorized": {"weight": 1}, "chat": {"weight": 1}}}))
+
+    assert report["targets"] == {"chat": 20, "uncategorized": 20} and len(rows) == 40
+
+
+# --- main: --recipe / --categories and the manifest ---------------------------------------------------------------------
+
+
+def _main_setup(write_jsonl, tmp_path, monkeypatch, groups):
+    src, cats = _categorized(write_jsonl, groups)
+    out = tmp_path / "out.jsonl"
+    monkeypatch.setattr(preprocess, "RAW_LOGS", src)
+    monkeypatch.setattr(preprocess, "PROCESSED_LOGS", str(out))
+    monkeypatch.setattr(preprocess, "EVAL_DATASET_PATH", str(tmp_path / "no-eval.jsonl"))
+    return src, cats, out
+
+
+def test_main_applies_a_recipe_by_name_and_records_it_in_the_manifest(write_jsonl, tmp_path, monkeypatch):
+    import manifest
+
+    # configs/datasets/example.json: greetings 1, recruitment/party 2, chat 6, bot 1
+    src, cats, out = _main_setup(write_jsonl, tmp_path, monkeypatch, {
+        "greetings": _lines("挨拶", 30), "recruitment/party": _lines("募集", 30), "chat": _lines("雑談", 90), "bot": _lines("通知", 30)})
+
+    preprocess.main(["--format", "pair", "--val-fraction", "0", "--recipe", "example", "--categories", cats])
+
+    rows = read_jsonl(out)
+    meta = manifest.read_manifest(manifest.manifest_path(str(out)))
+    block = meta["recipe"]
+    assert len(rows) == 150 and block["total"] == 150 and block["limited_by"] == "chat"
+    assert block["selected"] == {"greetings": 15, "recruitment/party": 30, "chat": 90, "bot": 15}
+    assert block["available"] == {"greetings": 30, "recruitment/party": 30, "chat": 90, "bot": 30}
+    assert block["name"] == "example" and block["seed"] == 42 and block["keep"] == []
+    assert block["weights"]["chat"] == "6"
+    assert block["sha256"] and block["categories_sha256"] == manifest.file_sha256(cats)
+    assert block["categories_file"] == os.path.basename(cats)
+    assert meta["data_sha256"] == manifest.file_sha256(str(out))
+
+
+def test_main_takes_a_recipe_file_by_path(write_jsonl, tmp_path, monkeypatch):
+    import manifest
+
+    src, cats, out = _main_setup(write_jsonl, tmp_path, monkeypatch, {"chat": _lines("雑談", 10), "bot": _lines("通知", 10)})
+    recipe_file = tmp_path / "mine.json"
+    recipe_file.write_text(json.dumps({"categories": {"chat": {"weight": 1}, "bot": {"weight": 1}}}), encoding="utf-8")
+
+    preprocess.main(["--format", "pair", "--val-fraction", "0", "--recipe", str(recipe_file), "--categories", cats])
+
+    assert len(read_jsonl(out)) == 20
+    assert manifest.read_manifest(manifest.manifest_path(str(out)))["recipe"]["name"] == "mine"
+
+
+def test_main_reads_the_recipe_from_the_environment_when_no_flag_is_given(write_jsonl, tmp_path, monkeypatch):
+    src, cats, out = _main_setup(write_jsonl, tmp_path, monkeypatch, {"chat": _lines("雑談", 10), "bot": _lines("通知", 10)})
+    recipe_file = tmp_path / "env.json"
+    recipe_file.write_text(json.dumps({"categories": {"chat": {"weight": 1}}}), encoding="utf-8")
+    monkeypatch.setenv("RESONANCE_RECIPE", str(recipe_file))
+
+    preprocess.main(["--format", "pair", "--val-fraction", "0", "--categories", cats])
+
+    assert len(read_jsonl(out)) == 10
+
+
+def test_main_without_a_recipe_writes_no_recipe_block(write_jsonl, tmp_path, monkeypatch):
+    import manifest
+
+    src, cats, out = _main_setup(write_jsonl, tmp_path, monkeypatch, {"chat": _lines("雑談", 10)})
+    monkeypatch.delenv("RESONANCE_RECIPE", raising=False)
+
+    preprocess.main(["--format", "pair", "--val-fraction", "0"])
+
+    assert "recipe" not in manifest.read_manifest(manifest.manifest_path(str(out)))
+
+
+@pytest.mark.parametrize("problem", ["no categories file", "bad recipe", "no recipe file"])
+def test_main_stops_with_a_message_when_the_recipe_cannot_be_used(write_jsonl, tmp_path, monkeypatch, capsys, problem):
+    import manifest
+
+    src, cats, out = _main_setup(write_jsonl, tmp_path, monkeypatch, {"chat": _lines("雑談", 10)})
+    recipe_file = tmp_path / "r.json"
+    recipe_file.write_text(json.dumps({"categories": {"chat": {"share": 1}} if problem == "bad recipe" else {"chat": {"weight": 1}}}), encoding="utf-8")
+    argv = ["--format", "pair", "--val-fraction", "0", "--recipe", str(recipe_file), "--categories", cats]
+    if problem == "no categories file":
+        argv[-1] = str(tmp_path / "missing.jsonl")
+    if problem == "no recipe file":
+        argv[argv.index("--recipe") + 1] = str(tmp_path / "missing.json")
+
+    with pytest.raises(SystemExit) as stopped:
+        preprocess.main(argv)
+
+    assert stopped.value.code == 1
+    assert "[ERROR]" in capsys.readouterr().out
+    assert not os.path.exists(manifest.manifest_path(str(out)))

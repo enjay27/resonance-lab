@@ -63,6 +63,8 @@ PREPROCESS_MAX_SUSPICIOUS = 0.30  # share of usable rows dropped as Hangeul-in-s
 HF_DATASET_CONFIG = os.path.join(BASE_DIR, "configs", "hf_dataset.yaml")
 # A dataset recipe (category -> weight; share = weight / total weight) is one JSON file here; see dataset_recipe.py.
 RECIPE_DIR = os.path.join(BASE_DIR, "configs", "datasets")
+# {key, category} per line, what a recipe selects by (written by Gate 1, or by any script); preprocess.py --categories.
+CATEGORIES_FILE = os.path.join(PROCESSED_DATA_DIR, "categories.jsonl")
 HF_DATA_DIR = os.path.join(BASE_DIR, "data", "hf")
 
 # --- Experiment tracking (tracking.py) ---

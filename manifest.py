@@ -38,11 +38,13 @@ def file_sha256(path):
     return digest.hexdigest()
 
 
-def write_manifest(data_path, fmt, style, reverse, raw_path, counts, eval_set, eval_lines, val_fraction=0.0):
+def write_manifest(data_path, fmt, style, reverse, raw_path, counts, eval_set, eval_lines, val_fraction=0.0, recipe=None):
     """Record how `data_path` was made; returns the manifest's path.
 
     `eval_set` is the eval file whose lines were kept out (None when nothing was excluded), `eval_lines` how many.
     The validation file next to `data_path`, when there is one, is recorded too (`val_fraction` is what was asked for).
+    `recipe`, when the lines were chosen by a dataset recipe, is the block that says which (name, hashes, what each
+    category offered and gave); without a recipe the manifest has no such key.
     """
     val = val_path(data_path)
     has_val = os.path.exists(val)
@@ -60,6 +62,8 @@ def write_manifest(data_path, fmt, style, reverse, raw_path, counts, eval_set, e
         "eval_lines_excluded_from": eval_lines if eval_set else 0,
         "created": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
+    if recipe:
+        meta["recipe"] = recipe
     path = manifest_path(data_path)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)

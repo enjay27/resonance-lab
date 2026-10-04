@@ -363,3 +363,8 @@ def test_only_the_ratio_of_the_sizes_matters_to_the_allocation():
     pool = {"a": 1000, "b": 1000}
 
     assert allocate({"a": Fraction(1), "b": Fraction(3)}, pool, total=40) == allocate(shares(a=0.25, b=0.75), pool, total=40)
+
+
+def test_a_missing_categories_file_is_a_recipe_error_that_names_it(tmp_path):
+    with pytest.raises(RecipeError, match="missing.jsonl"):
+        read_categories(str(tmp_path / "missing.jsonl"))

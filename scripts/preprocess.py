@@ -5,7 +5,8 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import RAW_LOGS, PROCESSED_LOGS, INSTRUCTION, EVAL_DATASET_PATH, PREPROCESS_MAX_SUSPICIOUS
+from config import RAW_LOGS, PROCESSED_LOGS, INSTRUCTION, EVAL_DATASET_PATH, PREPROCESS_MAX_SUSPICIOUS, CATEGORIES_FILE
+from dataset_recipe import UNCATEGORIZED, RecipeError, line_key, load_recipe, read_categories, recipe_path, select_lines
 from eval_metrics import load_eval_dataset
 import manifest
 from overlap import EvalOverlap
@@ -36,7 +37,9 @@ MAX_SUSPICIOUS = PREPROCESS_MAX_SUSPICIOUS
 # Rows dropped because the line is bad data: too many of them means the wrong file or a broken export (see max_drop).
 SUSPICIOUS = ("hangeul in original", "JP residual in translation", "hallucination")
 # Drops that are normal for chat logs and say nothing about the file's health: not counted in the guard's share.
-EXPECTED = ("empty field", "recruitment spam", "eval overlap", "eval overlap (near)", "duplicate")
+EXPECTED = ("empty field", "recruitment spam", "eval overlap", "eval overlap (near)", "duplicate", "not selected (recipe)")
+# Only counted (and reported) when a dataset recipe chose the training lines: passed lines the recipe left out.
+RECIPE_REASON = "not selected (recipe)"
 
 
 # Output row layouts, by pipeline: unsloth trains on instruction/input/output rows,
@@ -66,10 +69,11 @@ def pair_rows(original, translated, style=None, reverse=False):
     return rows
 
 
-def clean_reason(original, translated, direction="ja-ko"):
+def clean_reason(original, translated, direction="ja-ko", keep=()):
     """Why a row must not be trained on, or None when it is clean.
 
-    Duplicates are not decided here (they need the rows seen so far).
+    Duplicates are not decided here (they need the rows seen so far). A dataset recipe can `keep` a filter by name
+    (only "recruitment spam" so far): that filter lets the row through.
     """
     original = (original or "").strip()
     translated = (translated or "").strip()
@@ -93,7 +97,7 @@ def clean_reason(original, translated, direction="ja-ko"):
     if len(translated) > len(original) * 10:
         return "hallucination"
     # Guild recruitment walls: long lines with several IDs.
-    if len(original) > 150 and original.count('ID:') > 1:
+    if len(original) > 150 and original.count('ID:') > 1 and "recruitment spam" not in keep:
         return "recruitment spam"
     return None
 
@@ -101,18 +105,32 @@ def clean_reason(original, translated, direction="ja-ko"):
 def _report(counts):
     skipped = counts["total"] - counts["passed"]
     print("\n--- Preprocessing Report ---")
-    width = max(len(reason) for reason in REASONS)
+    width = max(len(reason) for reason in REASONS + (RECIPE_REASON,))
     print(f"{'Total input':<{width + 2}}: {counts['total']}")
     print(f"{'Passed':<{width + 2}}: {counts['passed']}")
     print(f"{'Skipped':<{width + 2}}: {skipped}")
-    for reason in REASONS:
+    for reason in REASONS + ((RECIPE_REASON,) if RECIPE_REASON in counts else ()):
         print(f"  {reason:<{width}}: {counts[reason]}")
     if counts["validation"]:
         print(f"{'Validation rows':<{width + 2}}: {counts['validation']} of the passed rows (the rest are training rows)")
 
 
+def _report_recipe(name, recipe, selection):
+    """What the recipe asked for and got, per key: its weight, the lines available and the lines selected."""
+    allocation = selection.allocation
+    print(f"\n--- Recipe {name} (seed {recipe.seed}) ---")
+    width = max(len(key) for key in recipe.weights)
+    print(f"{'category':<{width}}  {'share':>6}  {'available':>9}  {'selected':>8}")
+    for key, share in recipe.shares.items():
+        print(f"{key:<{width}}  {float(share):>6.1%}  {selection.available[key]:>9}  {allocation.targets[key]:>8}")
+    ended = f", limited by '{allocation.limited_by}' (it has no more lines)" if allocation.limited_by else ""
+    asked = f" of the {allocation.requested} asked for" if allocation.requested and allocation.requested != allocation.total else ""
+    print(f"{allocation.total} lines selected{asked}{ended}. A line is its normalised text: variants count once.")
+
+
 def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, reverse=False, eval_originals=(),
-                       val_file=None, val_fraction=0.0, max_drop=None):
+                       val_file=None, val_fraction=0.0, max_drop=None, recipe=None, categories=None, recipe_report=None,
+                       recipe_name="recipe"):
     """Clean raw {original, translated} rows into training rows of layout `fmt`.
 
     Rows whose original is one of `eval_originals` (exactly or nearly: see overlap.py) are dropped, so the
@@ -121,6 +139,11 @@ def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, 
     chosen per line by valsplit.py (both directions of a pair go to the same file).
     With `max_drop`, exits 1 when more than that share of the usable rows (not untranslated, duplicate, spam or eval
     lines) were dropped as suspicious (Hangeul in the source, Japanese left in the output, runaway-long output).
+    With a dataset `recipe` (dataset_recipe.py) and the `categories` of the lines ({line key: category}), the training
+    file holds only the lines the recipe selects by category weight; the validation lines are decided before the recipe
+    and do not depend on it, so every recipe has the same validation file. The lines it leaves out are counted as
+    "not selected (recipe)". `recipe_report`, a dict, is filled with the plan (available / targets / total / limited_by /
+    requested). The recipe's `keep` lets recruitment walls through the filters.
     Returns the counts per outcome (`total`, `passed` -- training and validation rows together --, `validation`
     and one per reason).
     """
@@ -136,9 +159,37 @@ def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, 
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     counts = {"total": 0, "passed": 0, **{reason: 0 for reason in REASONS}, "validation": 0}
+    keep = recipe.keep if recipe else ()
+    if recipe:
+        counts[RECIPE_REASON] = 0
     seen_inputs = set()
     eval_overlap = EvalOverlap(eval_originals)
     usable = suspicious = 0  # forward direction only: the guard's denominator and numerator
+    pending = []  # with a recipe: the training-side lines (original, translated), held until the recipe has chosen
+    selection = None
+
+    def emit(sink, original, translated):
+        """Write a passed line to `sink`, and with `reverse` its ko->ja row (tried on its own, counted on its own)."""
+        counts["validation"] += sink is f_val
+        if fmt == "pair":
+            sink.write(json.dumps(forward_row(original, translated, style), ensure_ascii=False) + '\n')
+        else:
+            sink.write(json.dumps(FORMATS[fmt](original, translated), ensure_ascii=False) + '\n')
+
+        # The reverse direction is tried only for rows whose forward direction passed, with its own filters and
+        # counted on its own (as experiment/translategemma's bidirectional preprocess did).
+        if reverse:
+            counts["total"] += 1
+            reason = clean_reason(translated, original, direction="ko-ja", keep=keep)
+            if reason is None and translated in seen_inputs:
+                reason = "duplicate"
+            if reason:
+                counts[reason] += 1
+                return
+            seen_inputs.add(translated)
+            counts["passed"] += 1
+            counts["validation"] += sink is f_val
+            sink.write(json.dumps(reverse_row(original, translated, style), ensure_ascii=False) + '\n')
 
     with contextlib.ExitStack() as files:
         f_in = files.enter_context(open(input_file, 'r', encoding='utf-8'))
@@ -154,7 +205,7 @@ def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, 
             original = (data.get("original") or "").strip()
             translated = (data.get("translated") or "").strip()
 
-            reason = clean_reason(original, translated)
+            reason = clean_reason(original, translated, keep=keep)
             if reason is None:
                 found = eval_overlap.check(original)
                 if found:
@@ -169,30 +220,35 @@ def transform_for_lora(input_file, output_file, fmt=DEFAULT_FORMAT, style=None, 
 
             seen_inputs.add(original)
             counts["passed"] += 1
-            # The pair's side is decided by its Japanese line, so the reverse row below follows the forward row.
+            # The pair's side is decided by its Japanese line, so the reverse row follows the forward row.
             sink = f_val if f_val and is_validation(original, val_fraction) else f_out
-            counts["validation"] += sink is f_val
-            if fmt == "pair":
-                sink.write(json.dumps(forward_row(original, translated, style), ensure_ascii=False) + '\n')
-            else:
-                sink.write(json.dumps(FORMATS[fmt](original, translated), ensure_ascii=False) + '\n')
+            if recipe is not None and sink is f_out:
+                pending.append((original, translated))
+                continue
+            emit(sink, original, translated)
 
-            # The reverse direction is tried only for rows whose forward direction passed, with its own filters and
-            # counted on its own (as experiment/translategemma's bidirectional preprocess did).
-            if reverse:
-                counts["total"] += 1
-                reason = clean_reason(translated, original, direction="ko-ja")
-                if reason is None and translated in seen_inputs:
-                    reason = "duplicate"
-                if reason:
-                    counts[reason] += 1
-                    continue
-                seen_inputs.add(translated)
-                counts["passed"] += 1
-                counts["validation"] += sink is f_val
-                sink.write(json.dumps(reverse_row(original, translated, style), ensure_ascii=False) + '\n')
+        if recipe is not None:
+            keyed = [(line_key(original), original, translated) for original, translated in pending]
+            known = categories or {}
+            selection = select_lines(recipe, [(key, known.get(key, UNCATEGORIZED)) for key, _, _ in keyed])
+            for key, original, translated in keyed:
+                if key in selection.keys:
+                    emit(f_out, original, translated)
+                else:
+                    counts["passed"] -= 1  # it passed the filters, but the recipe did not take it
+                    counts[RECIPE_REASON] += 1
 
     _report(counts)
+    if selection is not None:
+        _report_recipe(recipe_name, recipe, selection)
+        if recipe_report is not None:
+            allocation = selection.allocation
+            recipe_report.update(available=selection.available, targets=allocation.targets, total=allocation.total,
+                                 limited_by=allocation.limited_by, requested=allocation.requested)
+        if not selection.allocation.total:
+            print("[ERROR] The recipe selected no training lines: a category of the recipe has no lines in this log "
+                  f"('{selection.allocation.limited_by}'). Check the categories file and the recipe's category names.")
+            sys.exit(1)
     share = suspicious / usable if usable else 0.0
     print(f"{'Suspicious drops':<18}: {suspicious}/{usable} usable rows ({share:.1%})"
           + (f", limit {max_drop:.0%}" if max_drop is not None else ""))
@@ -234,6 +290,11 @@ def main(argv=None):
                         help="stop when more than this share of the usable rows is dropped as suspicious (default: %(default)s; 1 = never)")
     parser.add_argument("--reverse", action="store_true",
                         help="pair format only: also write every clean row as ko->ja, Korean as the input")
+    parser.add_argument("--recipe", default=os.environ.get("RESONANCE_RECIPE") or None, metavar="NAME_OR_FILE",
+                        help="choose the training lines by category weight: a recipe name (configs/datasets/<name>.json) or a "
+                             "JSON file (default: $RESONANCE_RECIPE; none = every clean line is trained on)")
+    parser.add_argument("--categories", default=CATEGORIES_FILE,
+                        help="with --recipe: the file saying which category each line is in (default: %(default)s)")
     args = parser.parse_args(argv)
     style = {"none": None, "auto": None}.get(args.prompt, args.prompt)
     if args.prompt == "auto":
@@ -244,11 +305,49 @@ def main(argv=None):
     eval_set, eval_originals = _eval_originals(args)
     manifest.remove_manifest(PROCESSED_LOGS)  # a failed run must not leave the old file's manifest or validation rows behind
     val_file = manifest.val_path(PROCESSED_LOGS) if val_fraction > 0 else None
-    counts = transform_for_lora(RAW_LOGS, PROCESSED_LOGS, args.fmt, style, args.reverse, eval_originals, val_file, val_fraction, args.max_drop)
+    recipe, recipe_inputs = _load_recipe(args)
+    recipe_report = {}
+    counts = transform_for_lora(RAW_LOGS, PROCESSED_LOGS, args.fmt, style, args.reverse, eval_originals, val_file, val_fraction, args.max_drop,
+                                recipe=recipe, categories=recipe_inputs and recipe_inputs["categories"], recipe_report=recipe_report,
+                                recipe_name=recipe_inputs["name"] if recipe_inputs else "recipe")
     if val_file and not counts["validation"]:
         print("[WARNING] No line fell into the validation split (too few lines?): training will refuse this data.")
-    path = manifest.write_manifest(PROCESSED_LOGS, args.fmt, style, args.reverse, RAW_LOGS, counts, eval_set, len(eval_originals), val_fraction)
+    block = _recipe_block(recipe, recipe_inputs, recipe_report) if recipe else None
+    path = manifest.write_manifest(PROCESSED_LOGS, args.fmt, style, args.reverse, RAW_LOGS, counts, eval_set, len(eval_originals), val_fraction,
+                                   recipe=block)
     print(f"Manifest written -> {path}")
+
+
+def _load_recipe(args):
+    """(Recipe, inputs) of `--recipe`, or (None, None) without one; exits 1 with a message when it cannot be used.
+
+    A recipe given by name is configs/datasets/<name>.json; anything with a path separator or ending in .json is a file.
+    """
+    if not args.recipe:
+        return None, None
+    try:
+        by_path = "/" in args.recipe or os.sep in args.recipe or args.recipe.endswith(".json")
+        path = args.recipe if by_path else recipe_path(args.recipe)
+        recipe, digest = load_recipe(path)
+        categories = read_categories(args.categories)
+    except RecipeError as error:
+        print(f"[ERROR] {error}")
+        sys.exit(1)
+    inputs = {"name": os.path.splitext(os.path.basename(path))[0], "sha256": digest, "categories": categories,
+              "categories_file": args.categories}
+    return recipe, inputs
+
+
+def _recipe_block(recipe, inputs, report):
+    """What the manifest says about the recipe: which one (name and content hash), and what each category offered and gave."""
+    return {
+        "name": inputs["name"], "sha256": inputs["sha256"], "seed": recipe.seed, "keep": list(recipe.keep),
+        "weights": {key: str(weight) for key, weight in recipe.weights.items()},
+        "categories_file": os.path.basename(inputs["categories_file"]),
+        "categories_sha256": manifest.file_sha256(inputs["categories_file"]),
+        "total": report["total"], "requested": report["requested"], "limited_by": report["limited_by"],
+        "available": report["available"], "selected": report["targets"],
+    }
 
 
 def _eval_originals(args):
