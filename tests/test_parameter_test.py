@@ -1,11 +1,13 @@
 import ast
 import json
 import os
+import subprocess
 import sys
 import time
 
 import pytest
 
+import eval_metrics
 import parameter_test as pt
 import pipelines
 from config import BASE_DIR
@@ -170,6 +172,78 @@ def test_an_interrupt_stops_the_child_and_its_children(tmp_path):
     assert not alive(grandchild)
 
 
+class FakeProc:
+    """A child process for terminate_tree: it dies when `die()` is called (by the fake taskkill or by `kill`)."""
+
+    pid = 4242
+
+    def __init__(self, survives_kill=False):
+        self.dead, self.survives_kill, self.killed = False, survives_kill, False
+
+    def die(self):
+        self.dead = True
+
+    def poll(self):
+        return 0 if self.dead else None
+
+    def kill(self):
+        self.killed = True
+        if not self.survives_kill:
+            self.die()
+
+    def wait(self, timeout=None):
+        if not self.dead:
+            raise subprocess.TimeoutExpired("fake", timeout)
+        return 0
+
+
+def fake_taskkill(proc, returncode=0, stderr="", kills=True):
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append(argv)
+        if kills:
+            proc.die()
+        return subprocess.CompletedProcess(argv, returncode, stdout="", stderr=stderr)
+
+    run.calls = calls
+    return run
+
+
+def test_on_windows_the_whole_tree_is_killed_with_taskkill():
+    proc = FakeProc()
+    run = fake_taskkill(proc)
+    pt.terminate_tree(proc, grace_seconds=0.01, platform="win32", run=run)
+    assert run.calls == [["taskkill", "/PID", "4242", "/T", "/F"]]
+    assert not proc.killed
+
+
+def test_a_taskkill_that_fails_is_reported_not_swallowed():
+    """The maintainer's interrupted sweep left a training running to the end: the failure must be visible."""
+    proc = FakeProc()
+    run = fake_taskkill(proc, returncode=1, stderr="ERROR: The process with PID 4242 could not be terminated. Access is denied.", kills=False)
+    with pytest.raises(pt.StopFailed, match="Access is denied") as caught:
+        pt.terminate_tree(proc, grace_seconds=0.01, platform="win32", run=run)
+    assert "4242" in str(caught.value) and "child processes may still be running" in str(caught.value)
+    assert proc.killed  # the fallback: at least the process itself
+
+
+def test_a_process_that_is_still_alive_after_the_kill_is_reported():
+    proc = FakeProc(survives_kill=True)
+    run = fake_taskkill(proc, kills=False)
+    with pytest.raises(pt.StopFailed, match="still running") as caught:
+        pt.terminate_tree(proc, grace_seconds=0.01, platform="win32", run=run)
+    assert "4242" in str(caught.value)
+
+
+def test_a_process_that_already_ended_is_left_alone():
+    proc = FakeProc()
+    proc.die()
+    run = fake_taskkill(proc)
+    pt.terminate_tree(proc, platform="win32", run=run)
+    assert run.calls == []
+
+
 # --- the curves ----------------------------------------------------------------------------------------------------
 
 def write_log(path, rows):
@@ -255,6 +329,55 @@ def test_run_lifecycle_lets_a_stage_failure_stop_it(tmp_path):
     with pytest.raises(pt.StageFailed):
         pt.run_lifecycle(pt.ParamSet(), run=run, emit=lambda line: None, adapter_dir=str(tmp_path))
     assert seen == ["Fine-Tuning"]  # merge and eval never ran
+
+
+# --- the eval scores of a run --------------------------------------------------------------------------------------
+
+def real_report(predictions):
+    samples = [{"original": "消化", "translated": "숙제한다"}, {"original": "消化", "translated": "숙제한다"}]
+    return eval_metrics.format_report(eval_metrics.evaluate(samples, predictions), samples, predictions, comet=None)
+
+
+def test_the_scores_are_read_from_the_real_report_format():
+    text = real_report(["숙제한다", "소화한다"])
+    scores = pt.parse_report(text)
+    assert scores["chrf"] == pytest.approx(float(next(line for line in text.splitlines() if line.startswith("chrF")).split(":")[1].split()[0]))
+    assert (scores["term_hits"], scores["term_total"], scores["term_pct"]) == (1, 2, 50.0)
+
+
+def test_a_report_without_terms_has_no_term_accuracy():
+    samples = [{"original": "おやすみ", "translated": "잘 자"}]
+    text = eval_metrics.format_report(eval_metrics.evaluate(samples, ["잘 자"]), samples, ["잘 자"])
+    scores = pt.parse_report(text)
+    assert scores["chrf"] is not None and scores["term_pct"] is None
+
+
+def write_report(eval_dir, profile, prompt, text, mtime):
+    path = eval_dir / f"{profile}-{prompt}.txt"
+    path.write_text(text, encoding="utf-8")
+    os.utime(path, (mtime, mtime))
+
+
+def test_summary_reads_the_reports_written_after_the_training(tmp_path):
+    adapters, eval_dir = tmp_path / "adapters", tmp_path / "eval"
+    eval_dir.mkdir()
+    made = start_run(str(adapters), "hy-mt2-1.8b-fast")
+    log = os.path.join(made.dir, "trainer_log.jsonl")
+    write_log(log, [{"current_steps": 5, "loss": 1.8}, {"current_steps": 10, "eval_loss": 0.9}])
+    finish_run(made.dir, "complete")
+    os.utime(log, (1000, 1000))
+    write_report(eval_dir, "hy-mt2-1.8b-fast", "training", real_report(["숙제한다", "소화한다"]), mtime=2000)
+    write_report(eval_dir, "hy-mt2-1.8b-fast", "chat-template", real_report(["숙제한다", "숙제한다"]), mtime=500)  # an older run's
+    params = pt.ParamSet(model="hy-mt2-1.8b", prompts=("training", "chat-template"))
+    result = pt.summarize_latest_run(params, str(adapters), eval_dir=str(eval_dir))
+    assert list(result.scores) == ["training"]  # the stale report of the other prompt is not this run's
+    assert result.scores["training"]["term_pct"] == 50.0
+
+
+def test_a_summary_without_reports_has_no_scores(tmp_path):
+    made = start_run(str(tmp_path), "hy-mt2-1.8b-fast")
+    write_log(os.path.join(made.dir, "trainer_log.jsonl"), [{"current_steps": 5, "loss": 1.8}])
+    assert pt.summarize_latest_run(pt.ParamSet(), str(tmp_path), eval_dir=str(tmp_path / "none")).scores == {}
 
 
 # --- the sweep -----------------------------------------------------------------------------------------------------
@@ -345,3 +468,34 @@ def test_kernel_warning_only_when_not_the_project_venv(tmp_path):
     assert pt.kernel_warning(str(venv_python), str(tmp_path)) is None
     warning = pt.kernel_warning(str(tmp_path / "other" / "python.exe"), str(tmp_path))
     assert ".venv" in warning and "requirements-llamafactory.txt" in warning
+
+
+def test_kernel_warning_tells_how_to_get_a_jupyter_kernel_from_the_venv(tmp_path):
+    warning = pt.kernel_warning(str(tmp_path / "other" / "python.exe"), str(tmp_path))
+    assert "ipykernel install" in warning and "jupyter lab" in warning
+
+
+def scored(lr, eval_loss, chrf, term_pct, run_id="r"):
+    scores = {"training": {"chrf": chrf, "term_hits": 0, "term_total": 21, "term_pct": term_pct}}
+    return pt.Result(pt.ParamSet(lr=lr), "done", run_id, eval_loss, 80, 1.0, 240.0, scores=scores)
+
+
+def test_results_markdown_shows_the_eval_scores():
+    lines = pt.results_markdown([scored(8e-4, 0.7938, 62.86, 61.9), done(2e-4, 0.83)]).splitlines()
+    assert "chrF / term acc" in lines[0] and lines[0].count("|") == lines[2].count("|") == lines[3].count("|")
+    assert "training 62.9 / 61.9%" in lines[2]
+
+
+def test_decision_says_when_the_scores_pick_another_run_than_the_eval_loss():
+    results = [scored(4e-4, 0.7724, 53.8, 42.9, run_id="a"), scored(8e-4, 0.7938, 62.9, 61.9, run_id="b"), scored(2e-4, 0.8317, 58.1, 33.3)]
+    text = pt.decision_text(results, "hy-mt2-1.8b-fast", CONFIG)
+    assert "eval loss 0.7724" in text and "lr=0.0004" in text
+    assert "By chrF the best is lr=0.0008" in text and "62.9" in text
+    assert "By term accuracy the best is lr=0.0008" in text and "61.9%" in text
+    assert "disagree" in text and "full profile" in text
+
+
+def test_decision_stays_quiet_when_eval_loss_and_scores_agree_or_are_missing():
+    agree = pt.decision_text([scored(4e-4, 0.7724, 62.9, 61.9), scored(2e-4, 0.8317, 58.1, 33.3)], "hy-mt2-1.8b-fast", CONFIG)
+    assert "By chrF" not in agree and "disagree" not in agree
+    assert "disagree" not in pt.decision_text([done(2e-4, 0.83), done(4e-4, 0.71)], "hy-mt2-1.8b-fast", CONFIG)

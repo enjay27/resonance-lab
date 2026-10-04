@@ -10,6 +10,7 @@ import dataclasses
 import json
 import math
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -19,7 +20,7 @@ from typing import NamedTuple
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "llamafactory"))
 import pipelines
-from config import BASE_DIR
+from config import BASE_DIR, EVAL_OUTPUT_DIR
 from lf_tools import load_profile, model_name, train_config, training_overrides
 from runs import latest_run, read_run
 
@@ -114,14 +115,24 @@ class StageFailed(Exception):
         super().__init__(f"{stage} {how}. Last lines of its output:\n" + "\n".join(self.tail))
 
 
-def terminate_tree(proc, grace_seconds=30):
+class StopFailed(RuntimeError):
+    """A stage could not be stopped: it (or something it started) may still be running and using the GPU."""
+
+
+def terminate_tree(proc, grace_seconds=30, platform=sys.platform, run=subprocess.run):
     """Stop `proc` and everything it started (train.py starts llamafactory-cli, which would train on without it).
     POSIX: SIGINT to the process group first, so a stage can close its MLflow run as KILLED, then SIGKILL after the grace.
-    Windows: `taskkill /T /F`, there is no gentler way to reach a child console program from a notebook kernel."""
+    Windows: `taskkill /T /F`, there is no gentler way to reach a child console program from a notebook kernel.
+    Raises StopFailed when that did not work (a failed taskkill used to be swallowed: an interrupted training ran on to the end)."""
     if proc.poll() is not None:
         return
-    if sys.platform == "win32":
-        subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True, check=False)
+    if platform == "win32":
+        result = run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            proc.kill()  # at least the process itself
+            detail = " ".join(f"{result.stdout or ''} {result.stderr or ''}".split())
+            raise StopFailed(f"taskkill could not stop the process tree of PID {proc.pid} (exit {result.returncode}: {detail or 'no output'}); "
+                             "its child processes may still be running: check Task Manager.")
     else:
         try:
             os.killpg(proc.pid, signal.SIGINT)
@@ -130,7 +141,10 @@ def terminate_tree(proc, grace_seconds=30):
             os.killpg(proc.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-    proc.wait()
+    try:
+        proc.wait(timeout=grace_seconds)
+    except subprocess.TimeoutExpired as e:
+        raise StopFailed(f"PID {proc.pid} is still running {grace_seconds:g} s after it was killed: check Task Manager.") from e
 
 
 def run_command(command, emit=print, tail_lines=50, grace_seconds=30):
@@ -223,9 +237,41 @@ class Result:
     seconds: float | None = None
     still_falling: bool = False
     error: str | None = None
+    scores: dict = dataclasses.field(default_factory=dict)  # eval prompt -> {chrf, term_hits, term_total, term_pct}, from the eval reports
 
 
-def run_lifecycle(params, refresh_data=False, emit=print, run=run_command, adapter_dir=None):
+# --- the eval scores -----------------------------------------------------------------------------------------------
+
+_CHRF = re.compile(r"^chrF\s*:\s*([\d.]+)", re.MULTILINE)
+_TERMS = re.compile(r"^Term Accuracy\s*:\s*(\d+)/(\d+) \(([\d.]+)%\)", re.MULTILINE)  # eval_metrics.format_report's shape (a test pins it)
+
+
+def parse_report(text):
+    """The numbers of an eval report (eval_metrics.format_report) that a sweep compares: chrF and term accuracy. A part the report
+    does not have (no term-containing samples) is None."""
+    chrf, terms = _CHRF.search(text), _TERMS.search(text)
+    return {"chrf": float(chrf.group(1)) if chrf else None,
+            "term_hits": int(terms.group(1)) if terms else None, "term_total": int(terms.group(2)) if terms else None,
+            "term_pct": float(terms.group(3)) if terms else None}
+
+
+def read_eval_scores(profile_name, prompts, eval_dir=EVAL_OUTPUT_DIR, newer_than=None):
+    """The scores of `eval.py`'s reports `<eval_dir>/<profile>-<prompt>.txt`, per prompt. A report is one file per model and prompt,
+    overwritten by the next eval, so one older than `newer_than` (a timestamp: the run's training log) is another run's and is left out."""
+    scores = {}
+    for prompt in prompts:
+        path = os.path.join(eval_dir, f"{profile_name}-{prompt}.txt")
+        try:
+            if newer_than is not None and os.path.getmtime(path) < newer_than:
+                continue
+            with open(path, encoding="utf-8") as f:
+                scores[prompt] = parse_report(f.read())
+        except OSError:
+            continue
+    return scores
+
+
+def run_lifecycle(params, refresh_data=False, emit=print, run=run_command, adapter_dir=None, eval_dir=EVAL_OUTPUT_DIR):
     """Run one parameter test: every command of `lifecycle`, stopping at the first failure (StageFailed). Returns the Result
     of the training run it made, read from that run's trainer_log.jsonl."""
     params.validate()
@@ -234,18 +280,21 @@ def run_lifecycle(params, refresh_data=False, emit=print, run=run_command, adapt
     for command in lifecycle(params, refresh_data=refresh_data):
         emit(f"\n[->] {command.name}")
         seconds += run(command, emit=emit)
-    return summarize_latest_run(params, adapter_dir, seconds)
+    return summarize_latest_run(params, adapter_dir, seconds, eval_dir=eval_dir)
 
 
-def summarize_latest_run(params, adapter_dir=None, seconds=None):
+def summarize_latest_run(params, adapter_dir=None, seconds=None, eval_dir=EVAL_OUTPUT_DIR):
     """The Result of the newest training run under the profile's adapter directory, read from its trainer_log.jsonl (the
     notebook's stage-by-stage cells call it after Fine-Tuning)."""
     adapter_dir = adapter_dir or load_profile(params.profile).adapter_dir
     run_dir = latest_run(adapter_dir)
-    curves = read_curves(os.path.join(run_dir, TRAINER_LOG)) if run_dir else Curves([], [])
+    log = os.path.join(run_dir, TRAINER_LOG) if run_dir else None
+    curves = read_curves(log) if log else Curves([], [])
     best = curves.best_eval
+    trained_at = os.path.getmtime(log) if log and os.path.isfile(log) else None
+    scores = read_eval_scores(params.profile, params.prompts, eval_dir, newer_than=trained_at) if trained_at is not None else {}
     return Result(params, "done", os.path.basename(run_dir) if run_dir else None, best[1] if best else None, best[0] if best else None,
-                  curves.train[-1][1] if curves.train else None, seconds, curves.still_falling)
+                  curves.train[-1][1] if curves.train else None, seconds, curves.still_falling, scores=scores)
 
 
 def run_sweep(param_sets, execute):
@@ -276,6 +325,28 @@ def _yaml_number(value):
     return f"{mantissa}.0{e}{exponent}" if e and "." not in mantissa else text
 
 
+def _first_scores(result):
+    return next(iter(result.scores.values()), None)
+
+
+def _score_disagreements(results, best):
+    """Lines saying so when another finished run has a better chrF / term accuracy than `best` (the lowest eval loss): the two measure
+    different things (validation loss vs generated lines of a small eval set), and a sweep showed they can pick different learning rates."""
+    lines = []
+    for label, key, fmt in (("chrF", "chrf", "chrF {:.1f}"), ("term accuracy", "term_pct", "term accuracy {:.1f}%")):
+        scored = [(r, _first_scores(r)[key]) for r in results if r.status == "done" and _first_scores(r) and _first_scores(r)[key] is not None]
+        if not scored:
+            continue
+        leader, value = max(scored, key=lambda pair: pair[1])
+        mine = _first_scores(best) and _first_scores(best)[key]
+        if leader is not best and (mine is None or value > mine):
+            lines.append(f"By {label} the best is {leader.params.label()} ({fmt.format(value)}), not {best.params.label()} "
+                         f"({'no score' if mine is None else fmt.format(mine)}).")
+    if lines:
+        lines.append("Eval loss and the eval scores disagree; the eval set is small (one term is about 5 points), so confirm both on the full profile.")
+    return lines
+
+
 def decision_text(results, profile_name, config):
     """What to do with the best result: the lines to change in the profile's train.yaml (`config`, its current values)."""
     best = best_result(results)
@@ -292,6 +363,7 @@ def decision_text(results, profile_name, config):
         lines += [f"Change in configs/llamafactory/{profile_name}/train.yaml:", *changes]
     else:
         lines.append("The profile already has these values; nothing to change.")
+    lines += _score_disagreements(results, best)
     if best.still_falling:
         lines.append("Eval loss was still falling at its last evaluation: the run ended before the minimum (more epochs or a higher lr).")
     if profile_name.endswith("-fast"):
@@ -301,15 +373,19 @@ def decision_text(results, profile_name, config):
 
 
 def results_markdown(results):
-    """The sweep as a GitHub table for the memory notes (the eval scores are in compare_runs' table, from MLflow)."""
+    """The sweep as a GitHub table for the memory notes (chrF / term accuracy of each eval prompt; the full scores are in compare_runs' table, from MLflow)."""
     def cell(value, fmt="{}"):
         return "-" if value is None else fmt.format(value)
 
-    rows = ["| params | run | best eval loss | @step | last train loss | min | status | note |", "|---|---|---|---|---|---|---|---|"]
+    def scores(result):
+        return "; ".join(f"{prompt} {s['chrf']:.1f} / {'-' if s['term_pct'] is None else format(s['term_pct'], '.1f') + '%'}"
+                         for prompt, s in result.scores.items() if s["chrf"] is not None) or "-"
+
+    rows = ["| params | run | best eval loss | @step | last train loss | chrF / term acc | min | status | note |", "|---|---|---|---|---|---|---|---|---|"]
     for r in results:
         note = "still falling" if r.still_falling else " ".join((r.error or "").split()[:12])
         rows.append("| " + " | ".join([
-            r.params.label(), cell(r.run_id), cell(r.best_eval_loss, "{:.4f}"), cell(r.best_step), cell(r.train_loss, "{:.4f}"),
+            r.params.label(), cell(r.run_id), cell(r.best_eval_loss, "{:.4f}"), cell(r.best_step), cell(r.train_loss, "{:.4f}"), scores(r),
             cell(None if r.seconds is None else r.seconds / 60, "{:.1f}"), r.status, note.replace("|", "/"),
         ]) + " |")
     return "\n".join(rows)
@@ -327,4 +403,5 @@ def kernel_warning(executable, base_dir=BASE_DIR):
     if os.path.normcase(os.path.abspath(executable)).startswith(venv):
         return None
     return (f"The kernel runs {executable}, not the project's .venv ({os.path.join(base_dir, '.venv')}): the stages would run with the "
-            "wrong packages. Install requirements-llamafactory.txt and requirements-notebook.txt in .venv and pick it as the notebook interpreter.")
+            "wrong packages. Install requirements-llamafactory.txt and requirements-notebook.txt in .venv, then start `jupyter lab` from that venv "
+            "(or register it once with `python -m ipykernel install --user --name resonance-lab` and pick that kernel).")
