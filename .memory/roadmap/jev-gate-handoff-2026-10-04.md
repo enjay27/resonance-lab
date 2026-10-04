@@ -1,3 +1,5 @@
+> **Superseded for Gate 1 (2026-10-04) by [`jev-gate1-handoff-2026-10-04.md`](jev-gate1-handoff-2026-10-04.md):** the first use of a judge is dataset quality (categorising messages) on `/v1/systemone`; the logprob backend below is dropped. This file's translation-fidelity design (ja -> ko) stays possible later.
+
 # Handoff: the Jev gate (typed judge), architecture for PR 2a — 2026-10-04
 
 **For the next session.** Read this, then `.memory/roadmap/mlflow-genai-eval.md` (the decisions of 2026-10-03, which this builds on, does not replace) and `CLAUDE.md`.
