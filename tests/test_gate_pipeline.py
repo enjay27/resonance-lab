@@ -4,7 +4,7 @@ from fractions import Fraction
 import pytest
 
 import gate_pipeline
-from dataset_recipe import Recipe, line_key
+from dataset_recipe import Recipe, RecipeError, line_key
 from gate_eval import SampleError, read_sample
 
 
@@ -162,6 +162,22 @@ def test_children_count_for_their_root_and_a_category_the_recipe_does_not_name_i
     assert preview["rows"][0]["available"] == 2 and preview["outside"] == 1
 
 
+def test_a_recipe_of_the_repo_is_previewed_by_its_name():
+    """The notebook passes a name; the file's loading (load_recipe returns the recipe AND its hash) is not its business."""
+    keys = [line_key(f"s{i}") for i in range(10)]
+
+    preview = gate_pipeline.recipe_preview_by_name("balanced-v1", {key: "social" for key in keys}, keys)
+
+    assert {row["key"] for row in preview["rows"]} >= {"social", "chat", "game"}
+    social = next(row for row in preview["rows"] if row["key"] == "social")
+    assert social["available"] == 10
+
+
+def test_an_unknown_recipe_name_is_a_recipe_error_naming_the_file():
+    with pytest.raises(RecipeError, match="not-a-recipe"):
+        gate_pipeline.recipe_preview_by_name("not-a-recipe", {}, [])
+
+
 def test_the_preview_is_text_with_a_marker_for_the_limiting_category():
     keys = [line_key("a")]
     preview = gate_pipeline.recipe_preview(recipe(social=1, chat=1), {line_key("a"): "social"}, keys)
@@ -171,7 +187,7 @@ def test_the_preview_is_text_with_a_marker_for_the_limiting_category():
     assert "balanced-v1" in text and "social" in text and "limits" in text
 
 
-# --- the decision text, the progress -----------------------------------------------------------------------------------
+# --- the decision text -----------------------------------------------------------------------------------
 
 
 def report(accuracy, coverage=1.0, precision=None, n=200):
@@ -202,15 +218,31 @@ def test_the_decision_text_leaves_out_what_it_was_not_given():
     assert "full pass" not in text and "None" not in text
 
 
-def test_the_progress_text_has_a_speed_and_an_estimate():
-    text = gate_pipeline.eta_text(done=12000, total=48000, seconds=600)
-
-    assert "12,000 / 48,000" in text and "25%" in text and "20.0 lines/s" in text and "30 min" in text
+# --- will the model fit the card ---------------------------------------------------------------------------------------
 
 
-def test_the_progress_text_before_any_line_has_no_speed():
-    assert "no speed yet" in gate_pipeline.eta_text(done=0, total=10, seconds=1)
+@pytest.mark.parametrize("run, dtype, gb", [
+    ("jaredpalmer/kev-0.8b@v1.0", "bf16", 2.6),
+    ("jaredpalmer/kev-4b@v1.0", "bf16", 9.0),
+    ("jaredpalmer/kev-9b@v1.0", "bf16", 19.0),
+    ("jaredpalmer/kev-9b", "fp32", 37.0),
+    ("jaredpalmer/kev-27b@v1.0", "bf16", 55.0),
+])
+def test_the_memory_estimate_follows_the_parameter_count_and_the_precision(run, dtype, gb):
+    assert gate_pipeline.estimated_gb(run, dtype) == pytest.approx(gb)
 
 
-def test_the_estimate_reads_in_hours_when_it_is_long():
-    assert "2 h 5 min" in gate_pipeline.eta_text(done=1, total=1001, seconds=7.5)
+def test_a_run_whose_size_is_not_in_its_name_has_no_estimate():
+    assert gate_pipeline.estimated_gb("D:/models/my-kev", "bf16") is None
+
+
+def test_a_model_that_does_not_fit_gets_a_warning_naming_a_smaller_one():
+    text = gate_pipeline.memory_warning("jaredpalmer/kev-9b@v1.0", "bf16", free_gb=15.2)
+
+    assert "19" in text and "15.2" in text and "kev-4b" in text
+
+
+def test_a_model_that_fits_or_cannot_be_judged_gets_no_warning():
+    assert gate_pipeline.memory_warning("jaredpalmer/kev-4b@v1.0", "bf16", free_gb=15.2) is None
+    assert gate_pipeline.memory_warning("jaredpalmer/kev-9b@v1.0", "bf16", free_gb=None) is None  # CPU: no VRAM to compare
+    assert gate_pipeline.memory_warning("D:/models/my-kev", "bf16", free_gb=1.0) is None

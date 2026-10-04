@@ -15,6 +15,9 @@ pydantic==2.13.5
 fastapi==0.142.2
 uvicorn==0.54.0
 pyyaml
+# the notebook (notebooks/gate_pipeline.ipynb): its kernel must BE this venv
+jupyterlab
+ipykernel
 
 # The Kev code, pinned to the commit the spike validated (D3). Not on PyPI; its own dependency list (datasets, scikit-learn, ...)
 # is more than the judge needs, hence --no-deps: install this file with `pip install -r`, then

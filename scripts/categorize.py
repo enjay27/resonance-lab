@@ -115,6 +115,37 @@ def report_distribution(per_root, uncategorized, damaged, out_path, by=BASELINE,
         print(f"{damaged} damaged row(s) skipped")
 
 
+class PassError(Exception):
+    """The judge pass cannot go on (a journal of another judge, a judge that stopped answering); the message says what to do."""
+
+
+def judge_pass(raw_path, journal_path, out_path, judge, by, cutoff, use_channel, force=False, where="the judge", who="the judge"):
+    """The whole judge pass over the raw log: resume from the journal, ask about the lines not in it, derive the categories file
+    for `cutoff`, print the split. What `main` does after it has a judge, a function so a notebook can run it on the judge it has
+    already loaded (a second process would load the model twice). Raises PassError."""
+    if force and os.path.exists(journal_path):
+        os.remove(journal_path)
+    trim_torn_tail(journal_path)
+    try:
+        done = read_journal(journal_path, by)
+    except JournalError as error:
+        raise PassError(str(error)) from None
+    print(f"Judge {by} at {where}: {len(done)} lines already in {journal_path}")
+    keys, unjudged, damaged, gone = judge_raw(raw_path, journal_path, judge, by, use_channel, done)
+    if gone:
+        raise PassError(f"the judge failed {MAX_CONSECUTIVE_FAILURES} requests in a row: is {who} still working? "
+                        f"The answers so far are in {journal_path}: run again to resume.")
+    categories, uncertain = categories_from({key: done[key] for key in keys if key in done}, cutoff)
+    write_categories(out_path, categories)
+    per_root = {}
+    for row in categories:
+        per_root[row["category"]] = per_root.get(row["category"], 0) + 1
+    report_distribution(per_root, uncertain + unjudged, damaged, out_path, by=by,
+                        why=f"margin below the cutoff {cutoff}, or {who} failed: left out of the file")
+    if unjudged:
+        print(f"{unjudged} line(s) unjudged ({who} failed on them): run again to ask about them.")
+
+
 def existing_judges(path):
     """The `by` of every judge that wrote rows into the categories file (the rule baseline does not count)."""
     found = set()
@@ -205,30 +236,11 @@ def main(argv=None, post=None, loader=None):
         report_distribution(per_root, uncategorized, damaged, args.out)
         return
 
-    if args.force and os.path.exists(args.journal):
-        os.remove(args.journal)
-    trim_torn_tail(args.journal)
     try:
-        done = read_journal(args.journal, by)
-    except JournalError as error:
+        judge_pass(args.raw, args.journal, args.out, judge, by, args.cutoff, args.use_channel, args.force, where, who)
+    except PassError as error:
         print(f"[ERROR] {error}")
         sys.exit(1)
-    print(f"Judge {by} at {where}: {len(done)} lines already in {args.journal}")
-    keys, unjudged, damaged, gone = judge_raw(args.raw, args.journal, judge, by, args.use_channel, done)
-    if gone:
-        print(f"[ERROR] the judge failed {MAX_CONSECUTIVE_FAILURES} requests in a row: is {who} still working? "
-              f"The answers so far are in {args.journal}: run again to resume.")
-        sys.exit(1)
-    categories, uncertain = categories_from({key: done[key] for key in keys if key in done}, args.cutoff)
-    write_categories(args.out, categories)
-    per_root = {}
-    for row in categories:
-        per_root[row["category"]] = per_root.get(row["category"], 0) + 1
-    report_distribution(per_root, uncertain + unjudged, damaged, args.out, by=by,
-                        why=f"margin below the cutoff {args.cutoff}, or {who} failed: left out of the file")
-    if unjudged:
-        print(f"{unjudged} line(s) unjudged ({who} failed on them): run again to ask about them.")
-
 
 if __name__ == "__main__":
     main()
