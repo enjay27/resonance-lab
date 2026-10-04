@@ -57,6 +57,13 @@ to `outputs/eval/`. `python scripts/llamafactory/eval.py --prompt training` eval
 instead of the model's chat template (the default, which is what resonance-stream sends) -- the gap between the two
 is the prompt mismatch in `.memory/active-issues/stream-contract.md`.
 
+Give each eval line a `category` from `configs/category_taxonomy.json` -- a root (`social`, `chat`, `game`, `question`,
+`coordination`, `recruitment`, `bot`, `spam`, `other`) or a child (`game/combat`). The report then scores every root
+(chrF, term accuracy, JP leakage; a child counts for its root) and lists how many lines each root has, the roots with none,
+unlabeled lines and labels the taxonomy does not know; MLflow gets `eval.root.<root>.chrf` / `.term_accuracy` / `.n`
+(and `eval.cat.<label>.*` for the labels as written). With only a few lines per root the scores are noise: a root with
+fewer than 10 lines is marked `(n small)`.
+
 The llamafactory `eval.py` also saves the translations to `outputs/eval/<profile>-<prompt>.jsonl`. With tracking on,
 `python scripts/mlflow_genai_eval.py --prompt training` then sends every eval line to MLflow as a trace with its own scores
 (chrF, JP leakage, term check, `discord`, think leak, exact match) in the experiment `resonance-lab-eval`, tagged with the

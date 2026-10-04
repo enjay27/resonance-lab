@@ -210,6 +210,16 @@ def _number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
+def _category_scores(prefix, stats):
+    """chrF and term accuracy of one category (what a report from before they were kept does not have is left out)."""
+    scores = {}
+    if "chrf" in stats:
+        scores[f"{prefix}.chrf"] = stats["chrf"]
+    if stats.get("term_total"):
+        scores[f"{prefix}.term_accuracy"] = 1 - stats["term_miss"] / stats["term_total"]
+    return scores
+
+
 def eval_metrics(report, comet=None):
     """The eval report (eval_metrics.evaluate) as MLflow metrics: scores, rates, and per-category counts."""
     n = report["n"]
@@ -227,6 +237,10 @@ def eval_metrics(report, comet=None):
     for name, stats in report["categories"].items():
         for field in ("total", "jp_leak", "term_miss", "discord_viol"):
             metrics[f"eval.cat.{name}.{field}"] = stats[field]
+        metrics.update(_category_scores(f"eval.cat.{name}", stats))
+    for name, stats in report.get("roots", {}).items():  # `game/combat` counts for `game`: the root is what a recipe and Gate 1 use
+        metrics[f"eval.root.{name}.n"] = stats["total"]
+        metrics.update(_category_scores(f"eval.root.{name}", stats))
     return {clean_key(key): float(value) for key, value in metrics.items()}
 
 

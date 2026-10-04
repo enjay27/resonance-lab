@@ -4,6 +4,7 @@ import sys
 import pytest
 
 import eval_metrics as em
+from taxonomy import Taxonomy
 
 
 def sample(jp, ko, category=None):
@@ -158,7 +159,8 @@ def test_evaluate_counts_every_rule():
 def test_evaluate_breaks_down_by_category():
     report = em.evaluate(SAMPLES, PREDICTIONS, RAW)
 
-    assert report["categories"]["slang"] == {"total": 2, "jp_leak": 0, "term_miss": 1, "discord_viol": 0}
+    slang = report["categories"]["slang"]
+    assert {key: slang[key] for key in ("total", "jp_leak", "term_miss", "discord_viol")} == {"total": 2, "jp_leak": 0, "term_miss": 1, "discord_viol": 0}
     assert report["categories"]["party"]["discord_viol"] == 1
     assert report["categories"]["chat"]["jp_leak"] == 1
 
@@ -206,3 +208,90 @@ def test_term_misses_are_capped_in_the_report():
     samples = [sample("消化", "숙제") for _ in range(9)]
     text = em.format_report(em.evaluate(samples, ["소화"] * 9), samples, ["소화"] * 9)
     assert text.count("Expected '숙제' for '消化'") == 5
+
+
+# --- per category: chrF, term accuracy, roots ---------------------------------------------------------------------------
+
+
+def test_each_category_has_its_own_chrf_and_term_counts():
+    report = em.evaluate(SAMPLES, PREDICTIONS, RAW)
+
+    party, slang, chat = (report["categories"][name] for name in ("party", "slang", "chat"))
+    assert party["chrf"] == pytest.approx(100.0)  # its one prediction is its reference
+    assert 0 < slang["chrf"] < 100 and 0 < chat["chrf"] < 100
+    assert (slang["term_total"], slang["term_miss"]) == (2, 1) and party["term_total"] == 0
+
+
+def test_a_sub_category_counts_for_its_root_too():
+    samples = [sample("消化する", "숙제한다", "game/combat"), sample("消化する", "숙제한다", "game/market"), sample("おやすみ", "잘 자", "chat")]
+
+    report = em.evaluate(samples, ["숙제한다", "소화한다", "잘 자"], taxonomy=TAX)
+
+    assert set(report["categories"]) == {"game/combat", "game/market", "chat"}
+    assert set(report["roots"]) == {"game", "chat"}
+    assert report["roots"]["game"]["total"] == 2 and report["roots"]["game"]["term_miss"] == 1 and report["roots"]["game"]["term_total"] == 2
+    assert report["roots"]["chat"]["chrf"] == pytest.approx(100.0)
+    assert report["categories"]["game/combat"]["chrf"] == pytest.approx(100.0) and report["roots"]["game"]["chrf"] < 100
+
+
+def test_a_report_says_how_many_eval_lines_each_root_has():
+    report = em.evaluate([sample("a", "b", "chat"), sample("c", "d")], ["b", "d"], taxonomy=TAX)
+
+    assert report["coverage"] == {"counts": {"chat": 1, "game": 0, "other": 0}, "unknown": {}, "unlabeled": 1}
+
+
+def test_without_a_readable_taxonomy_the_report_has_no_coverage(monkeypatch):
+    monkeypatch.setattr(em, "CATEGORY_TAXONOMY", "/nonexistent/taxonomy.json")
+
+    assert em.evaluate([sample("a", "b")], ["b"])["coverage"] is None
+
+
+TAX = Taxonomy(roots=("chat", "game", "other"), paths={"chat": "c", "game": "g", "game/combat": "x", "game/market": "m", "other": "o"})
+
+
+def test_the_report_has_a_score_table_per_root_and_marks_the_ones_with_few_lines():
+    samples = [sample("消化する", "숙제한다", "game")] * 12 + [sample("おやすみ", "잘 자", "chat")] * 3
+    predictions = ["숙제한다"] * 12 + ["잘 자"] * 3
+
+    text = em.format_report(em.evaluate(samples, predictions, taxonomy=TAX), samples, predictions)
+
+    table = text.split("--- Category Scores ---")[1].split("\n---")[0]
+    game_row = next(line for line in table.splitlines() if line.strip().startswith("game"))
+    chat_row = next(line for line in table.splitlines() if line.strip().startswith("chat"))
+    assert "12" in game_row and "100.0" in game_row and "12/12" in game_row and "small" not in game_row
+    assert "3" in chat_row and "small" in chat_row
+
+
+def test_the_score_columns_line_up_whatever_the_names_are():
+    samples = [sample("a", "b", "chat"), sample("c", "d", "game/combat")]
+
+    table = em.format_report(em.evaluate(samples, ["b", "d"], taxonomy=TAX), samples, ["b", "d"]).split("--- Category Scores ---")[1].split("\n\n")[0]
+    rows = [line for line in table.splitlines() if line.startswith("  ") and "category" not in line and not line.startswith("  (")]
+    header = next(line for line in table.splitlines() if "category" in line)
+
+    assert all(row.index("100.0") + len("100.0") == header.index("chrF") + len("chrF") for row in rows)
+
+    flat = [sample("a", "b", "chat")]
+    nested = [sample("a", "b", "game/combat")]
+
+    assert "Sub-categories" not in em.format_report(em.evaluate(flat, ["b"], taxonomy=TAX), flat, ["b"])
+    assert "Sub-categories" in em.format_report(em.evaluate(nested, ["b"], taxonomy=TAX), nested, ["b"])
+
+
+def test_the_coverage_section_shows_empty_roots_unlabeled_and_unknown_lines():
+    samples = [sample("a", "b", "chat"), sample("c", "d"), sample("e", "f", "Chat")]
+
+    text = em.format_report(em.evaluate(samples, ["b", "d", "f"], taxonomy=TAX), samples, ["b", "d", "f"])
+
+    section = text.split("--- Eval Set Coverage")[1].split("--- Category Breakdown")[0]
+    assert "game" in section and "no lines" in section
+    assert "other" in section and section.count("no lines") == 1  # 'other' is the catch-all: it may stay empty
+    assert "1 line" in section and "no category" in section
+    assert "Chat" in section and "not in the taxonomy" in section
+
+
+def test_no_coverage_section_without_a_taxonomy(monkeypatch):
+    monkeypatch.setattr(em, "CATEGORY_TAXONOMY", "/nonexistent/taxonomy.json")
+    samples = [sample("a", "b", "chat")]
+
+    assert "Eval Set Coverage" not in em.format_report(em.evaluate(samples, ["b"]), samples, ["b"])
