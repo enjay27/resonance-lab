@@ -48,3 +48,15 @@ Reading: higher lr is better on every metric and 2e-4 is the edge of the sweep; 
 high steps included), not a final loss: do not read a train/eval gap from it. Training is reproducible (three 2e-4 runs: identical train loss 1.2382); the noise is the 51-line eval set. The fast profile has effective batch 32 + packing =
 ~87 updates, far fewer than the full profile, so it may want a higher lr or more epochs. **Next sweep:** `--lr 4e-4`, `--lr 8e-4` (watch `grad_norm`/loss spikes), `--lr 2e-4 --epochs 6` (where does eval loss turn up?). Then confirm the best on the full
 `hy-mt2-1.8b` (~25 min) with both eval prompts, and set the winner in the base + `-fast` profiles (a PR with tests). The profile default is 2e-4 already.
+
+
+## Second sweep (2026-10-04, from the notebook under Jupyter) — same setup; 2e-4 reproduced a fourth time (identical 0.8317 / 1.2382 / 58.1 / 33.3%)
+| lr | best eval loss (@step) | train loss (run mean) | chrF | term acc | JP leak |
+|---|---|---|---|---|---|
+| 4e-4 | 0.7724 (80) | 1.0131 | 53.8 | 42.9% | 0.0% |
+| 8e-4 | 0.7938 (80) | 0.9009 | not evaluated | | |
+| 2e-4 | 0.8317 (80) | 1.2382 | 58.1 | 33.3% | 0.0% |
+Reading: eval loss is lowest at 4e-4 and turns back up at 8e-4, but chrF is *lower* at 4e-4 than at 2e-4 (53.8 vs 58.1) while term accuracy is higher (9/21 vs 7/21): eval loss and the 51-line scores disagree, and one line moves them
+by points, so do not pick on chrF alone (`--prompt chat-template` and the full profile are the tie-breakers). 8e-4 was never merged/evaluated: the sweep cell was interrupted by hand during its training. **That training still ended
+FINISHED in MLflow with an eval loss at step 80** (the next training's startup sent the queued run), i.e. the interrupt on Windows probably did not stop it (`taskkill /T /F` on `train.py`'s tree) -- to check on the machine:
+`outputs\hy-mt2-1.8b-fast_lora\20261004-082157\run.json` and `train_stdout.log`. Open: `--lr 2e-4 --epochs 6`, then the full profile with both eval prompts.
