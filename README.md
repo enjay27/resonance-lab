@@ -45,7 +45,7 @@ To train on a chosen mix of message categories instead of every clean line, give
 `python run_pipeline.py --recipe balanced` (or `preprocess.py --recipe`; `RESONANCE_RECIPE` is the fallback). A recipe is
 `configs/datasets/<name>.json` -- a weight per category, a category's share being its weight / the total weight -- and
 needs a categories file (`data/processed/categories.jsonl`, `--categories` on `preprocess.py`: one `{"key", "category"}`
-per line, `key` = `dataset_recipe.line_key(original)`). `configs/datasets/example.json` shows the format. The validation
+per line, `key` = `dataset_recipe.line_key(original)`). `configs/datasets/example.json` shows the format; `balanced-v1.json` (by root category) and `balanced-v1-detailed.json` (children, needs a deeper gate) are a first guess at a mix, over the categories of `configs/category_taxonomy.json`. The validation
 file is the same for every recipe; the recipe, its hash and the lines each category gave are recorded in the manifest and
 in MLflow (tags `dataset.recipe*`, params `data.cat.<category>`, a `recipe` column in `scripts/mlflow_compare.py`).
 

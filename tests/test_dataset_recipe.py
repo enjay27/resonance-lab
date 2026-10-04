@@ -368,3 +368,11 @@ def test_only_the_ratio_of_the_sizes_matters_to_the_allocation():
 def test_a_missing_categories_file_is_a_recipe_error_that_names_it(tmp_path):
     with pytest.raises(RecipeError, match="missing.jsonl"):
         read_categories(str(tmp_path / "missing.jsonl"))
+
+
+@pytest.mark.parametrize("text, ok", [("chat", True), ("recruitment/party", True), ("game/combat/skills", True), ("a_b-c1", True),
+                                       ("", False), ("Chat", False), ("a//b", False), ("/a", False), ("a/", False), ("a b", False)])
+def test_is_category_tells_a_valid_category_path(text, ok):
+    from dataset_recipe import is_category
+
+    assert is_category(text) is ok
