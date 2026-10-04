@@ -80,6 +80,8 @@ track_records.py      what each stage records (params/tags/metrics for train, me
 stage_tracking.py     the stages' use of the tracker (open_tracker never raises; start/finish_training, resume_stage, record_stage, fail_stage); tested
 compare_runs.py       the experiment's runs as one table (profile, lr, epochs, best eval loss, eval scores, data revision), sorted/filtered; pure; tested
 tracker.py            sends queued runs to the NAS oldest-first, resumable, never raises into a training; `from_environment()` -> Tracker or NullTracker; tested with a fake client
+categorizer.py        Gate 1 baseline: rules put a chat line in a root category of the taxonomy, or nothing; pure; tested
+gate_eval.py          scores a categorizer on a hand-labelled sample (accuracy, coverage, precision / recall per root, confusions); pure; tested
 taxonomy.py           configs/category_taxonomy.json: the categories (roots, children, descriptions), `coverage`: eval lines per root; pure; tested
 dataset_recipe.py     a recipe (configs/datasets/<name>.json: category -> weight) + a categories file choose the training lines, seeded and nested; pure; `preprocess.py --recipe` applies it; tested
 overlap.py            is a training line also an eval line? (normalised + near-duplicate); preprocess drops them; tested
@@ -94,6 +96,7 @@ scripts/
                           only when missing/changed; skipped without a repo or with RESONANCE_RAW_LOGS; `--pin` writes the latest commit; `--force`
   mlflow_compare.py     data: `python scripts/mlflow_compare.py [--profile hy] [--sort eval-loss|chrf|term] [--markdown] [--all]` prints compare_runs' table from the NAS's MLflow
   mlflow_genai_eval.py  data: `python scripts/mlflow_genai_eval.py [--model M] [--prompt ...]` evaluates `eval.py`'s saved predictions line by line in MLflow (traces + assessments, experiment `resonance-lab-eval`)
+  categorize.py         data: `python scripts/categorize.py [--probe [SAMPLE]]` raw log -> data/processed/categories.jsonl (Gate 1 baseline), or score it on a labelled sample
   validate.py           shared data: raw-log sanity gate (empty/missing file, >1% damaged lines, >10% Hangeul in `original` -> ValidationError; limits in config.py)
   preprocess.py         shared data: raw {original, translated} -> {instruction, input, output};
                           `clean_reason` drops empty/untranslated, Hangeul-in-source,
