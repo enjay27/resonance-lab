@@ -114,14 +114,24 @@ class StageFailed(Exception):
         super().__init__(f"{stage} {how}. Last lines of its output:\n" + "\n".join(self.tail))
 
 
-def terminate_tree(proc, grace_seconds=30):
+class StopFailed(RuntimeError):
+    """A stage could not be stopped: it (or something it started) may still be running and using the GPU."""
+
+
+def terminate_tree(proc, grace_seconds=30, platform=sys.platform, run=subprocess.run):
     """Stop `proc` and everything it started (train.py starts llamafactory-cli, which would train on without it).
     POSIX: SIGINT to the process group first, so a stage can close its MLflow run as KILLED, then SIGKILL after the grace.
-    Windows: `taskkill /T /F`, there is no gentler way to reach a child console program from a notebook kernel."""
+    Windows: `taskkill /T /F`, there is no gentler way to reach a child console program from a notebook kernel.
+    Raises StopFailed when that did not work (a failed taskkill used to be swallowed: an interrupted training ran on to the end)."""
     if proc.poll() is not None:
         return
-    if sys.platform == "win32":
-        subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True, check=False)
+    if platform == "win32":
+        result = run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            proc.kill()  # at least the process itself
+            detail = " ".join(f"{result.stdout or ''} {result.stderr or ''}".split())
+            raise StopFailed(f"taskkill could not stop the process tree of PID {proc.pid} (exit {result.returncode}: {detail or 'no output'}); "
+                             "its child processes may still be running: check Task Manager.")
     else:
         try:
             os.killpg(proc.pid, signal.SIGINT)
@@ -130,7 +140,10 @@ def terminate_tree(proc, grace_seconds=30):
             os.killpg(proc.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-    proc.wait()
+    try:
+        proc.wait(timeout=grace_seconds)
+    except subprocess.TimeoutExpired as e:
+        raise StopFailed(f"PID {proc.pid} is still running {grace_seconds:g} s after it was killed: check Task Manager.") from e
 
 
 def run_command(command, emit=print, tail_lines=50, grace_seconds=30):

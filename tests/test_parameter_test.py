@@ -1,6 +1,7 @@
 import ast
 import json
 import os
+import subprocess
 import sys
 import time
 
@@ -168,6 +169,78 @@ def test_an_interrupt_stops_the_child_and_its_children(tmp_path):
             break
         time.sleep(0.1)
     assert not alive(grandchild)
+
+
+class FakeProc:
+    """A child process for terminate_tree: it dies when `die()` is called (by the fake taskkill or by `kill`)."""
+
+    pid = 4242
+
+    def __init__(self, survives_kill=False):
+        self.dead, self.survives_kill, self.killed = False, survives_kill, False
+
+    def die(self):
+        self.dead = True
+
+    def poll(self):
+        return 0 if self.dead else None
+
+    def kill(self):
+        self.killed = True
+        if not self.survives_kill:
+            self.die()
+
+    def wait(self, timeout=None):
+        if not self.dead:
+            raise subprocess.TimeoutExpired("fake", timeout)
+        return 0
+
+
+def fake_taskkill(proc, returncode=0, stderr="", kills=True):
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append(argv)
+        if kills:
+            proc.die()
+        return subprocess.CompletedProcess(argv, returncode, stdout="", stderr=stderr)
+
+    run.calls = calls
+    return run
+
+
+def test_on_windows_the_whole_tree_is_killed_with_taskkill():
+    proc = FakeProc()
+    run = fake_taskkill(proc)
+    pt.terminate_tree(proc, grace_seconds=0.01, platform="win32", run=run)
+    assert run.calls == [["taskkill", "/PID", "4242", "/T", "/F"]]
+    assert not proc.killed
+
+
+def test_a_taskkill_that_fails_is_reported_not_swallowed():
+    """The maintainer's interrupted sweep left a training running to the end: the failure must be visible."""
+    proc = FakeProc()
+    run = fake_taskkill(proc, returncode=1, stderr="ERROR: The process with PID 4242 could not be terminated. Access is denied.", kills=False)
+    with pytest.raises(pt.StopFailed, match="Access is denied") as caught:
+        pt.terminate_tree(proc, grace_seconds=0.01, platform="win32", run=run)
+    assert "4242" in str(caught.value) and "child processes may still be running" in str(caught.value)
+    assert proc.killed  # the fallback: at least the process itself
+
+
+def test_a_process_that_is_still_alive_after_the_kill_is_reported():
+    proc = FakeProc(survives_kill=True)
+    run = fake_taskkill(proc, kills=False)
+    with pytest.raises(pt.StopFailed, match="still running") as caught:
+        pt.terminate_tree(proc, grace_seconds=0.01, platform="win32", run=run)
+    assert "4242" in str(caught.value)
+
+
+def test_a_process_that_already_ended_is_left_alone():
+    proc = FakeProc()
+    proc.die()
+    run = fake_taskkill(proc)
+    pt.terminate_tree(proc, platform="win32", run=run)
+    assert run.calls == []
 
 
 # --- the curves ----------------------------------------------------------------------------------------------------
