@@ -126,3 +126,11 @@ def test_the_gate_notebook_saves_no_probe_unless_asked_and_compares_without_a_mo
     assert "if PROBE_LABEL:" in save_cell.split("gate_compare.save_probe(")[0]
     (compare_cell,) = [cell for cell in cells if "gate_compare.compare_probes(" in cell]
     assert "JUDGE" not in compare_cell and "client" not in compare_cell, "the comparison reads saved files: it must work in a kernel with no judge loaded"
+
+
+def test_the_gate_notebook_asks_the_question_of_its_prompt_variant():
+    text = "\n".join(source(GATE_NOTEBOOK))
+    assert 'JUDGE_PROMPT = "default"' in text
+    assert "judge_prompts.judge_question(" in text and "GateJudge(client, OPTIONS, CUTOFF, INSTRUCTIONS)" in text
+    assert "gate_judge.INSTRUCTIONS" not in text, "the question comes from the variant, never from the default constant"
+    assert 'notes=f"prompt {JUDGE_PROMPT}"' in text

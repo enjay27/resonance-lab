@@ -73,6 +73,9 @@ HF_DATA_DIR = os.path.join(BASE_DIR, "data", "hf")
 # Gate 1's judge: a local llama-server serving a decision model (POST /v1/systemone, judge_client.py). Never a hosted service:
 # the chat lines stay on this machine.
 JUDGE_URL = "http://127.0.0.1:8080"
+# What the judge is asked, apart from the taxonomy: `categorize.py --judge-prompt NAME` reads configs/judge_prompts/NAME.json
+# (judge_prompts.py); "default" = the taxonomy's root descriptions as they are.
+JUDGE_PROMPT_DIR = os.path.join(BASE_DIR, "configs", "judge_prompts")
 # One saved probe per judge (`categorize.py --probe ... --save-probe LABEL`): what it answered on the labelled sample, compared with
 # `scripts/compare_judges.py`. Gitignored with the rest of data/.
 GATE1_COMPARE_DIR = os.path.join(BASE_DIR, "data", "eval", "gate1-compare")
