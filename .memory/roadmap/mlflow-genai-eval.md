@@ -21,7 +21,7 @@ match), run means (`chrf/mean`, ...), and two evaluation runs can be compared li
   script in `scripts/` (fixed). **Not seen:** the web UI (Evaluation runs page, Overview -> Quality), the NAS's basic-auth, Python 3.13 / Windows.
 - Maintainer's check: `python scripts\llamafactory\eval.py --prompt training` (now also writes the JSONL), then `python scripts\mlflow_genai_eval.py --prompt training`; look at Evaluation runs in `resonance-lab-eval`.
 
-## PR 2a/2b — the judge (decided 2026-10-03, not started; **architecture of the gate and a handoff: [`jev-gate-handoff-2026-10-04.md`](jev-gate-handoff-2026-10-04.md)**)
+## PR 2a/2b — the judge (decided 2026-10-03, not started; **partly superseded 2026-10-04 by [`jev-gates-2026-10-04.md`](jev-gates-2026-10-04.md): first use = dataset quality; llama.cpp serves `/v1/systemone` natively, so the hand-built logprobs backend is dropped;** **architecture of the gate and a handoff: [`jev-gate-handoff-2026-10-04.md`](jev-gate-handoff-2026-10-04.md)**)
 Why: the checks above are deterministic; they cannot say "meaning kept", "negation dropped", "something invented". A judge answers typed yes/no questions with a **probability** (the Jev idea: typed answers, calibrated
 confidence). Sources read: TypeSafe's Jev post (hosted API, early access, no string output), Benchmark Heaven's JevBench list (Jev-class systems; open ones such as Winnow-12B / Cygnet (Gemma-4-12B base), JevK5 / decider-4b
 (Qwen3.5-4B base), OpenSourceJev (Qwen3.5-4B Q4_K_M, llama.cpp, MIT)), and the LinkedIn "Jev in the loop" post (a yes/no gate caught planted errors: wrong number, dropped negation, omission, invention; a proof of concept).
