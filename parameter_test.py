@@ -327,4 +327,5 @@ def kernel_warning(executable, base_dir=BASE_DIR):
     if os.path.normcase(os.path.abspath(executable)).startswith(venv):
         return None
     return (f"The kernel runs {executable}, not the project's .venv ({os.path.join(base_dir, '.venv')}): the stages would run with the "
-            "wrong packages. Install requirements-llamafactory.txt and requirements-notebook.txt in .venv and pick it as the notebook interpreter.")
+            "wrong packages. Install requirements-llamafactory.txt and requirements-notebook.txt in .venv, then start `jupyter lab` from that venv "
+            "(or register it once with `python -m ipykernel install --user --name resonance-lab` and pick that kernel).")

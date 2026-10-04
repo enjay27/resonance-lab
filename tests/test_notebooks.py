@@ -47,3 +47,26 @@ def test_a_notebook_carries_no_machine_specific_metadata(path):
     metadata = load(path)["metadata"]
     assert set(metadata) <= {"kernelspec", "language_info"}
     assert "path" not in json.dumps(metadata).lower().replace("pathlib", "")
+
+
+def source(path):
+    return ["".join(cell["source"]) for cell in load(path)["cells"]]
+
+
+def test_the_notebook_is_for_jupyter_not_pycharm():
+    notebook = os.path.join(BASE_DIR, "notebooks", "parameter_test.ipynb")
+    text = "\n".join(source(notebook))
+    assert "pycharm" not in text.lower()
+    assert "jupyter lab" in text
+    with open(os.path.join(BASE_DIR, "requirements-notebook.txt"), encoding="utf-8") as f:
+        requirements = [line.split("#")[0].strip().lower() for line in f]
+    assert "jupyterlab" in requirements
+
+
+def test_run_all_does_not_start_the_sweep():
+    """The sweep trains, merges and evaluates every parameter set (hours of GPU): it needs a switch that is off."""
+    notebook = os.path.join(BASE_DIR, "notebooks", "parameter_test.ipynb")
+    (cell,) = [text for text in source(notebook) if "pt.run_sweep(" in text]
+    assert "RUN_SWEEP = False" in cell
+    call = next(line for line in cell.splitlines() if "pt.run_sweep(" in line)
+    assert call.startswith(" ") and "if RUN_SWEEP:" in cell.split(call)[0]

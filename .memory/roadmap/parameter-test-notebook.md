@@ -25,7 +25,7 @@ which need steps 2 again. A generic allow-listed `--set key=value` would be the 
 - Failure handling follows the stage rule: a failing stage stops the lifecycle with its tail log; nothing is retried silently.
 
 ## Answers of the maintainer (2026-10-02) and what was built
-1. PyCharm notebook support (live output = line-by-line streaming into the cell; plots = inline matplotlib). 2. `.ipynb`, outputs stripped, guarded by `tests/test_notebooks.py`; executed copies `*.executed.ipynb` are gitignored.
+1. PyCharm notebook support at first (live output = line-by-line streaming into the cell; plots = inline matplotlib). 2. `.ipynb`, outputs stripped, guarded by `tests/test_notebooks.py`; executed copies `*.executed.ipynb` are gitignored.
 3. One notebook. 4. The sweep runs only the `training` prompt unless a parameter set (or `PROMPTS`) lists `chat-template` too.
 Built: `parameter_test.py` (`ParamSet`, `lifecycle`, `run_command` with process-tree stop on interrupt, `read_curves`/`run_curves`, `run_lifecycle`/`run_sweep`/`best_result`, `decision_text`, `results_markdown`, `kernel_warning`);
 `notebooks/parameter_test.ipynb` (parameters, data, train, merge, eval, curves, MLflow compare, sweep, decide); `requirements-notebook.txt` (ipykernel, matplotlib).
@@ -33,7 +33,7 @@ Left out / next: an interrupted cell on Windows is a hard `taskkill` (the MLflow
 only `lr`/`epochs` are sweepable (the generic `--set key=value` override is the next PR).
 
 ## Open questions that were asked (kept for the record)
-1. Where does it run: PyCharm's notebook support, or `jupyter lab` in a terminal? (affects the live-output cell and the plotting choice)
+1. Where does it run: PyCharm's notebook support, or `jupyter lab` in a terminal? **Answer 2026-10-04: `jupyter lab`** (PyCharm's launch of it failed with `PermissionError` on `%APPDATA%\jupyter\runtime`; fix: `JUPYTER_RUNTIME_DIR` to a writable folder). Converted: `jupyterlab` in `requirements-notebook.txt`, launch steps in the notebook, a `RUN_SWEEP = False` switch so "Run All" cannot start the sweep. No change to the live-output cell or the plots (print loop, `plt.show()`).
 2. Stored how: `.ipynb` with stripped outputs (guard test), or jupytext percent-format `.py` (clean diffs, opened as a notebook)?
 3. One notebook for the whole lifecycle, or a small set (`01_data`, `02_parameter_test`, `03_compare`)?
 4. Should the sweep loop also run both eval prompts for every parameter set (doubles the eval time, small), or only `training` unless asked?

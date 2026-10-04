@@ -1,4 +1,5 @@
 # --- notebooks/parameter_test.ipynb: install into the project .venv next to requirements-llamafactory.txt ---
 # The notebook runs the training stages as subprocesses with its own interpreter, so its kernel must BE that venv.
+jupyterlab
 ipykernel
 matplotlib

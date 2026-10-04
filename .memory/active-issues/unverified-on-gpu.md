@@ -4,7 +4,7 @@ Code or config changed in a session without CUDA. Delete an item once it has run
 
 - **`notebooks/parameter_test.ipynb` + `parameter_test.py` (2026-10-02):** the commands (data stages via `run_pipeline.py --only`, `train.py/merge.py/eval.py` with `--model/--fast/--lr/--epochs/--prompt`), the curves, the sweep
   bookkeeping and the decision text are unit-tested (fake runner; a real subprocess for streaming, failure tail and SIGINT to the process group); the notebook's code cells were executed up to the setup,
-  parameters, data, curves and decide cells against fake runs. NOT run: a real train/merge/eval from the notebook, in PyCharm, on Windows. Check: (1) the kernel warning is silent in the `.venv`; (2) step 3 streams
+  parameters, data, curves and decide cells against fake runs. Run once on the GPU machine under Jupyter (2026-10-04, from the maintainer's executed notebook): kernel ok, steps 3-5 trained/merged/evaluated (train ~5.6 min), step 7 read the NAS, the sweep's first set (lr 4e-4) ran end to end; the run was then interrupted by hand during set 2. Still to check: (1) ~~the kernel warning is silent in the `.venv`~~ (seen: ok); (2) step 3 streams
   and the run appears in MLflow with `train.overrides`; (3) **interrupting a cell**: on Windows `terminate_tree` is `taskkill /T /F` (hard), so the MLflow run is probably left RUNNING, not KILLED -- confirm, and if so
   close it from the notebook (a follow-up); on Linux/macOS it is SIGINT to the group first (KILLED works); (4) the sweep cell with two short sets, then step 9's text.
 

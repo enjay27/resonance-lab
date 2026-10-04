@@ -345,3 +345,8 @@ def test_kernel_warning_only_when_not_the_project_venv(tmp_path):
     assert pt.kernel_warning(str(venv_python), str(tmp_path)) is None
     warning = pt.kernel_warning(str(tmp_path / "other" / "python.exe"), str(tmp_path))
     assert ".venv" in warning and "requirements-llamafactory.txt" in warning
+
+
+def test_kernel_warning_tells_how_to_get_a_jupyter_kernel_from_the_venv(tmp_path):
+    warning = pt.kernel_warning(str(tmp_path / "other" / "python.exe"), str(tmp_path))
+    assert "ipykernel install" in warning and "jupyter lab" in warning
