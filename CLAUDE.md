@@ -128,6 +128,7 @@ notebooks/            parameter_test.ipynb: one parameter test / a sweep, train 
 configs/llamafactory/<profile>/   train.yaml + merge.yaml per model (tests check they agree)
 configs/judge_prompts/ judge-facing wordings of the Gate question (default, clean, clean-no-other, v2, v2-no-other); configs/datasets/     dataset recipes (category -> weight); configs/category_taxonomy.json: the categories + descriptions (tests check they agree)
 deploy/mlflow/        the MLflow tracking server for the maintainer's NAS (Dockerfile, compose, basic_auth.ini, .env.example, README); tests/test_deploy_mlflow.py guards it
+docs/                 versioned guides, edited per season: translation-glossary.md (official + decided Korean game terms, translation rules), labeling-guide.md (how a chat line gets its category); tests/test_docs.py pins header, changelog and taxonomy coverage
 tests/                pytest for the data part; conftest.py has the JSONL fixtures
 data/raw/ data/processed/   stage inputs/outputs (config.py paths) -- GITIGNORED
 graft/                graft's generated cards -- GITIGNORED, regenerable (`graft build`)
