@@ -64,7 +64,7 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
 ## Repository Layout
 
 ```
-.claude/              graft wiring (hooks, helpers), skills/: graft, workflow-control
+.claude/              graft wiring (hooks, helpers), skills/: graft, workflow-control, season-data (the runbook for labelling + translating a season's chat with agents)
 .memory/              working memory; see .memory/README.md
 .github/workflows/    CI (data gate) + auto-merge
 justfile              the gates as commands

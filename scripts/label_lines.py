@@ -1,7 +1,7 @@
 """Label a season's chat lines with agents: prepare the batches, check what they wrote, assemble the labels and the judge's sample.
 
     python scripts/label_lines.py prepare  --season S1 --raw data/raw/raw_translated_logs.jsonl [more logs] [--size 300]
-    python scripts/label_lines.py check    --season S1                 # every batch against its input and the labeling guide's categories
+    python scripts/label_lines.py check    --season S1 [--batch B]    # every batch against its input and the labeling guide's categories
     python scripts/label_lines.py assemble --season S1                 # labels.jsonl + judge-sample.jsonl + labels.meta.json (the counts table for the guide)
     python scripts/label_lines.py export   --season S1                 # judge-sample.jsonl again from labels.jsonl (after labels were corrected by hand)
     python scripts/label_lines.py report   --season S1                 # the counts table again
@@ -141,8 +141,10 @@ def read_inputs(season, name):
 def check_command(args):
     season = Season(args)
     taxonomy, label_map, record = season.taxonomy(), season.label_map(), season.run_record()
-    bad = 0
-    for name in record["batches"]:
+    bad, names = 0, [n for n in record["batches"] if not args.batch or n == args.batch]
+    if not names:
+        fail(f"no batch named {args.batch!r} (batches: {', '.join(record['batches'])})")
+    for name in names:
         outputs, problems = check.read_jsonl(os.path.join(season.out_dir, name + ".jsonl"))
         if problems and not outputs:
             print(f"{name}: no output yet ({problems[0]})")
@@ -238,6 +240,7 @@ def main(argv=None):
     parser.add_argument("--guide", default=LABELING_GUIDE_DOC, help="the labeling guide (default: %(default)s)")
     parser.add_argument("--label-map", default=LABEL_MAP, help="the label map (default: %(default)s)")
     parser.add_argument("--raw", nargs="+", help="prepare: the raw chat logs (JSONL with `original` and optionally `channel`)")
+    parser.add_argument("--batch", help="check: only this batch (an agent checks its own output, not the others')")
     parser.add_argument("--size", type=int, default=300, help="prepare: at most this many lines per batch (default: %(default)s)")
     parser.add_argument("--dev-fraction", type=float, default=tools.DEV_FRACTION, help="assemble/export: the share of the judge sample that is dev (default: %(default)s)")
     args = parser.parse_args(argv)
