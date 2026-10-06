@@ -1,6 +1,6 @@
 # Translation glossary — Japanese chat → Korean
 
-**Version:** 1.0.0 · **Season:** S1 (2026-10)
+**Version:** 1.0.1 · **Season:** S1 (2026-10)
 
 How Japanese *Blue Protocol: Star Resonance* chat is translated into Korean for resonance-lab's data. Read by people and given
 as the brief to translation agents. It holds terms and rules only — never chat lines (no data in git, `tests/test_docs.py`).
@@ -20,7 +20,8 @@ Every line is a real chat message from the Japanese server of the game, written 
 (everyone), `PARTY` (the players in your party, usually inside a raid), `LOCAL` (nearby), `BEGINNER`. Almost everything is about game content:
 raids and difficulties, dungeons with tiers (`M6`, `M15`), party recruitment in slot notation, boss and channel calls, raid mechanics, ordinary
 player talk. The readers of the translation are **Korean players of the same game** — write what they would type in their own chat.
-Guild messages are not translated (the maintainer's guild is Korean); see the labeling guide.
+Guild adverts (`recruitment/guild`) are **not translated by default** (the maintainer's guild is Korean): `scripts/translate_agents.py prepare` skips them, `--include-guild` overrides.
+Season 1 translated them anyway (60 lines, the first batches did not skip them): the rows carry their category, drop them there if unwanted.
 
 ## 2. Style rules
 
@@ -189,6 +190,7 @@ official), バジ → 바지, プレデター → 프레데터, クロックゲ�
 
 | Version | Date | Change |
 |---|---|---|
+| 1.0.1 | 2026-10-06 | Corrected the guild note: season 1 did translate the 60 guild lines (the doc said they were skipped); the tooling skips them by default. Rules now also live in `configs/glossary/s1.json`. |
 | 1.0.0 | 2026-10-05 | First versioned glossary. Official classes and content names from the maintainer; 継 → 계속 (was 계승); dungeon short forms use the full official names; 2,169 non-guild lines translated with it (0 violations of the strict check). |
 
 ## Observed terms, season 1 (generated, provisional)

@@ -1,6 +1,6 @@
 # Labeling guide — which category is a chat line
 
-**Version:** 1.0.0 · **Season:** S1 (2026-10)
+**Version:** 1.0.1 · **Season:** S1 (2026-10)
 
 How a Japanese *Blue Protocol: Star Resonance* chat line gets its category. Used by whoever labels the Gate 1 sample by hand, by labelling agents, and as the
 reference when the judge's answers are read. The categories themselves live in `configs/category_taxonomy.json` (what the judge is shown); this guide says
@@ -62,7 +62,7 @@ and the version of this guide rises with it.
 
 ## 3. Decisions of season 1
 
-- **Guild lines are labelled but not translated:** the maintainer's guild members are Korean. They are `recruitment/guild`.
+- **Guild lines are labelled `recruitment/guild` and, by default, not translated** (the maintainer's guild members are Korean; the translation tooling skips them). Season 1 translated them anyway: 60 lines.
 - **Long advertisement walls** were labelled by what they recruit (guild or party), not `spam`; no line was labelled `spam` in season 1. Whether a wall should be `spam/wall` is open.
 - **`bot` lines are real chat lines of the app's log** (timekeeper bots announcing the hour, weekend-reminder bots): a category, not a drop.
 - **Slot notation is recruitment:** `@T1`, `D3H1`, `T1H3D12`, `↑` (minimum score) and a dungeon/raid name. The judge missed this until the wording of its question taught it (`configs/judge_prompts/v2.json`).
@@ -102,4 +102,5 @@ rule is about 10 % precise; Kev-0.8B's argmax accuracy rose from 29 % to 60 % wh
 
 | Version | Date | Change |
 |---|---|---|
+| 1.0.1 | 2026-10-06 | Corrected the guild decision: season 1 translated the guild lines (the guide said it did not); the tooling skips them by default. |
 | 1.0.0 | 2026-10-05 | First versioned guide: the taxonomy's 25 categories plus the four proposed ones (`coordination/boss_call`, `recruitment/closed`, `other/placeholder`, `non_japanese`); season-1 decisions and counts. |

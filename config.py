@@ -87,6 +87,13 @@ JUDGE_PASS_FILE = os.path.join(PROCESSED_DATA_DIR, "gate1_judge.jsonl")
 # uncategorized. A GUESS: the cutoff is per model, choose it with `categorize.py --probe SAMPLE --judge-url ...` (the sweep).
 JUDGE_CUTOFF = 0.3
 
+# --- Translating chat lines with agents (translation_check.py, translation_assemble.py, scripts/translate_agents.py) ---
+# The glossary as data (configs/glossary/<season>.json) next to its human version (docs/translation-glossary.md, versioned); a season's batches,
+# the agents' outputs and the assembled file live in data/translation/<season>/ (gitignored: they are players' chat).
+GLOSSARY_DIR = os.path.join(BASE_DIR, "configs", "glossary")
+GLOSSARY_DOC = os.path.join(BASE_DIR, "docs", "translation-glossary.md")
+TRANSLATION_DIR = os.path.join(BASE_DIR, "data", "translation")
+
 # --- Experiment tracking (tracking.py) ---
 # The NAS server's URL and credentials: gitignored, see .env.mlflow.example and deploy/mlflow/README.md.
 MLFLOW_ENV_FILE = os.path.join(BASE_DIR, ".env.mlflow")

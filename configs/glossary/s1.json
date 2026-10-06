@@ -1,0 +1,185 @@
+{
+ "description": "The translation glossary as data, for translation_check.py / translation_assemble.py. docs/translation-glossary.md is the human version; tests/test_glossary.py keeps the two in step (doc_version, every official Korean name appears in the document). `required`: a line whose Japanese matches `ja` (and not `unless`) must hold `ko` unless it is flagged. `banned`: `ko` must not appear (only when the Japanese matches `when`, if given). `fixes`: a deterministic replacement of a rendering the first pass got wrong (when the Japanese matches `when` and not `unless`).",
+ "version": 1,
+ "season": "S1",
+ "doc_version": "1.0.1",
+ "required": [
+  {
+   "ja": "威咲|イサキ|いさき",
+   "ko": "심판"
+  },
+  {
+   "ja": "森癒",
+   "ko": "치유"
+  },
+  {
+   "ja": "狂音",
+   "ko": "음파"
+  },
+  {
+   "ja": "響奏|協奏|きょうそう",
+   "ko": "협주"
+  },
+  {
+   "ja": "鷹弓",
+   "ko": "매활"
+  },
+  {
+   "ja": "狼弓",
+   "ko": "늑대활"
+  },
+  {
+   "ja": "墓",
+   "ko": "저주받은 무덤"
+  },
+  {
+   "ja": "工場",
+   "ko": "기계화 처리소"
+  },
+  {
+   "ja": "巨塔",
+   "ko": "침식 거탑"
+  },
+  {
+   "ja": "霧海",
+   "ko": "안개 속 사냥터"
+  },
+  {
+   "ja": "珊瑚",
+   "ko": "환해 암초"
+  },
+  {
+   "ja": "幻夢",
+   "ko": "환상꿈"
+  },
+  {
+   "ja": "ワルレ|ワールドレイド",
+   "ko": "월드 보스"
+  },
+  {
+   "ja": "極限",
+   "ko": "극한공간"
+  },
+  {
+   "ja": "迷妄の森|迷森",
+   "ko": "미망의 숲"
+  },
+  {
+   "ja": "継",
+   "unless": "継続",
+   "ko": "계속"
+  }
+ ],
+ "banned": [
+  {
+   "ko": "계승",
+   "why": "継 is 계속, not 계승"
+  },
+  {
+   "ko": "와이프",
+   "why": "ワイプ is 전멸 (와이프 = wife)"
+  },
+  {
+   "ko": "딜러 화력",
+   "why": "damage output is 딜"
+  },
+  {
+   "ko": "위소",
+   "why": "威咲 is 심판"
+  },
+  {
+   "ko": "이사키",
+   "why": "イサキ is 심판"
+  },
+  {
+   "ko": "광음",
+   "why": "狂音 is 음파"
+  },
+  {
+   "ko": "향주",
+   "why": "響奏 is 협주"
+  },
+  {
+   "ko": "숲 힐러",
+   "why": "森癒 is 치유"
+  },
+  {
+   "ko": "숲치유",
+   "why": "森癒 is 치유"
+  },
+  {
+   "ko": "이지만",
+   "when": "イージー|イージ",
+   "why": "イージーのみ is 이지 난이도만 (이지만 reads as 'although')"
+  }
+ ],
+ "fixes": [
+  {
+   "when": "ワイプ|わいぷ",
+   "old": "와이프",
+   "new": "전멸",
+   "why": "ワイプ -> 전멸 (not 와이프 = wife)"
+  },
+  {
+   "when": "リログ|りろぐ",
+   "old": "리로그",
+   "new": "재접속",
+   "why": "リログ -> 재접속"
+  },
+  {
+   "when": "イージー|イージ",
+   "old": "이지만",
+   "new": "이지 난이도만",
+   "why": "이지만 reads as 'although' -> 이지 난이도만"
+  },
+  {
+   "when": "火力",
+   "old": "딜러 화력",
+   "new": "딜",
+   "why": "딜러 화력 -> 딜 (火力 = damage output)"
+  },
+  {
+   "when": "\\d滅で",
+   "old": "전멸에서",
+   "new": "전멸 시",
+   "why": "N전멸에서 -> N전멸 시"
+  },
+  {
+   "when": "MN",
+   "unless": "NM",
+   "old": "MN",
+   "new": "NM",
+   "why": "poster's typo MN -> NM"
+  },
+  {
+   "when": "不動若葉",
+   "old": "고정 새싹",
+   "new": "가만히 있는 새싹",
+   "why": "不動若葉 -> 가만히 있는 새싹"
+  },
+  {
+   "when": "不動若葉",
+   "old": "부동 새싹",
+   "new": "가만히 있는 새싹",
+   "why": "不動若葉 -> 가만히 있는 새싹"
+  },
+  {
+   "when": "不動若葉",
+   "old": "안 움직이는 새싹",
+   "new": "가만히 있는 새싹",
+   "why": "不動若葉 -> 가만히 있는 새싹"
+  },
+  {
+   "when": "[一1]周",
+   "old": "한 바퀴",
+   "new": "1회",
+   "why": "一周 -> 1회"
+  },
+  {
+   "when": "^[！!]*時報だ[！!]*$",
+   "old": "시보다",
+   "new": "정각이다",
+   "why": "時報だ -> 정각이다"
+  }
+ ]
+}
