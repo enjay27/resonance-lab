@@ -24,6 +24,8 @@ artifacts; NAS `MINIO_ENDPOINT_URL` must be the NAS's real address; Ctrl+C -> KI
 
 **Translation tooling built 2026-10-06 (PR 1 of 3: translation, labeling, skill):** `scripts/translate_agents.py` (prepare / check / assemble / revise / report), `glossary.py` + `configs/glossary/s1.json`, `translation_check.py`, `translation_assemble.py`; assembling the season-1 batches reproduces the 2,169 final lines exactly; `assemble` refuses when `docs/translation-glossary.md` changed since `prepare`. Corrected: season 1 DID translate the 60 guild lines (docs said not); the tool skips guild by default.
 
+**Labeling tooling built 2026-10-06 (PR 2 of 3):** `scripts/label_lines.py` (prepare / check / assemble / export / report), `labeling_tools.py`, `configs/label_map.json`; exporting the season-1 labels reproduces 2,200 lines / 133 unsure / a 2,171-line judge sample with the same roots (the dev/test split is now a hash of the line, so it differs from the sample sent earlier). Next: PR 3 = skill `season-data` + the session note.
+
 **Model part never runs in a cloud session** (no GPU): every model stage is NOT VERIFIED —
 [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md). Auto-merge of `claude/*` PRs works.
 
