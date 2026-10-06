@@ -2,44 +2,46 @@
 // SessionStart hook for Graft (https://github.com/trailhq/Graft).
 //
 // Cloud sessions start from a fresh clone, so graft/ (git-ignored) is missing.
-// Before handing off to graft's own session-start, this:
-//   1. installs graft if the environment's setup script didn't;
-//   2. records repo-only wiring (global:false) so graft's wiring refresh doesn't
-//      write hooks into ~/.claude (trailhq/Graft#491, #497);
-//   3. builds the structural graph (no LLM, no API key).
+// Before handing off to graft's own session-start, this runs, in order:
+//   1. npm install -g @nanonets/graft      (only if the environment didn't install it)
+//   2. graft telemetry disable
+//   3. graft init --yes --no-global --no-agents --no-statusline
+//        (--no-global keeps hooks and the MCP server out of ~/.claude and ~/.claude.json,
+//         trailhq/Graft#491, #497)
+//   4. graft build                          (structural graph, no LLM, no API key)
 // Locally it only runs graft's session-start, which no-ops if graft isn't installed.
 //
-// Replaces graft's own SessionStart entry: re-running `graft init` adds that entry
-// back to .claude/settings.json, so remove it again afterwards.
-// It also resets .mcp.json's graft server to a bare `graft mcp`; point it back at
-// .claude/helpers/graft-mcp.cjs, which waits for the install this hook does.
-const fs = require('fs');
+// `graft init` rewrites tracked wiring files (.claude/settings.json re-gains graft's own
+// SessionStart entry, .mcp.json loses the graft-mcp.cjs wrapper, the helpers and the graft
+// skill are regenerated), so this hook puts back every tracked file init changed. The
+// session therefore starts with a clean tree, and this hook stays the only SessionStart entry.
 const path = require('path');
 const { execSync, spawnSync } = require('child_process');
 
-const GRAFT_VERSION = '0.21.1';
 const dir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const quiet = (cmd) => execSync(cmd, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+// Tracked files with uncommitted changes (porcelain: "XY path"; untracked "??" excluded).
+const modified = () =>
+  new Set(quiet('git status --porcelain --untracked-files=no').split('\n')
+    .filter(Boolean).map((l) => l.slice(3)));
 
 if (process.env.CLAUDE_CODE_REMOTE === 'true') {
   try {
-    let version;
     try {
-      version = quiet('graft --version').trim();
+      quiet('graft --version');
     } catch {
-      quiet(`npm i -g @nanonets/graft@${GRAFT_VERSION}`);
-      version = quiet('graft --version').trim();
+      quiet('npm install -g @nanonets/graft');
     }
-    // Same shape graft's writeStamp() uses (dist/upkeep.js); re-check when upgrading graft.
-    const stamp = path.join(dir, 'graft', '.cache', 'wiring-stamp.json');
-    if (!fs.existsSync(stamp)) {
-      fs.mkdirSync(path.dirname(stamp), { recursive: true });
-      fs.writeFileSync(stamp, JSON.stringify({
-        version,
-        hosts: ['claude'],
-        opts: { global: false, mcp: true, hooks: true, statusline: false },
-        at: new Date().toISOString(),
-      }, null, 2));
+    quiet('graft telemetry disable');
+    const before = modified();
+    try {
+      quiet('graft init --yes --no-global --no-agents --no-statusline');
+    } finally {
+      const touched = [...modified()].filter((f) => !before.has(f));
+      if (touched.length) {
+        execSync(`git checkout -- ${touched.map((f) => JSON.stringify(f)).join(' ')}`,
+          { cwd: dir, stdio: 'ignore' });
+      }
     }
     quiet('graft build');
   } catch {

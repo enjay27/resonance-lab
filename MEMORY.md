@@ -22,6 +22,8 @@ artifacts; NAS `MINIO_ENDPOINT_URL` must be the NAS's real address; Ctrl+C -> KI
 
 **Season data workflow built 2026-10-06 (PRs #74-#76 + the skill):** `.claude/skills/season-data/SKILL.md` is the runbook (agents label + translate a season's chat: `scripts/label_lines.py`, `scripts/translate_agents.py`; guides `docs/labeling-guide.md`, `docs/translation-glossary.md`, versioned; `assemble` refuses when a guide changed since `prepare`). Season 1: 2,200 lines labelled, 2,169 translated (data stays local). Open and not started: the 4 proposed categories into the taxonomy, translations as training data, a full review — [`sessions/2026-10-06-season-data-workflow.md`](.memory/sessions/2026-10-06-season-data-workflow.md).
 
+**Graft bootstrap (2026-10-06, `claude/graft-init-hook`):** in a cloud session `.claude/hooks/graft-bootstrap.cjs` installs graft if missing, disables telemetry, runs `graft init --yes --no-global --no-agents --no-statusline` (nothing written to `~/.claude` / `~/.claude.json`: no user-level server), restores every tracked file init changed (`.mcp.json` keeps the `graft-mcp.cjs` wrapper), then `graft build`. Ported from resonance-stream's `experiment/graft-init-hook`; unpinned install; cloud path NOT VERIFIED here, check `git status` is clean and the 180 s timeout holds in a fresh session.
+
 **Model part never runs in a cloud session** (no GPU): every model stage is NOT VERIFIED —
 [`unverified-on-gpu.md`](.memory/active-issues/unverified-on-gpu.md). Auto-merge of `claude/*` PRs works.
 
