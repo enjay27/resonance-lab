@@ -94,6 +94,13 @@ GLOSSARY_DIR = os.path.join(BASE_DIR, "configs", "glossary")
 GLOSSARY_DOC = os.path.join(BASE_DIR, "docs", "translation-glossary.md")
 TRANSLATION_DIR = os.path.join(BASE_DIR, "data", "translation")
 
+# --- Labelling chat lines with agents (labeling_tools.py, scripts/label_lines.py) ---
+# docs/labeling-guide.md (versioned) says how a line gets its category; configs/label_map.json where the labels the taxonomy does not have yet go for the
+# judge. A season's lines, batches, labels and the judge's sample live in data/labeling/<season>/ (gitignored: players' chat).
+LABELING_GUIDE_DOC = os.path.join(BASE_DIR, "docs", "labeling-guide.md")
+LABEL_MAP = os.path.join(BASE_DIR, "configs", "label_map.json")
+LABELING_DIR = os.path.join(BASE_DIR, "data", "labeling")
+
 # --- Experiment tracking (tracking.py) ---
 # The NAS server's URL and credentials: gitignored, see .env.mlflow.example and deploy/mlflow/README.md.
 MLFLOW_ENV_FILE = os.path.join(BASE_DIR, ".env.mlflow")

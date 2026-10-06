@@ -1,0 +1,14 @@
+{
+ "description": "Where the labels of the labeling guide that are not in configs/category_taxonomy.json go for the Gate 1 judge (`map`: label -> taxonomy path), and which labels are lines the judge never sees (`exclude`). docs/labeling-guide.md is the human version: the tests keep the two in step (doc_version, and the guide's row of each label ends with its judge path). When a label is added to the taxonomy, remove it here (a test fails until you do).",
+ "version": 1,
+ "season": "S1",
+ "doc_version": "1.0.1",
+ "map": {
+  "coordination/boss_call": "coordination",
+  "recruitment/closed": "recruitment",
+  "other/placeholder": "other"
+ },
+ "exclude": [
+  "non_japanese"
+ ]
+}
