@@ -189,3 +189,16 @@ def test_report_prints_the_counts_table_for_the_guide(env, capsys):
 def test_a_season_is_a_plain_name(env, name):
     with pytest.raises(SystemExit):
         run(env, "prepare", "--season", name, "--raw", env["raw"])
+
+
+def test_check_batch_looks_at_one_batch_only_and_an_unknown_batch_is_an_error(env, capsys):
+    run(env, "prepare", "--season", "S1", "--raw", env["raw"], "--size", "2")
+    names = sorted(n[:-6] for n in os.listdir(season(env) / "round1" / "in"))
+    rows = read(season(env) / "round1" / "in" / f"{names[0]}.jsonl")
+    write_out(env, names[0], [{"i": r["i"], "cat": "chat"} for r in rows])
+
+    assert run(env, "check", "--season", "S1", "--batch", names[0]) == 0
+    with pytest.raises(SystemExit):
+        run(env, "check", "--season", "S1")
+    with pytest.raises(SystemExit):
+        run(env, "check", "--season", "S1", "--batch", "nope")

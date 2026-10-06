@@ -1,7 +1,7 @@
 """Translate a season's chat lines with agents: prepare the batches, check what they wrote, revise, assemble.
 
     python scripts/translate_agents.py prepare  --season S1 --labels data/eval/gate1-labels.jsonl [--size 200] [--include-guild]
-    python scripts/translate_agents.py check    --season S1 [--round N]       # every batch of the latest (or the given) round against its input and the glossary
+    python scripts/translate_agents.py check    --season S1 [--round N] [--batch B]  # every batch of the latest (or the given) round against its input and the glossary
     python scripts/translate_agents.py assemble --season S1                   # final.jsonl, terms.tsv, final.meta.json (exit 1 when a line breaks the glossary)
     python scripts/translate_agents.py revise   --season S1 [--all]           # the next round: the lines that break the glossary, with their `prev`
     python scripts/translate_agents.py report   --season S1                   # counts, flagged lines, terms rendered more than one way
@@ -139,9 +139,12 @@ def read_inputs(season, number, name):
 def check_command(args):
     season = Season(args)
     glossary, record = season.glossary(), season.run_record()
-    bad = 0
+    bad, checked = 0, 0
     for number in season.rounds(record, args.round) if args.round else [max(season.rounds(record))]:  # default: the latest round (earlier ones are superseded)
         for name in record["rounds"][str(number)]:
+            if args.batch and name != args.batch:
+                continue
+            checked += 1
             outputs, problems = check.read_jsonl(season.batch_paths(number, name)[1])
             if problems and not outputs:
                 print(f"round {number} {name}: no output yet ({problems[0]})")
@@ -155,6 +158,8 @@ def check_command(args):
                     print("  ", problem)
             else:
                 print(f"round {number} {name}: OK ({len(outputs)} lines, {sum(bool(r.get('flag')) for r in outputs)} flagged)")
+    if not checked:
+        fail(f"no batch named {args.batch!r} in the round (batches: {', '.join(record['rounds'][str(max(season.rounds(record), default=1))])})")
     if bad:
         fail(f"{bad} batch(es) with problems")
     return 0
@@ -258,6 +263,7 @@ def main(argv=None):
     parser.add_argument("--include-guild", action="store_true", help="prepare: also translate guild adverts (skipped by default: the guild is Korean)")
     parser.add_argument("--skip", help="prepare: categories not to translate, comma separated (default: guild, non_japanese, other/placeholder)")
     parser.add_argument("--round", type=int, help="check: this round (default: the latest)")
+    parser.add_argument("--batch", help="check: only this batch (an agent checks its own output, not the others')")
     parser.add_argument("--all", action="store_true", help="revise: every line, not only the ones that break the glossary")
     args = parser.parse_args(argv)
     if args.command == "prepare":

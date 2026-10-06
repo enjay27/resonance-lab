@@ -241,3 +241,21 @@ def test_report_lists_the_terms_with_more_than_one_rendering_and_the_flagged_lin
 
     out = capsys.readouterr().out
     assert "lines: 3" in out and "flagged: 1" in out and "more than one rendering" in out
+
+
+# --- check --batch (an agent checks its own batch, not the others') ----------------------------------------------------------
+
+
+def test_check_batch_looks_at_one_batch_only_and_an_unknown_batch_is_an_error(env, capsys):
+    run(env, "prepare", "--season", "S1", "--labels", env["labels"], "--size", "2")
+    names = sorted(n[:-6] for n in os.listdir(season(env) / "round1" / "in"))
+    first = read(season(env) / "round1" / "in" / f"{names[0]}.jsonl")
+    write_out(env, 1, names[0], [{"i": r["i"], "ko": "수고하셨습니다", "terms": []} for r in first if r["ja"] != "墓M6 ＠D2"] + (
+        [{"i": r["i"], "ko": "저주받은 무덤 M6 @D2", "terms": [["墓", "저주받은 무덤"]]} for r in first if r["ja"] == "墓M6 ＠D2"]))
+
+    assert run(env, "check", "--season", "S1", "--batch", names[0]) == 0          # the other batch has no output: not this agent's problem
+    assert names[0] in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        run(env, "check", "--season", "S1")                                          # the whole round does fail
+    with pytest.raises(SystemExit):
+        run(env, "check", "--season", "S1", "--batch", "nope")
