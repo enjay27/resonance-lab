@@ -64,7 +64,7 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
 ## Repository Layout
 
 ```
-.claude/              graft wiring (hooks, helpers), skills/: graft, workflow-control, season-data (the runbook for labelling + translating a season's chat with agents)
+.claude/              skills/: workflow-control, season-data (the runbook for labelling + translating a season's chat with agents)
 .memory/              working memory; see .memory/README.md
 .github/workflows/    CI (data gate) + auto-merge
 justfile              the gates as commands
@@ -137,32 +137,10 @@ deploy/mlflow/        the MLflow tracking server for the maintainer's NAS (Docke
 docs/                 versioned guides, edited per season: translation-glossary.md (official + decided Korean game terms, translation rules), labeling-guide.md (how a chat line gets its category); tests/test_docs.py pins header, changelog and taxonomy coverage
 tests/                pytest for the data part; conftest.py has the JSONL fixtures
 data/raw/ data/processed/   stage inputs/outputs (config.py paths) -- GITIGNORED
-graft/                graft's generated cards -- GITIGNORED, regenerable (`graft build`)
 ```
 
 Model and dataset outputs (`lora_dataset/`, `model_f16*/`, `outputs/`, `*.gguf`,
 `*.safetensors`, `llama.cpp/`) are gitignored. Never commit them.
-
----
-
-## Using graft (the repo is indexed) — graft first, as the index of every file
-
-**Rule: before you open a source file, get its index from graft; read only the span you need.** The index is the
-file's map; the file itself is the last thing to open, and only in pieces. (`.claude/skills/graft/SKILL.md` has the
-full tool list.)
-
-1. **Know a file?** `graft skeleton <file>`: every signature with its `file:line` span, ~10x cheaper than the file.
-   Then `Read` with `offset`/`limit` for just that span. Never `Read` a whole code file, or `grep`/`rg` for it, first.
-2. **Don't know where it lives?** `graft ask "<task>" --source` (code inlined at each hit). **Need every
-   occurrence?** `graft grep "<literal>"` (ask is ranked top-N and misses some).
-3. **Before moving, renaming, splitting or changing a signature:** `graft callers <sym> --depth all`. Editing the
-   primary file and stopping is the classic miss. `config.py` constants are imported by name from every script —
-   `graft grep "<NAME>"` before renaming one.
-4. **The graph follows your edits** (PostToolUse hook); `graft build` if it looks stale. `graft/` is gitignored.
-5. **Not indexed** (yaml, md, json, requirements, `.github/`, `.memory/`): read those directly. Files you are about
-   to rewrite whole, or under ~50 lines, may be read directly too. Say so when graft is missing or empty instead of
-   silently falling back to grep.
-6. **Close a turn that used graft with the savings tally line** its hook asks for (`🌱 graft saved ~N tokens ...`).
 
 ---
 
@@ -184,9 +162,8 @@ full tool list.)
 
 ## Guardrails
 
-- **Graft first.** Index a file with `graft skeleton` before reading it; see *Using graft*.
 - **Plan first.** Do not modify scripts, config, manifests or CI on the first turn of a
-  task. Present an impact analysis (graft `callers` output is the evidence) and wait for
+  task. Present an impact analysis (`g callers` from the `graft-kade` skill is the evidence) and wait for
   explicit confirmation. See `.claude/skills/workflow-control/SKILL.md`.
 - **Refactors do not change behaviour.** A move/split commit changes no logic, no
   hyper-parameter, no prompt and no file format. Changing `INSTRUCTION`, the chat
