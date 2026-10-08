@@ -11,10 +11,10 @@ Four steps, in order. Do not skip ahead.
 
 ## 1 · Plan (no edits)
 
-- Locate the code with graft, not by reading whole files:
-  `graft ask "<task>" --source`, `graft skeleton <file>`.
+- Locate the code with graft (the `graft-kade` account skill), not by reading whole files:
+  `g ask "<task>" --source`, `g skeleton <file>`.
 - For every symbol you will move, rename, split or change the signature of, run
-  `graft callers <sym> --depth all`. For a `config.py` constant, `graft grep "<NAME>"`.
+  `g callers <sym> --depth all`. For a `config.py` constant, `g grep "<NAME>"`.
   List the files it reaches — that is the impact.
 - Say which part(s) are touched (data / model, per `CLAUDE.md`) and therefore which gate
   applies, and whether this session can run it (no GPU here: the model part cannot run).
@@ -31,7 +31,7 @@ A new step discovered mid-way that widens scope goes back to the developer.
 - One task at a time. Refactors are behaviour-preserving: move first, change later,
   never both in one commit.
 - Test first (CLAUDE.md *Guardrails*): the failing test, then the code.
-- After each move, re-run `graft callers` on the moved symbol and confirm every caller
+- After each move, re-run `g callers` on the moved symbol and confirm every caller
   imports the new path.
 - At most **2** self-corrections on a failing gate; then stop and report.
 
