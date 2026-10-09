@@ -47,6 +47,10 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
   loads when pipeline, config or requirements files are touched.
 - **Conventions** (where paths live, stage exit codes, how scripts import `config`, adding a
   pipeline): `.claude/rules/conventions.md`; loads when Python files, tests or `pyproject.toml` are touched.
+- **State** is the organization Project "Resonance" (star-resonance): read
+  `git fetch origin status && git show origin/status:STATUS.md` (a snapshot 3 times a day; run
+  `project-snapshot.yml` for a fresh one). No `MEMORY.md`, no handoff files; `.memory/` stays the
+  detail store.
 - **Repository layout** (what every file is for): `docs/repository-layout.md`; not loaded
   automatically, read it when you need to find a file.
 
@@ -67,9 +71,9 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
 1. **Model-part changes need a manual run** on the Windows/CUDA machine (the affected
    stage, plus `eval.py` when the model changes); say in the commit body whether it was
    done, or `NOT VERIFIED: model part -- no GPU in this session`.
-2. **Record the outcome in the memory tree.** `MEMORY.md` is an index under ~40 lines —
-   update its *Now* section. Detail goes in `.memory/` (see its README). Both are updated in
-   the task's own branch, before the push, so a merged task never leaves the index behind.
+2. **Record state on the issue**: a `cmd:` label (`cmd:status-now`, `cmd:verify-needs-windows`,
+   `cmd:verify-not-verified`, ...); a decision for Kade: assign the issue to him; a follow-up
+   gets an issue. Detail goes in `.memory/` (see its README), in the task's own branch.
 
 ---
 

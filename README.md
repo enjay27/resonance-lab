@@ -2,7 +2,7 @@
 Python project for Resonance Stream: fine-tunes its Japanese -> Korean translator model (pipelines: LLaMA-Factory, unsloth).
 
 ## Development
-- Rules, gates and layout: [`CLAUDE.md`](CLAUDE.md); current state: [`MEMORY.md`](MEMORY.md)
+- Rules, gates and layout: [`CLAUDE.md`](CLAUDE.md); current state: `STATUS.md` on the `status` branch (organization Project "Resonance")
 - `pip install -r requirements-dev.txt` then `just check` (lint + data-stage tests, CPU only)
 - `python run_pipeline.py` runs a training pipeline (see *Pipelines*; `pipelines.py` lists them)
 
