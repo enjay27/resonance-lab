@@ -1,8 +1,8 @@
 # .memory — which file takes what
 
-`MEMORY.md` (repo root) is the index. It holds only what would be *false* the moment
-it goes stale: what is next, and what is written but not yet verified. Everything
-else lives here, one folder per kind of note.
+State (what is next, what is written but not yet verified) lives in the organization
+Project "Resonance", as issues with `cmd:` labels; read it as `STATUS.md` on the `status`
+branch. There is no `MEMORY.md`. Everything else lives here, one folder per kind of note.
 
 | folder | takes | rule |
 |---|---|---|

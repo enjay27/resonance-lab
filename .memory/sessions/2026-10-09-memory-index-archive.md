@@ -1,3 +1,7 @@
+> Archive of the root `MEMORY.md` as it stood on 2026-10-09, when state moved to the star-resonance Project
+> "Resonance" (issues with `cmd:` labels, read as `STATUS.md` on the `status` branch). Kept whole because *Now* held
+> detail that had no issue yet. Links below are relative to the repository root, not to this folder.
+
 # Active State — resonance-lab
 
 **Index, not the record.** Only what would be *false* the moment it goes stale lives here.

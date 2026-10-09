@@ -71,7 +71,7 @@ Loop `revise` -> agents (same prompt, the new `round<N>/brief.md`) -> `check` ->
 
 1. Send the maintainer `final.jsonl` (`original, translated, category, channel, flag, terms`) and `terms.tsv`; say how many lines, how many were revised, flagged, the terms with more than one rendering, and the open questions. Do not send guild or chat lines anywhere else.
 2. Docs PR: replace the glossary's *Observed terms* table (do not append), answer/replace the open-questions table, bump both guides (patch / minor / major per their *Updating* sections), add changelog rows, set `doc_version` in `configs/glossary/<season>.json` and `configs/label_map.json`.
-3. `.memory/sessions/<date>-<topic>.md` with what went wrong this time; `MEMORY.md` *Now*; then `just check` and the PR (one at a time, CLAUDE.md).
+3. `.memory/sessions/<date>-<topic>.md` with what went wrong this time; the issue's `cmd:` label; then `just check` and the PR (one at a time, CLAUDE.md).
 4. Using the translations as training data is **not part of this runbook**: it changes the model (a feature, its own plan and eval run).
 
 ## 4. Wrong turns of season 1 (do not repeat)
