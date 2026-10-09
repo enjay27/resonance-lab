@@ -52,7 +52,7 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
 
 ## Guardrails
 
-- **The plan's evidence** is an impact analysis: `g callers` from the `graft-kade` skill. See
+- **The plan's evidence** is an impact analysis: `g callers` from the `code-graph` skill. See
   `.claude/skills/workflow-control/SKILL.md`.
 - **Changing the model is a feature, not a refactor.** `INSTRUCTION`, the chat template and a
   training hyper-parameter each change the model: own PR and an eval run. A move/split commit
