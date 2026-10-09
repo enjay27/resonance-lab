@@ -80,6 +80,8 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
   commit. If CI fails, fix on the same branch and push again: the run for the new commit decides.
 - Only `claude/*` branches auto-merge. `workflow_run` workflows are read from `main`, so a
   change to `auto-merge.yml` itself takes effect after it has been merged once.
+- Local sessions follow the same flow: a `claude/<task>` branch and a PR, opened with Kade's
+  `gh` login (without it, print the commands for Kade).
 - Only a green local gate is pushed.
 
 ### Never commit
