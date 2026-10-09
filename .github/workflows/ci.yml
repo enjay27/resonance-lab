@@ -27,8 +27,8 @@ jobs:
           python-version: '3.13'
           cache: pip
           cache-dependency-path: requirements-dev.txt
-      # CPU-only gate tooling; the model part (torch, unsloth, CUDA) is not
-      # installed here and has no CI gate -- see CLAUDE.md.
+      # CPU-only gate tooling; the model part (torch, unsloth, CUDA) is not installed here. Its only
+      # CI check is the mock pipeline run inside `just check` (tests/mock_gpu/) -- see CLAUDE.md.
       - run: pip install -r requirements-dev.txt
       - uses: extractions/setup-just@v2
       - run: just check

@@ -19,4 +19,7 @@ paths:
   (`import preprocess`). A new script folder goes into `pythonpath`.
 - **A new pipeline is a folder under `scripts/` plus an entry in `pipelines.py`**;
   `tests/test_pipelines.py` checks every registered stage script exists.
+- **A llamafactory stage that calls a new external tool, or reads a new file from it,** gets a fake and a contract check in
+  `tests/mock_gpu/` (`contract.py`); `just mock-check` runs the pipeline against them. The fakes check what the real tool needs, not
+  what the command builders produce.
 - JSONL is read and written as UTF-8 with `ensure_ascii=False`.
