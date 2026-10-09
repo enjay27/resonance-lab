@@ -21,12 +21,13 @@ most important thing on this page.
 | tree | part | runs on | gate |
 |---|---|---|---|
 | `scripts/fetch_data.py` `scripts/validate.py` `scripts/preprocess.py` `scripts/unsloth/split_dataset.py` `scripts/llamafactory/lf_tools.py` `scripts/llamafactory/update_dataset_info.py` `scripts/llamafactory/watch_training.py` `scripts/mlflow_compare.py` `scripts/mlflow_genai_eval.py` `scripts/judge_check.py` `judge_client.py` `judge_local.py` `gate_pipeline.py` `gate_compare.py` `glossary.py` `translation_check.py` `translation_assemble.py` `scripts/translate_agents.py` `labeling_tools.py` `scripts/label_lines.py` `judge_prompts.py` `scripts/compare_judges.py` `compare_runs.py` `eval_metrics.py` `genai_eval.py` `text_rules.py` `hf_data.py` `runs.py` `tracking.py` `run_queue.py` `tracker.py` `track_records.py` `stage_tracking.py` `parameter_test.py` `overlap.py` `valsplit.py` `manifest.py` `config.py` `pipelines.py` `run_pipeline.py` `configs/` `deploy/` | **data** — raw chat logs → checked, LoRA-ready train/val JSONL | any OS, CPU | `just check` (ruff lint + pytest) |
-| `scripts/unsloth/train.py` `scripts/unsloth/eval.py` `scripts/unsloth/fix_metadata.py` `scripts/llamafactory/train.py` `merge.py` `gguf.py` `eval.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements-<pipeline>.txt`) | none automated — a manual run, reported |
+| `scripts/unsloth/train.py` `scripts/unsloth/eval.py` `scripts/unsloth/fix_metadata.py` `scripts/llamafactory/train.py` `merge.py` `gguf.py` `eval.py`, GGUF conversion (README) | **model** — fine-tune, merge, clean, evaluate | **Windows + CUDA GPU only** (`requirements-<pipeline>.txt`) | a manual run, reported; `just mock-check` fakes the GPU tools (plumbing only) |
 
 `just check` needs only `requirements-dev.txt` (`pip install -r requirements-dev.txt`;
 `pip install rust-just` for `just`). CI (`.github/workflows/ci.yml`) runs it on Linux on
 every push to `main` and every PR. The model part never runs in CI or in a cloud session:
-no GPU, and torch/unsloth are not installed there.
+no GPU, and torch/unsloth are not installed there. `tests/test_mock_pipeline.py` runs the
+`llamafactory` stages with only the GPU tools faked: it checks the plumbing between stages, never the training.
 
 **New pure logic goes in the data part**, where it is tested on every OS. Model-part
 scripts run at import time (no `main()`); keep anything worth testing out of them.

@@ -2,6 +2,8 @@
 
 Code or config changed in a session without CUDA. Delete an item once it has run.
 
+- **Mock pipeline (2026-10-09; data part):** `tests/test_mock_pipeline.py` runs the 8 `llamafactory` stages in a temp copy with fake `llamafactory-cli`, `convert_hf_to_gguf.py`, `llama-quantize` and stub torch / transformers. It proves the plumbing (paths, files each stage leaves for the next, eval's own code on echoed predictions). Still NOT VERIFIED on the GPU machine: `llamafactory-cli train` / `export`, the GGUF convert and quantize, and eval's real model loading and generation.
+
 - **Gate 1 baseline (2026-10-04; data part):** `categorizer.py`, `gate_eval.py` and `scripts/categorize.py` are unit-tested and ran on made-up lines only (89% accuracy on the made-up sample, which proves nothing: the rules and the sample were written together). NOT run on the real raw log or a real labelled sample. Check: `python scripts\categorize.py` prints the split by root and `uncategorized` share and writes `data/processed/categories.jsonl`; hand-label ~200 real lines into `data/eval/gate1-sample.jsonl` and run `--probe`; then `preprocess.py --recipe balanced-v1` prints the per-category table.
 
 - **Per-category eval report (2026-10-04; data part):** `eval_metrics.evaluate` / `format_report` / `tracking.eval_metrics` and the new `taxonomy.py` are unit-tested; the report text was printed for made-up lines only. NOT run through a real `eval.py` (both scripts use the shared functions, unchanged). Check after relabelling `data/eval/bp-eval-dataset.jsonl` with root names: `python scripts\llamafactory\eval.py --prompt training` prints the Category Scores table (n, chrF, terms, JP leak), the Eval Set Coverage section, and `eval.root.<root>.chrf` appears in the MLflow run.
