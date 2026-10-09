@@ -44,7 +44,7 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
 ## Tech Stack
 
 - **Python 3.13** (README; CI runs the data gate on 3.13). Windows for the model part.
-- **Gate dev deps** (`requirements-dev.txt`): pytest, ruff, pyyaml (profile yaml files), rich (the monitor).
+- **Gate dev deps** (`requirements-dev.txt`): pytest, ruff (configured in `pyproject.toml`), pyyaml (profile yaml files), rich (the monitor).
 - **`llamafactory` pipeline** (`requirements-llamafactory.txt`): LLaMA-Factory SFT + LoRA; profile
   **default and fixed model (maintainer, 2026-10-02): `hy-mt2-1.8b`** = `tencent/Hy-MT2-1.8B` (the 7B later; the TranslateGemma profiles stay, not developed; the shipped app model is still `translategemma-4b` =
   `google/translategemma-4b-it`, template `gemma3`), dataset `bp_translation` (validation: `bp_translation_val`, split by line in `preprocess.py`)
@@ -57,7 +57,6 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
   `rd211/Qwen3-1.7B-Instruct` (`config.py`), LoRA r=64, alpha=128.
 - **Conversion:** llama.cpp `convert_hf_to_gguf.py` → `llama-quantize q4_k_m` (README; the
   `llamafactory` pipeline's `gguf.py` does it, finding `llama-quantize` under `llama.cpp/build/bin/`).
-- **Gate tooling:** pytest, ruff (`pyproject.toml`), `just`.
 
 ---
 
@@ -139,9 +138,6 @@ tests/                pytest for the data part; conftest.py has the JSONL fixtur
 data/raw/ data/processed/   stage inputs/outputs (config.py paths) -- GITIGNORED
 ```
 
-Model and dataset outputs (`lora_dataset/`, `model_f16*/`, `outputs/`, `*.gguf`,
-`*.safetensors`, `llama.cpp/`) are gitignored. Never commit them.
-
 ---
 
 ## Conventions
@@ -169,18 +165,15 @@ Model and dataset outputs (`lora_dataset/`, `model_f16*/`, `outputs/`, `*.gguf`,
   changes none of them, nor a file format.
 - **No data or weights in git.** Chat logs are players' messages; they stay local.
   Test fixtures are short, made-up lines.
-- **A cloud session cannot train or evaluate** (no GPU): the model part is a manual run, named
-  `NOT VERIFIED` in the commit body.
 
 ---
 
 ## Definition of Done
 
-1. **The gate for every part touched** is in the table above: `just check` for the data part.
-2. **Model-part changes need a manual run** on the Windows/CUDA machine (the affected
+1. **Model-part changes need a manual run** on the Windows/CUDA machine (the affected
    stage, plus `eval.py` when the model changes); say in the commit body whether it was
    done, or `NOT VERIFIED: model part -- no GPU in this session`.
-3. **Record the outcome in the memory tree.** `MEMORY.md` is an index under ~40 lines —
+2. **Record the outcome in the memory tree.** `MEMORY.md` is an index under ~40 lines —
    update its *Now* section. Detail goes in `.memory/` (see its README). Both are updated in
    the task's own branch, before the push, so a merged task never leaves the index behind.
 
@@ -193,8 +186,7 @@ Model and dataset outputs (`lora_dataset/`, `model_f16*/`, `outputs/`, `*.gguf`,
   commit. If CI fails, fix on the same branch and push again: the run for the new commit decides.
 - Only `claude/*` branches auto-merge. `workflow_run` workflows are read from `main`, so a
   change to `auto-merge.yml` itself takes effect after it has been merged once.
-- Only a green local gate is pushed. A check that could not run here is named in the last
-  commit body (`NOT VERIFIED: train.py -- no GPU in this session`) and left to a manual run.
+- Only a green local gate is pushed.
 
 ### Never commit
 - Chat logs and datasets (`data/**`, `lora_dataset/`), weights (`*.safetensors`,
