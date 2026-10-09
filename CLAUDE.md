@@ -41,21 +41,14 @@ The training data comes from the app (`dataset_<CHANNEL>.jsonl`: `pid`, `origina
 
 ---
 
-## Tech Stack
+## Where the rest is
 
-Moved to [`.claude/rules/tech-stack.md`](.claude/rules/tech-stack.md): Python version, the pipelines and their profiles, conversion. It loads when pipeline, config or requirements files are touched.
-
----
-
-## Repository Layout
-
-Moved to [`docs/repository-layout.md`](docs/repository-layout.md): what every file is for. It is not loaded automatically; read it when you need to find a file.
-
----
-
-## Conventions
-
-Moved to [`.claude/rules/conventions.md`](.claude/rules/conventions.md): where paths live, stage exit codes, how scripts import `config`, adding a pipeline. It loads when Python files, tests or `pyproject.toml` are touched.
+- **Tech stack** (Python, the pipelines and their profiles, conversion): `.claude/rules/tech-stack.md`;
+  loads when pipeline, config or requirements files are touched.
+- **Conventions** (where paths live, stage exit codes, how scripts import `config`, adding a
+  pipeline): `.claude/rules/conventions.md`; loads when Python files, tests or `pyproject.toml` are touched.
+- **Repository layout** (what every file is for): `docs/repository-layout.md`; not loaded
+  automatically, read it when you need to find a file.
 
 ## Guardrails
 
