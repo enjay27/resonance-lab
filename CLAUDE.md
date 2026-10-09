@@ -162,91 +162,41 @@ Model and dataset outputs (`lora_dataset/`, `model_f16*/`, `outputs/`, `*.gguf`,
 
 ## Guardrails
 
-- **Plan first.** Do not modify scripts, config, manifests or CI on the first turn of a
-  task. Present an impact analysis (`g callers` from the `graft-kade` skill is the evidence) and wait for
-  explicit confirmation. See `.claude/skills/workflow-control/SKILL.md`.
-- **Refactors do not change behaviour.** A move/split commit changes no logic, no
-  hyper-parameter, no prompt and no file format. Changing `INSTRUCTION`, the chat
-  template or a training hyper-parameter changes the model — that is a feature, with its
-  own PR and an eval run.
-- **Zero hardcoded credentials.** No HF tokens or keys in committed files.
+- **The plan's evidence** is an impact analysis: `g callers` from the `graft-kade` skill. See
+  `.claude/skills/workflow-control/SKILL.md`.
+- **Changing the model is a feature, not a refactor.** `INSTRUCTION`, the chat template and a
+  training hyper-parameter each change the model: own PR and an eval run. A move/split commit
+  changes none of them, nor a file format.
 - **No data or weights in git.** Chat logs are players' messages; they stay local.
   Test fixtures are short, made-up lines.
-- **TDD for every task flow.** Test first: write the failing unit test that pins the
-  wanted behaviour, run it and see it fail for the right reason, then write the code that
-  makes it pass, then refactor with the tests green. A bug fix starts with a test that
-  reproduces the bug. If a change cannot be unit-tested (GPU / model code), say so in the
-  commit body.
-- **Auto-correction restraint.** Self-correct at most **2** times, then stop and ask.
-- **Never report a gate as passed when it could not run.** A cloud session cannot train
-  or evaluate; say so (`NOT VERIFIED: ...`).
+- **A cloud session cannot train or evaluate** (no GPU): the model part is a manual run, named
+  `NOT VERIFIED` in the commit body.
 
 ---
 
 ## Definition of Done
 
-0. **Test first.** New behaviour or a bug fix has its failing unit test before its code.
-1. **Run the gate for every part touched** (table above): `just check`.
+1. **The gate for every part touched** is in the table above: `just check` for the data part.
 2. **Model-part changes need a manual run** on the Windows/CUDA machine (the affected
    stage, plus `eval.py` when the model changes); say in the commit body whether it was
    done, or `NOT VERIFIED: model part -- no GPU in this session`.
 3. **Record the outcome in the memory tree.** `MEMORY.md` is an index under ~40 lines —
-   update its *Now* section. Detail goes in `.memory/` (see its README).
-4. **Push the branch and open the PR** — see *Version Control*; CI merges it when green.
+   update its *Now* section. Detail goes in `.memory/` (see its README). Both are updated in
+   the task's own branch, before the push, so a merged task never leaves the index behind.
 
 ---
 
 ## Version Control
 
-**One task, one branch, one PR.** Claude runs the whole flow without being asked.
-
-1. **Start.** Every new task gets its own branch from an up-to-date `main`:
-   `git checkout main && git pull && git checkout -b claude/<short-task-name>`.
-   Never commit to `main`. A follow-up to a merged task is a new task: new branch.
-2. **During the task, commit freely** -- as many local commits as help. Unpushed history may
-   be tidied (`git commit --amend`, or `git reset --soft <base>` + one commit to squash).
-   Never rewrite history that is already pushed.
-3. **Finish = test, then push.** When the task is done, run the gate for every part
-   touched and fix failures. Only a green local gate is pushed:
-   `git push -u origin claude/<name>`. A check that could not run here is named in the
-   last commit body (`NOT VERIFIED: train.py -- no GPU in this session`) and left to a
-   manual run.
-4. **Open the PR** against `main` (check for a PR template first). Do not merge it by
-   hand: `.github/workflows/auto-merge.yml` merges it and deletes its `claude/*` branch
-   (never any other branch) once the CI workflow passes on the PR's latest commit. If CI
-   fails, fix on the same branch and push again -- the run for the new commit decides.
-   Never skip, disable or edit a test/gate to get green.
-
-### Several tasks in one session
-
-1. **One PR at a time, in order.** Finish a task (gate green, pushed), open its PR, then
-   **wait until the PR is merged**. Do not start the next task, or push anything for it,
-   before that.
-2. **CI failed?** Fix it first, on the same branch, and push again. Retry until the PR
-   merges; if a failure is not this PR's (red on `main` too), say so on the PR.
-3. **Before the next task, check it is really done:** the PR is closed as *merged* and its
-   `claude/*` branch is gone. Then start from `main` again: `git fetch origin main &&
-   git checkout -B claude/<next> origin/main`. A later task never stacks on an unmerged one.
-4. Waiting is done with the PR event subscription (`subscribe_pr_activity`) and a
-   check-in (`send_later`), not with `sleep` loops. Update `MEMORY.md` in each task's own
-   branch, so a merged task never leaves the index behind.
-
-```bash
-git status            # check BEFORE -A, never after
-git add -A && git commit
-```
-
-- **Commit subject states the point of the change**, not the files touched
-  (`Data stages are unit-tested on any OS`, not `add tests`). The body says what
-  changed, why, and **what is verified vs open**.
-- `MEMORY.md` and `.memory/` updates go in the branch, before the push.
-- **Claude never commits work it did not do.** Pre-existing changes stay untouched.
+- `.github/workflows/auto-merge.yml` (not GitHub auto-merge) merges the PR and deletes its
+  `claude/*` branch (never any other branch) once the CI workflow passes on the PR's latest
+  commit. If CI fails, fix on the same branch and push again: the run for the new commit decides.
 - Only `claude/*` branches auto-merge. `workflow_run` workflows are read from `main`, so a
   change to `auto-merge.yml` itself takes effect after it has been merged once.
+- Only a green local gate is pushed. A check that could not run here is named in the last
+  commit body (`NOT VERIFIED: train.py -- no GPU in this session`) and left to a manual run.
 
 ### Never commit
-- Secrets, `.env`, HF tokens.
 - Chat logs and datasets (`data/**`, `lora_dataset/`), weights (`*.safetensors`,
   `*.gguf`, `model_f16*/`, `outputs/`), `llama.cpp/`, `unsloth_compiled_cache/`.
 - `graft/` (regenerable), `__pycache__/`, virtualenvs, IDE folders.
-- A half-applied tree "to save progress". Use a branch.
