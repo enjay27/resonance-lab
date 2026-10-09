@@ -1,0 +1,20 @@
+#!/usr/bin/env python3
+"""Fake llama.cpp llama-quantize <f16 gguf> <out gguf> <type>."""
+
+import os
+import sys
+
+sys.path.insert(0, os.environ["MOCK_GPU_LIB"])
+import contract  # noqa: E402
+
+TOOL = "llama-quantize"
+
+contract.require(TOOL, len(sys.argv) == 4, f"usage: llama-quantize <in.gguf> <out.gguf> <type>; got {sys.argv[1:]}")
+source, target, kind = sys.argv[1:]
+contract.require(TOOL, kind == "Q4_K_M", f"type {kind!r}: resonance-stream's model is q4_k_m")
+contract.require(TOOL, os.path.isfile(source), f"input {source!r} does not exist")
+with open(source, "rb") as f:
+    contract.require(TOOL, f.read(4) == contract.GGUF_MAGIC, f"input {source!r} is not a GGUF file")
+contract.require(TOOL, os.path.isdir(os.path.dirname(os.path.abspath(target))), f"output folder of {target!r} does not exist")
+contract.write(target, contract.GGUF_MAGIC + b" mock q4_k_m\n")
+print(f"mock quantize {source} -> {target} ({kind})")
